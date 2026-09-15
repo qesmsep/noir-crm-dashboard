@@ -10,6 +10,7 @@
 export const MEMBER_STATUS_FILTERS = [
   'all',
   'active',
+  'processing',
   'payment_failed',
   'canceled',
   'paused',
@@ -21,11 +22,27 @@ export type MemberStatusFilter = (typeof MEMBER_STATUS_FILTERS)[number];
 export const MEMBER_STATUS_FILTER_LABELS: Record<MemberStatusFilter, string> = {
   all: 'All Status',
   active: 'Active',
+  processing: 'ACH Processing',
   payment_failed: 'Payment Failed',
   canceled: 'Canceled',
   paused: 'Paused',
   no_subscription: 'No Subscription',
 };
+
+/**
+ * Statuses that mean "this is a current, paying member".
+ *
+ * 'processing' is an ACH payment in flight: retry-payment.ts writes it when the
+ * payment intent is still clearing, and the Stripe webhook flips it back to
+ * 'active' once the funds land. MemberSubscriptionCard already renders it with
+ * the active styling and an "ACH PROCESSING" label. The members list treated it
+ * as not-active, which is why an ACH member on a live subscription disappeared
+ * from the Active view.
+ */
+export const ACTIVE_SUBSCRIPTION_STATUSES = ['active', 'processing', 'trialing'];
+
+/** Statuses that mean a payment is failing, independent of the failed-payments summary. */
+export const FAILING_SUBSCRIPTION_STATUSES = ['past_due', 'unpaid'];
 
 export interface FilterableAccount {
   account_id: string;
@@ -94,11 +111,16 @@ export function matchesStatusFilter(
     case 'all':
       return true;
     case 'active':
-      return status === 'active';
+      return !!status && ACTIVE_SUBSCRIPTION_STATUSES.includes(status);
+    case 'processing':
+      return status === 'processing';
     case 'paused':
       return status === 'paused';
     case 'payment_failed':
-      return failedPaymentAccounts.has(account.account_id);
+      return (
+        failedPaymentAccounts.has(account.account_id) ||
+        (!!status && FAILING_SUBSCRIPTION_STATUSES.includes(status))
+      );
     case 'canceled':
       return (
         isAccountCancelled(account) ||

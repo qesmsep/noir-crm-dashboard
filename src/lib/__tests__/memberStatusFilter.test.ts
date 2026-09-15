@@ -22,58 +22,78 @@ const account = (
 };
 
 describe('matchesStatusFilter', () => {
-  describe('account with no subscription status (the Ketterman case)', () => {
-    // Two active members, but the accounts row carries no subscription_status.
-    // Before the fix these matched none of the named filters, so the account
-    // was visible under "All Status" and nowhere else.
+  describe("the Ketterman case: an ACH payment in flight ('processing')", () => {
+    // Two active members on a live subscription paid by us_bank_account. The
+    // ACH payment was still clearing, so subscription_status read 'processing'
+    // -- a value no named filter tested for. The account matched none of them
+    // and was visible under "All Status" and nowhere else.
     const ketterman = account({
       account_id: 'acct_ketterman',
       allMembers: [{ status: 'active' }, { status: 'active' }],
-      subscription_status: null,
+      subscription_status: 'processing',
     });
 
     it('is visible under All Status', () => {
       expect(matchesStatusFilter(ketterman, 'all', ctx())).toBe(true);
     });
 
-    it('is visible under the No Subscription filter', () => {
-      expect(matchesStatusFilter(ketterman, 'no_subscription', ctx())).toBe(true);
+    it('is visible under Active -- an ACH payment clearing is still a member', () => {
+      expect(matchesStatusFilter(ketterman, 'active', ctx())).toBe(true);
     });
 
-    it('is reachable from at least one named filter', () => {
-      const named = MEMBER_STATUS_FILTERS.filter(f => f !== 'all');
-      const visibleUnder = named.filter(f => matchesStatusFilter(ketterman, f, ctx()));
-      expect(visibleUnder).not.toHaveLength(0);
+    it('is also visible under its own ACH Processing bucket', () => {
+      expect(matchesStatusFilter(ketterman, 'processing', ctx())).toBe(true);
     });
 
-    it('still does not claim to be active, paused, canceled or failing payment', () => {
-      for (const f of ['active', 'paused', 'canceled', 'payment_failed']) {
+    it('is not canceled, paused, failing payment, or subscription-less', () => {
+      for (const f of ['canceled', 'paused', 'payment_failed', 'no_subscription']) {
         expect(matchesStatusFilter(ketterman, f, ctx())).toBe(false);
+      }
+    });
+  });
+
+  describe('account with no subscription status at all', () => {
+    const abandoned = account({
+      account_id: 'acct_abandoned',
+      allMembers: [{ status: 'active' }],
+      subscription_status: null,
+    });
+
+    it('is reachable from the No Subscription bucket, not just All Status', () => {
+      expect(matchesStatusFilter(abandoned, 'all', ctx())).toBe(true);
+      expect(matchesStatusFilter(abandoned, 'no_subscription', ctx())).toBe(true);
+    });
+
+    it('does not claim to be active, processing, paused, canceled or failing', () => {
+      for (const f of ['active', 'processing', 'paused', 'canceled', 'payment_failed']) {
+        expect(matchesStatusFilter(abandoned, f, ctx())).toBe(false);
       }
     });
 
     it('treats an empty-string status the same as null', () => {
-      const empty = account({ subscription_status: '' });
-      expect(matchesStatusFilter(empty, 'no_subscription', ctx())).toBe(true);
+      expect(matchesStatusFilter(account({ subscription_status: '' }), 'no_subscription', ctx())).toBe(true);
     });
   });
 
   describe('active accounts', () => {
-    const active = account({ subscription_status: 'active' });
-
-    it('matches the Active filter and All Status', () => {
+    it('matches Active and All Status', () => {
+      const active = account({ subscription_status: 'active' });
       expect(matchesStatusFilter(active, 'active', ctx())).toBe(true);
       expect(matchesStatusFilter(active, 'all', ctx())).toBe(true);
     });
 
-    it('does not fall into the No Subscription bucket', () => {
-      expect(matchesStatusFilter(active, 'no_subscription', ctx())).toBe(false);
+    it('counts trialing as active', () => {
+      expect(matchesStatusFilter(account({ subscription_status: 'trialing' }), 'active', ctx())).toBe(true);
     });
 
-    it('stays out of No Subscription even if the summary endpoint flags it', () => {
-      expect(
-        matchesStatusFilter(active, 'no_subscription', ctx({ noSub: ['acct_1'] }))
-      ).toBe(false);
+    it('does not put an active account in the ACH Processing bucket', () => {
+      expect(matchesStatusFilter(account({ subscription_status: 'active' }), 'processing', ctx())).toBe(false);
+    });
+
+    it('does not fall into No Subscription, even if the summary endpoint flags it', () => {
+      const active = account({ subscription_status: 'active' });
+      expect(matchesStatusFilter(active, 'no_subscription', ctx())).toBe(false);
+      expect(matchesStatusFilter(active, 'no_subscription', ctx({ noSub: ['acct_1'] }))).toBe(false);
     });
   });
 
@@ -84,14 +104,11 @@ describe('matchesStatusFilter', () => {
     });
 
     it('matches canceled on subscription_status', () => {
-      expect(
-        matchesStatusFilter(account({ subscription_status: 'canceled' }), 'canceled', ctx())
-      ).toBe(true);
+      expect(matchesStatusFilter(account({ subscription_status: 'canceled' }), 'canceled', ctx())).toBe(true);
     });
 
     it('matches canceled on a scheduled cancellation', () => {
       const scheduled = account({
-        subscription_status: 'active',
         accounts: { subscription_status: 'active', subscription_cancel_at: '2026-12-01' },
       });
       expect(matchesStatusFilter(scheduled, 'canceled', ctx())).toBe(true);
@@ -102,15 +119,20 @@ describe('matchesStatusFilter', () => {
       expect(matchesStatusFilter(acct, 'payment_failed', ctx({ failed: ['acct_1'] }))).toBe(true);
       expect(matchesStatusFilter(acct, 'payment_failed', ctx())).toBe(false);
     });
+
+    it('matches payment_failed on past_due even with an empty failed-payments set', () => {
+      expect(
+        matchesStatusFilter(account({ subscription_status: 'past_due' }), 'payment_failed', ctx())
+      ).toBe(true);
+    });
   });
 
   describe('fully archived accounts', () => {
-    const archived = account({
-      subscription_status: 'canceled',
-      allMembers: [{ status: 'inactive' }, { status: 'inactive' }],
-    });
-
     it('is hidden from every filter except Canceled', () => {
+      const archived = account({
+        subscription_status: 'canceled',
+        allMembers: [{ status: 'inactive' }, { status: 'inactive' }],
+      });
       for (const f of MEMBER_STATUS_FILTERS) {
         expect(matchesStatusFilter(archived, f, ctx())).toBe(f === 'canceled');
       }
@@ -135,22 +157,37 @@ describe('matchesStatusFilter', () => {
     });
   });
 
-  it('never hides an account from All Status that a named filter would show', () => {
-    const cases: FilterableAccount[] = [
-      account({ subscription_status: 'active' }),
-      account({ subscription_status: 'paused' }),
-      account({ subscription_status: null }),
-      account({ subscription_status: '' }),
-      account({ subscription_status: 'incomplete' }),
-      account({ subscription_status: 'trialing' }),
+  describe('every status value reaches at least one named filter', () => {
+    // The statuses actually present in production on 2026-09-15 (active,
+    // canceled, paused, processing, null), plus the other values the Stripe
+    // webhook can write. A status matching no named filter is invisible
+    // everywhere except "All Status" -- that is the bug this module exists for.
+    const STATUSES: Array<string | null> = [
+      'active', 'canceled', 'paused', 'processing', null, '',
+      'trialing', 'past_due', 'unpaid',
     ];
-    for (const acct of cases) {
-      const shownSomewhere = MEMBER_STATUS_FILTERS.filter(f => f !== 'all').some(f =>
-        matchesStatusFilter(acct, f, ctx({ failed: [], noSub: [] }))
-      );
-      if (shownSomewhere) {
-        expect(matchesStatusFilter(acct, 'all', ctx())).toBe(true);
+
+    it.each(STATUSES.map(s => [s === null ? 'null' : s === '' ? '<empty>' : s, s] as const))(
+      'status %s is reachable from a named filter',
+      (_label, raw) => {
+        const acct = account({ subscription_status: raw });
+        const visibleUnder = MEMBER_STATUS_FILTERS.filter(
+          f => f !== 'all' && matchesStatusFilter(acct, f, ctx())
+        );
+        expect(visibleUnder.length).toBeGreaterThan(0);
       }
-    }
+    );
+
+    it('never hides from All Status an account a named filter would show', () => {
+      for (const raw of STATUSES) {
+        const acct = account({ subscription_status: raw });
+        const shownSomewhere = MEMBER_STATUS_FILTERS.some(
+          f => f !== 'all' && matchesStatusFilter(acct, f, ctx())
+        );
+        if (shownSomewhere) {
+          expect(matchesStatusFilter(acct, 'all', ctx())).toBe(true);
+        }
+      }
+    });
   });
 });
