@@ -3,6 +3,10 @@
 import { buffer } from 'micro';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import {
+  activateAccountAfterAchClears,
+  resolveAccountIdForCharge,
+} from '../../lib/achPaymentRecovery';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-08-16',
@@ -426,26 +430,41 @@ export default async function handler(req, res) {
           amount: charge.amount,
         });
 
+        // Resolve the account once, up front. The recovery below must run on
+        // every path out of this handler -- not just the one that finds a
+        // pending ledger row -- or the account stays stuck in 'processing'
+        // and monthly-billing.ts stops billing it.
+        const achAccountId = await resolveAccountIdForCharge(supabase, charge);
+
         // Check if ledger entry already has this charge_id (already updated)
         const { data: existingCharge } = await supabase
           .from('ledger')
           .select('id')
           .eq('stripe_charge_id', charge.id)
-          .single();
+          .maybeSingle();
 
         if (existingCharge) {
           console.log('Ledger entry already updated with charge:', charge.id);
+          // Still attempt the recovery: this is the path a redelivered webhook
+          // takes, and it is how an already-stranded account repairs itself.
+          const recovery = await activateAccountAfterAchClears(supabase, achAccountId);
+          if (recovery.activated) {
+            console.log('✅ Recovered account from "processing" to "active":', achAccountId);
+          } else if (recovery.reason === 'error') {
+            console.error('Error recovering account status:', recovery.error);
+          }
           return res.json({ success: true, message: 'Ledger entry already updated' });
         }
 
         // Find existing ledger entry by payment_intent_id and update it
         if (charge.payment_intent) {
+          // No `type` filter: billing.ts writes the dues row as type 'credit',
+          // so filtering on 'payment' here never matched a billing-cron charge.
           const { data: existingEntry, error: findError } = await supabase
             .from('ledger')
             .select('id, account_id')
-            .eq('stripe_payment_intent_id', charge.payment_intent)
-            .eq('type', 'payment')
-            .single();
+            .eq('ledger_entry_key', charge.payment_intent)
+            .maybeSingle();
 
           if (existingEntry) {
             // Update the existing entry: add stripe_charge_id and change status to 'cleared'
@@ -462,17 +481,15 @@ export default async function handler(req, res) {
               return res.status(500).json({ error: 'Failed to update ledger' });
             }
 
-            // Update account status from 'processing' to 'active' now that ACH payment cleared
-            const { error: accountUpdateError } = await supabase
-              .from('accounts')
-              .update({ subscription_status: 'active' })
-              .eq('account_id', existingEntry.account_id)
-              .eq('subscription_status', 'processing'); // Only update if still in processing state
-
-            if (accountUpdateError) {
-              console.error('Error updating account status:', accountUpdateError);
+            // Account status from 'processing' to 'active' now that ACH payment cleared
+            const recovery = await activateAccountAfterAchClears(
+              supabase,
+              existingEntry.account_id || achAccountId
+            );
+            if (recovery.reason === 'error') {
+              console.error('Error updating account status:', recovery.error);
               // Don't fail the entire webhook, just log the error
-            } else {
+            } else if (recovery.activated) {
               console.log('✅ Updated account status to "active" for account:', existingEntry.account_id);
             }
 
@@ -533,6 +550,18 @@ export default async function handler(req, res) {
         if (ledgerError) {
           console.error('Error adding ACH payment to ledger:', ledgerError);
           return res.status(500).json({ error: 'Failed to update ledger' });
+        }
+
+        // This is the path that used to strand accounts: it created the ledger
+        // row and returned without ever touching subscription_status.
+        const fallbackRecovery = await activateAccountAfterAchClears(
+          supabase,
+          account.account_id || achAccountId
+        );
+        if (fallbackRecovery.activated) {
+          console.log('✅ Updated account status to "active" for account:', account.account_id);
+        } else if (fallbackRecovery.reason === 'error') {
+          console.error('Error updating account status:', fallbackRecovery.error);
         }
 
         console.log('Successfully created new ledger entry for ACH payment:', account.account_id);
