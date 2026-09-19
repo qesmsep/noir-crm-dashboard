@@ -138,6 +138,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // closures, private events and capacity, so the flag grants nothing new.
     // available-slots is the public booking path, where a flag read off the
     // request body would be a way past the window for anyone who sends it.
+    //
+    // Either way this endpoint is display-only — it decides what the picker
+    // greys out, not what may be booked. The authorization boundary is
+    // POST /api/reservations, which verifies admin credentials properly.
     if (adminOverride !== 'true' && isPastDay(
       requestDate.toFormat('yyyy-MM-dd'),
       venueToday(timezone)

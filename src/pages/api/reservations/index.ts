@@ -216,7 +216,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // here keeps a past-dated guest request off the hold lookup and the
       // table scan below.
       if (body.start_time) {
-        const requestedStart = DateTime.fromISO(body.start_time).setZone(venueTimezone);
+        // Parsed *in* the venue zone rather than converted into it: an
+        // offset-aware start_time (what the booking forms send) is unaffected,
+        // and a bare one from some future caller is read as venue wall-clock
+        // instead of the server's, which is the bug this branch exists to fix.
+        const requestedStart = DateTime.fromISO(body.start_time, { zone: venueTimezone });
         if (!requestedStart.isValid) {
           return res.status(400).json({ error: 'Invalid start_time' });
         }

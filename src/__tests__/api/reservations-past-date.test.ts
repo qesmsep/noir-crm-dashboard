@@ -101,6 +101,26 @@ describe('POST /api/reservations past-date gate', () => {
     expect(mockFrom).not.toHaveBeenCalledWith('tables');
   });
 
+  it('reads a start_time without an offset as venue wall-clock', async () => {
+    // A caller that is not the booking form (a script, a webhook) may send a
+    // bare local time. Parsing it in the server's zone would shift the day.
+    const yesterdayBare = DateTime.now()
+      .setZone('America/Chicago')
+      .minus({ days: 1 })
+      .set({ hour: 20, minute: 0 })
+      .toFormat("yyyy-MM-dd'T'HH:mm:ss");
+
+    const { req, res, json } = createReqRes({
+      ...reservationBody(DateTime.now().toISO()!),
+      start_time: yesterdayBare,
+    });
+    await handler(req, res);
+
+    expect(json).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'DATE_IN_PAST' })
+    );
+  });
+
   it('lets a reservation later today through the gate', async () => {
     // Late enough in the venue day that the check cannot read it as past
     const laterToday = DateTime.now()
