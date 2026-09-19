@@ -208,19 +208,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
-      // A reservation can never be created for a day that has already passed at
-      // the venue. Checked here, before the hold lookup and the table scan, so
-      // a request for a past date is refused without paying for those queries.
-      // admin_override is still verified below; a caller that sets it without
-      // admin credentials is rejected there rather than slipping past this.
-      if (body.start_time && body.admin_override !== true) {
+      // A guest can never create a reservation for a day that has already
+      // passed at the venue. Staff can: a walk-in gets logged after the fact
+      // and a mistaken entry gets re-entered, so the gate turns on whether the
+      // caller is a verified admin rather than on a flag they send us. The
+      // verification only runs when the date is actually past, and running it
+      // here keeps a past-dated guest request off the hold lookup and the
+      // table scan below.
+      if (body.start_time) {
         const requestedStart = DateTime.fromISO(body.start_time).setZone(venueTimezone);
         if (!requestedStart.isValid) {
           return res.status(400).json({ error: 'Invalid start_time' });
         }
         const requestedDay = requestedStart.toFormat('yyyy-MM-dd');
         const todayAtVenue = DateTime.now().setZone(venueTimezone).toFormat('yyyy-MM-dd');
-        if (isPastDay(requestedDay, todayAtVenue)) {
+        if (isPastDay(requestedDay, todayAtVenue) && !(await verifyAdmin(req))) {
           console.warn('[PAST DATE] Rejected reservation for a past date:', { requestedDay, todayAtVenue });
           return res.status(400).json({
             error: 'That date has already passed. Please choose an upcoming date.',

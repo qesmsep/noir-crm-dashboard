@@ -17,8 +17,9 @@ jest.mock('../../lib/supabase', () => ({
   supabaseAdmin: { from: (...args: any[]) => mockFrom(...args) },
 }));
 
+const mockVerifyAdmin = jest.fn().mockResolvedValue(false);
 jest.mock('../../lib/admin-auth', () => ({
-  verifyAdmin: jest.fn().mockResolvedValue(false),
+  verifyAdmin: (...args: any[]) => mockVerifyAdmin(...args),
 }));
 
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -61,6 +62,7 @@ function reservationBody(startTime: string, extra: Record<string, any> = {}) {
 
 describe('POST /api/reservations past-date gate', () => {
   beforeEach(() => {
+    mockVerifyAdmin.mockResolvedValue(false);
     mockFrom.mockImplementation((table: string) => {
       if (table === 'locations') return locationsChain('America/Chicago');
       throw new Error(`Unexpected query on '${table}' — the past-date check should short-circuit first`);
@@ -115,7 +117,23 @@ describe('POST /api/reservations past-date gate', () => {
     );
   });
 
-  it('does not apply the gate to an admin override request', async () => {
+  it('lets a verified admin back-date a walk-in', async () => {
+    mockVerifyAdmin.mockResolvedValue(true);
+    const yesterday = DateTime.now()
+      .setZone('America/Chicago')
+      .minus({ days: 1 })
+      .set({ hour: 20, minute: 0 });
+
+    const { req, res, json } = createReqRes(reservationBody(yesterday.toISO()!));
+    await handler(req, res);
+
+    expect(json).not.toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'DATE_IN_PAST' })
+    );
+  });
+
+  it('is not satisfied by an admin_override flag without credentials', async () => {
+    mockVerifyAdmin.mockResolvedValue(false);
     const yesterday = DateTime.now()
       .setZone('America/Chicago')
       .minus({ days: 1 })
@@ -126,7 +144,7 @@ describe('POST /api/reservations past-date gate', () => {
     );
     await handler(req, res);
 
-    expect(json).not.toHaveBeenCalledWith(
+    expect(json).toHaveBeenCalledWith(
       expect.objectContaining({ code: 'DATE_IN_PAST' })
     );
   });

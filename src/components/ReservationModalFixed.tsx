@@ -281,6 +281,18 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
         }
         headers['Authorization'] = `Bearer ${session.access_token}`;
         console.log('[ADMIN OVERRIDE] Authorization header added');
+      } else {
+        // Attached on the ordinary path too, so the server can tell staff from
+        // a guest and still accept a back-dated manual entry. Best effort: a
+        // missing session only costs that, it does not block the booking.
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            headers['Authorization'] = `Bearer ${session.access_token}`;
+          }
+        } catch (sessionError) {
+          console.warn('Could not attach admin session to reservation request:', sessionError);
+        }
       }
 
       const response = await fetch('/api/reservations', {
