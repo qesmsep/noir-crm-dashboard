@@ -1,6 +1,7 @@
 import { DateTime, Settings } from 'luxon';
 import {
   calendarDayToDate,
+  venueDateTime,
   earliestBookableDay,
   isPastDay,
   isWithinBookingWindow,
@@ -40,6 +41,27 @@ describe('bookingDays', () => {
 
     it('round-trips through calendarDayToDate', () => {
       expect(toCalendarDay(calendarDayToDate('2026-09-24'))).toBe('2026-09-24');
+    });
+  });
+
+  describe('venueDateTime', () => {
+    it('keeps the reservation on the day the picker showed', () => {
+      const picked = new Date(2026, 8, 25); // local midnight, September 25
+      const start = venueDateTime(picked, 20, 30, 'America/Chicago');
+      expect(start.toFormat('yyyy-MM-dd HH:mm')).toBe('2026-09-25 20:30');
+      expect(start.zoneName).toBe('America/Chicago');
+    });
+
+    it('does not slip a day for a guest booking from a zone ahead of the venue', () => {
+      // A browser in Europe/Berlin: local midnight on the 25th is 5pm on the
+      // 24th in Chicago, so reprojecting the instant would book the wrong day.
+      const berlinMidnight = DateTime.fromISO('2026-09-25T00:00', { zone: 'Europe/Berlin' });
+      expect(
+        DateTime.fromJSDate(berlinMidnight.toJSDate(), { zone: 'America/Chicago' }).toFormat('yyyy-MM-dd')
+      ).toBe('2026-09-24');
+
+      const picked = new Date(2026, 8, 25); // what that browser's picker hands back
+      expect(venueDateTime(picked, 20, 30, 'America/Chicago').toFormat('yyyy-MM-dd')).toBe('2026-09-25');
     });
   });
 

@@ -12,8 +12,10 @@ import {
   calendarDayToDate,
   earliestBookableDay,
   isWithinBookingWindow,
+  isPastDay,
   toBookingDay,
   toCalendarDay,
+  venueDateTime,
   venueToday,
 } from '@/utils/bookingDays';
 import type { LocationHours, WeeklyHours } from '@/types/hours';
@@ -211,7 +213,10 @@ const getHoursForDate = (date: Date, locationHours: LocationHours | null): Array
 
   try {
     const timezone = locationHours.timezone || 'America/Chicago';
-    const dt = DateTime.fromJSDate(date, { zone: timezone });
+    // Anchored on the picked calendar day, not the instant — reprojecting
+    // browser-local midnight into the venue zone can land on the day before
+    // and look up the wrong day's hours.
+    const dt = DateTime.fromISO(toCalendarDay(date), { zone: timezone });
     const dayOfWeek = dt.weekday % 7; // Luxon: 1=Monday, 7=Sunday -> convert to 0=Sunday, 6=Saturday
     const dayName = dt.toFormat('EEEE').toLowerCase(); // "thursday", "friday", etc.
 
@@ -327,8 +332,7 @@ export default function SimpleReservationRequestModal({
       if (period === 'PM' && hour !== 12) hour += 12;
       else if (period === 'AM' && hour === 12) hour = 0;
 
-      const start = DateTime.fromJSDate(date, { zone: locationTimezone })
-        .set({ hour, minute, second: 0, millisecond: 0 });
+      const start = venueDateTime(date, hour, minute, locationTimezone);
       if (!start.isValid) return null;
       const end = start.plus({ hours: reservationDuration });
       if (!end.isValid) return null;
@@ -786,8 +790,7 @@ export default function SimpleReservationRequestModal({
         hour = 0;
       }
 
-      const startDateTime = DateTime.fromJSDate(date!, { zone: locationTimezone })
-        .set({ hour, minute, second: 0, millisecond: 0 });
+      const startDateTime = venueDateTime(date!, hour, minute, locationTimezone);
 
       const endDateTime = startDateTime.plus({ hours: reservationDuration });
 
@@ -983,8 +986,7 @@ export default function SimpleReservationRequestModal({
             hour = 0;
           }
 
-          const startDateTime = DateTime.fromJSDate(date, { zone: locationTimezone })
-            .set({ hour, minute, second: 0, millisecond: 0 });
+          const startDateTime = venueDateTime(date, hour, minute, locationTimezone);
 
           const reservationDate = startDateTime.toFormat('MMMM d, yyyy');
           const locationName = selectedLocation === 'rooftopkc' ? 'RooftopKC' : 'Noir KC';
@@ -1040,8 +1042,7 @@ export default function SimpleReservationRequestModal({
         hour = 0;
       }
 
-      const startDateTime = DateTime.fromJSDate(date, { zone: locationTimezone })
-        .set({ hour, minute, second: 0, millisecond: 0 });
+      const startDateTime = venueDateTime(date, hour, minute, locationTimezone);
 
       // End time is based on location's default reservation duration
       const endDateTime = startDateTime.plus({ hours: reservationDuration });
@@ -1175,7 +1176,7 @@ export default function SimpleReservationRequestModal({
       if (!adminOverride) {
         // A day that has already passed at the venue is never bookable,
         // whatever timezone the guest's device is set to
-        if (day < venueToday(locationTimezone)) {
+        if (isPastDay(day, venueToday(locationTimezone))) {
           return false;
         }
         if (!isWithinBookingWindow(day, bookingStartDay, bookingEndDay)) {
@@ -1187,7 +1188,10 @@ export default function SimpleReservationRequestModal({
       // Skip if hours are still loading
       if (!loadingHours) {
         // For dates in different weeks, we need to check the appropriate week's data
-        const dateWeekSunday = getSundayOfWeek(date, locationTimezone);
+        const dateWeekSunday = getSundayOfWeek(
+          DateTime.fromISO(day, { zone: locationTimezone }),
+          locationTimezone
+        );
         const weeklyHoursForDateWeek = weeklyHoursMap.get(dateWeekSunday) || null;
 
         // Create a temporary locationHours object with the correct week's data

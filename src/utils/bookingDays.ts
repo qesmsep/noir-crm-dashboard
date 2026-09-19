@@ -41,6 +41,25 @@ export function toBookingDay(
   return parsed.isValid ? parsed.toFormat('yyyy-MM-dd') : null;
 }
 
+/**
+ * The venue-local instant for a day the guest picked plus a time they chose.
+ *
+ * `DateTime.fromJSDate(picked, { zone })` would reproject the *instant* — for a
+ * guest whose browser is hours ahead of the venue, midnight on the picked day
+ * lands the evening before at the venue, and the reservation is written to the
+ * wrong calendar day. Anchoring on the calendar day keeps the booking on the
+ * day the picker showed, whatever zone the guest is in.
+ */
+export function venueDateTime(
+  picked: Date,
+  hour: number,
+  minute: number,
+  timezone: string = VENUE_DEFAULT_TIMEZONE
+): DateTime {
+  return DateTime.fromISO(toCalendarDay(picked), { zone: timezone })
+    .set({ hour, minute, second: 0, millisecond: 0 });
+}
+
 /** A day that has already passed at the venue can never be booked. */
 export function isPastDay(day: string, today: string): boolean {
   return day < today;

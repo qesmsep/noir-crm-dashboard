@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
+import { isPastDay } from '../../utils/bookingDays';
 import {
   calcPeakConcurrentGuests,
   fetchOccupancyReservations,
@@ -131,7 +132,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // A day that has already passed at the venue is never bookable. Returned
     // as a full-day block so the picker greys it out the same way it greys a
     // closure, and so a hand-crafted request can't get slots back for it.
-    if (adminOverride !== 'true' && requestDate.toFormat('yyyy-MM-dd') < DateTime.now().setZone(timezone).toFormat('yyyy-MM-dd')) {
+    if (adminOverride !== 'true' && isPastDay(
+      requestDate.toFormat('yyyy-MM-dd'),
+      DateTime.now().setZone(timezone).toFormat('yyyy-MM-dd')
+    )) {
       return res.status(200).json({
         date,
         blockedTimeRanges: [{
