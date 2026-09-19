@@ -54,9 +54,6 @@ export async function POST(request: Request) {
     if (DEBUG) console.log('🚨 Environment check - URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Present' : 'Missing');
     if (DEBUG) console.log('🚨 DEPLOYMENT TIMESTAMP:', new Date().toISOString());
 
-    // date should already be in YYYY-MM-DD format from frontend
-    const dateStr = typeof date === 'string' ? date : new Date(date).toISOString().slice(0, 10);
-
     // Get location_id if location slug is provided
     let locationId: string | null = null;
     let venueTimezone = VENUE_DEFAULT_TIMEZONE;
@@ -72,6 +69,14 @@ export async function POST(request: Request) {
         venueTimezone = locationData.timezone || venueTimezone;
       }
     }
+
+    // The frontend always sends a yyyy-MM-dd string; anything else is read as
+    // an instant and resolved to the day it falls on *at the venue*, rather
+    // than sliced off a UTC ISO string, which is the bug this file was just
+    // rewritten to avoid.
+    const dateStr = typeof date === 'string'
+      ? date
+      : DateTime.fromJSDate(new Date(date)).setZone(venueTimezone).toFormat('yyyy-MM-dd');
 
     // A day that has already passed at the venue has no slots, whatever the
     // caller's clock says

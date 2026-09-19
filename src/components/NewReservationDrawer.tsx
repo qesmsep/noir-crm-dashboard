@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { adminRequestHeaders } from '../lib/adminRequestHeaders';
 import {
   Sheet,
   SheetContent,
@@ -212,18 +212,7 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
 
 
 
-      // Sent so the server can tell an admin from a guest: a back-dated entry
-      // (a walk-in logged after the fact, a mistaken entry re-entered) is
-      // refused for guests and allowed for staff.
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session?.access_token) {
-          headers['Authorization'] = `Bearer ${session.access_token}`;
-        }
-      } catch (sessionError) {
-        console.warn('Could not attach admin session to reservation request:', sessionError);
-      }
+      const headers = await adminRequestHeaders();
 
       const response = await fetch('/api/reservations', {
         method: 'POST',
