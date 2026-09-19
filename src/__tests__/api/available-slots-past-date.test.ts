@@ -56,6 +56,14 @@ describe('POST /api/available-slots past-date gate', () => {
     expect(mockFrom).not.toHaveBeenCalledWith('settings');
   });
 
+  it('refuses a date it cannot parse rather than comparing a bad string', async () => {
+    const response = await POST(request({ date: { nonsense: true }, party_size: 2, location: 'rooftopkc' }));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid date' });
+    expect(mockFrom).not.toHaveBeenCalledWith('settings');
+  });
+
   it('reads the venue day rather than the server day', async () => {
     // A server running in UTC is already on the next calendar day for part of
     // the evening in Chicago, which would wrongly reject the venue's today.

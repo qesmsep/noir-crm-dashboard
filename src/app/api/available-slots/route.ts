@@ -78,6 +78,12 @@ export async function POST(request: Request) {
       ? date
       : DateTime.fromJSDate(new Date(date)).setZone(venueTimezone).toFormat('yyyy-MM-dd');
 
+    // An unparseable date yields Luxon's 'Invalid DateTime', which would then
+    // be string-compared against real days below and answer by accident.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+    }
+
     // A day that has already passed at the venue has no slots, whatever the
     // caller's clock says
     if (isPastDay(dateStr, venueToday(venueTimezone))) {
