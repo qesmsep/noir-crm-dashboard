@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/useToast';
 import { localInputToUTC, dateToLocalInput } from '../utils/dateUtils';
 import { useSettings } from '../context/SettingsContext';
 import { supabase } from '../lib/supabase';
+import { adminRequestHeaders } from '../lib/adminRequestHeaders';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -265,22 +266,19 @@ const ReservationModalFixed: React.FC<ReservationModalProps> = ({
         console.log('[ADMIN OVERRIDE] Creating reservation during private event');
       }
 
-      // Get the session for authentication if we need admin override
-      const headers: HeadersInit = { 'Content-Type': 'application/json' };
-      if (isPrivateEventOverride) {
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        if (sessionError || !session) {
-          console.error('[ADMIN OVERRIDE] Failed to get session:', sessionError);
-          toast({
-            title: 'Authentication Error',
-            description: 'Unable to verify admin credentials. Please refresh and try again.',
-            status: 'error',
-            duration: 5000,
-          });
-          return;
-        }
-        headers['Authorization'] = `Bearer ${session.access_token}`;
-        console.log('[ADMIN OVERRIDE] Authorization header added');
+      // Sent on every path so the server can tell staff from a guest. A
+      // private-event override *requires* the credentials, so that path fails
+      // loudly when there is no session rather than being silently refused.
+      const headers = await adminRequestHeaders();
+      if (isPrivateEventOverride && !headers['Authorization']) {
+        console.error('[ADMIN OVERRIDE] No admin session available');
+        toast({
+          title: 'Authentication Error',
+          description: 'Unable to verify admin credentials. Please refresh and try again.',
+          status: 'error',
+          duration: 5000,
+        });
+        return;
       }
 
       const response = await fetch('/api/reservations', {

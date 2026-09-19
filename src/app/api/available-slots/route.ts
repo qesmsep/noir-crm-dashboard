@@ -7,6 +7,7 @@ import {
   getLocationCapacity,
 } from '../../../lib/capacity';
 import { fetchActiveHolds } from '../../../lib/holds';
+import { isPastDay, isWithinBookingWindow, toBookingDay, venueToday, VENUE_DEFAULT_TIMEZONE } from '../../../utils/bookingDays';
 
 // Enable debug by default to help diagnose issues
 const DEBUG = process.env.DEBUG_AVAILABLE_SLOTS === '1' || process.env.NEXT_PUBLIC_DEBUG_AVAILABLE_SLOTS === '1' || true;
@@ -53,26 +54,49 @@ export async function POST(request: Request) {
     if (DEBUG) console.log('🚨 Environment check - URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'Present' : 'Missing');
     if (DEBUG) console.log('🚨 DEPLOYMENT TIMESTAMP:', new Date().toISOString());
 
-    // date should already be in YYYY-MM-DD format from frontend
-    const dateStr = typeof date === 'string' ? date : new Date(date).toISOString().slice(0, 10);
-
     // Get location_id if location slug is provided
     let locationId: string | null = null;
+    let venueTimezone = VENUE_DEFAULT_TIMEZONE;
     if (location && typeof location === 'string') {
       const { data: locationData, error: locationError } = await supabase
         .from('locations')
-        .select('id')
+        .select('id, timezone')
         .eq('slug', location)
         .single();
 
       if (!locationError && locationData) {
         locationId = locationData.id;
+        venueTimezone = locationData.timezone || venueTimezone;
       }
+    }
+
+    // The frontend always sends a yyyy-MM-dd string; anything else is read as
+    // an instant and resolved to the day it falls on *at the venue*, rather
+    // than sliced off a UTC ISO string, which is the bug this file was just
+    // rewritten to avoid.
+    const dateStr = typeof date === 'string'
+      ? date
+      : DateTime.fromJSDate(new Date(date)).setZone(venueTimezone).toFormat('yyyy-MM-dd');
+
+    // An unparseable date yields Luxon's 'Invalid DateTime', which would then
+    // be string-compared against real days below and answer by accident.
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return NextResponse.json({ error: 'Invalid date' }, { status: 400 });
+    }
+
+    // A day that has already passed at the venue has no slots, whatever the
+    // caller's clock says
+    if (isPastDay(dateStr, venueToday(venueTimezone))) {
+      if (DEBUG) console.log('Requested date is in the past at the venue:', { dateStr, venueTimezone });
+      return NextResponse.json({ slots: [] });
     }
     
     // 0. Check if date is within booking window (location-specific with global fallback)
-    let bookingStart: Date | null = null;
-    let bookingEnd: Date | null = null;
+    // Held as venue calendar days (yyyy-MM-dd): `new Date('2026-09-24')` is
+    // midnight UTC, which is the evening of the 23rd in Central, and shifted
+    // both edges of the window by a day.
+    let bookingStart: string | null = null;
+    let bookingEnd: string | null = null;
 
     // Fetch global settings
     const { data: settingsData } = await supabase
@@ -92,8 +116,8 @@ export async function POST(request: Request) {
       const effectiveStart = locationData?.booking_start_date || settingsData?.booking_start_date;
       const effectiveEnd = locationData?.booking_end_date || settingsData?.booking_end_date;
 
-      bookingStart = effectiveStart ? new Date(effectiveStart) : null;
-      bookingEnd = effectiveEnd ? new Date(effectiveEnd) : null;
+      bookingStart = toBookingDay(effectiveStart, venueTimezone);
+      bookingEnd = toBookingDay(effectiveEnd, venueTimezone);
 
       if (DEBUG) console.log('Using location-specific booking window:', {
         locationBooking: { start: locationData?.booking_start_date, end: locationData?.booking_end_date },
@@ -102,21 +126,22 @@ export async function POST(request: Request) {
       });
     } else {
       // No location specified: use global settings
-      bookingStart = settingsData?.booking_start_date ? new Date(settingsData.booking_start_date) : null;
-      bookingEnd = settingsData?.booking_end_date ? new Date(settingsData.booking_end_date) : null;
+      bookingStart = toBookingDay(settingsData?.booking_start_date, venueTimezone);
+      bookingEnd = toBookingDay(settingsData?.booking_end_date, venueTimezone);
 
       if (DEBUG) console.log('Using global booking window:', { start: bookingStart, end: bookingEnd });
     }
 
     // Check if requested date is within the effective booking window
-    const reqDate = new Date(dateStr + 'T00:00:00');
-    if ((bookingStart && reqDate < bookingStart) || (bookingEnd && reqDate > bookingEnd)) {
+    if (!isWithinBookingWindow(dateStr, bookingStart, bookingEnd)) {
       if (DEBUG) console.log('Date outside booking window:', { dateStr, bookingStart, bookingEnd });
       return NextResponse.json({ slots: [] });
     }
     
     // 1. Check if the venue is open on this date
-    const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+    // Read in the venue's zone rather than from an implicitly-local parse, so
+    // it cannot drift with wherever this runs (Luxon: 1=Mon..7=Sun -> 0=Sun)
+    const dayOfWeek = DateTime.fromISO(dateStr, { zone: venueTimezone }).weekday % 7;
     
     if (DEBUG) console.log('Checking venue hours for:', { dateStr, dayOfWeek });
     

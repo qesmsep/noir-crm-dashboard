@@ -1,4 +1,5 @@
 import { DateTime } from 'luxon';
+import { toCalendarDay } from './bookingDays';
 
 // Default timezone - will be overridden by settings
 const DEFAULT_TIMEZONE = 'America/Chicago';
@@ -199,7 +200,11 @@ export function createDateTimeFromTimeString(timeString: string | null | undefin
     [hours, minutes] = timeString.split(':').map(Number);
   }
 
-  const baseDate = DateTime.fromJSDate(date).setZone(timezone);
+  // Anchored on the calendar day the caller picked. `DateTime.fromJSDate(date)
+  // .setZone(timezone)` reprojects the *instant*: browser-local midnight for a
+  // guest east of the venue — anywhere from US Eastern outward — lands the
+  // previous evening at the venue, and the time is then set on the wrong day.
+  const baseDate = DateTime.fromISO(toCalendarDay(date), { zone: timezone });
   return baseDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
 }
 

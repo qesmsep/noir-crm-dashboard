@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminRequestHeaders } from '../lib/adminRequestHeaders';
 import {
   Modal,
   ModalOverlay,
@@ -200,9 +201,11 @@ const ReservationModal: React.FC<ReservationModalProps> = ({
         source: 'manual'
       };
 
+      const headers = await adminRequestHeaders();
+
       const response = await fetch('/api/reservations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(reservationData),
       });
 

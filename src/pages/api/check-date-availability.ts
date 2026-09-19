@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
+import { isPastDay, venueToday } from '../../utils/bookingDays';
 import {
   calcPeakConcurrentGuests,
   fetchOccupancyReservations,
@@ -125,6 +126,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({
         error: 'Invalid date or timezone',
         details: requestDate.invalidReason
+      });
+    }
+
+    // A day that has already passed at the venue is never bookable. Returned
+    // as a full-day block so the picker greys it out the same way it greys a
+    // closure, and so a hand-crafted request can't get slots back for it.
+    //
+    // This honours `adminOverride` where /api/available-slots does not: the
+    // surfaces that pass it here are admin-rendered and already use it to skip
+    // closures, private events and capacity, so the flag grants nothing new.
+    // available-slots is the public booking path, where a flag read off the
+    // request body would be a way past the window for anyone who sends it.
+    //
+    // Either way this endpoint is display-only — it decides what the picker
+    // greys out, not what may be booked. The authorization boundary is
+    // POST /api/reservations, which verifies admin credentials properly.
+    if (adminOverride !== 'true' && isPastDay(
+      requestDate.toFormat('yyyy-MM-dd'),
+      venueToday(timezone)
+    )) {
+      return res.status(200).json({
+        date,
+        blockedTimeRanges: [{
+          id: 'past-date',
+          title: 'Date has passed',
+          startTime: '12:00 AM',
+          endTime: '11:59 PM',
+          startHour: 0,
+          startMinute: 0,
+          endHour: 23,
+          endMinute: 59,
+          reason: 'past_date',
+        }],
       });
     }
 

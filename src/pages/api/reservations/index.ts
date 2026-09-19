@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
+import { isPastDay, venueToday, VENUE_DEFAULT_TIMEZONE } from '../../../utils/bookingDays';
 import { verifyAdmin } from '../../../lib/admin-auth';
 import {
   checkReservationCapacity,
@@ -173,13 +174,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Get location ID if location_slug is provided
       let locationId: string | null = null;
+      let venueTimezone = VENUE_DEFAULT_TIMEZONE;
       if (body.location_slug) {
         const { data: locationData } = await client
           .from('locations')
-          .select('id')
+          .select('id, timezone')
           .eq('slug', body.location_slug)
           .single();
         locationId = locationData?.id || null;
+        venueTimezone = locationData?.timezone || venueTimezone;
       } else if (body.private_event_id) {
         // For RSVP reservations, inherit location from the private event
         console.log('[RSVP Location] Fetching location_id from private_event:', body.private_event_id);
@@ -190,6 +193,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .single();
         locationId = eventData?.location_id || null;
         console.log('[RSVP Location] Inherited location_id:', locationId);
+
+        // The RSVP path resolves its location from the event rather than a
+        // slug, so the timezone has to be looked up separately. Without this
+        // it silently falls back to the default and the past-date check below
+        // would read the wrong day the moment a venue outside Central exists.
+        if (locationId) {
+          const { data: eventLocation } = await client
+            .from('locations')
+            .select('timezone')
+            .eq('id', locationId)
+            .single();
+          venueTimezone = eventLocation?.timezone || venueTimezone;
+        }
+      }
+
+      // A guest can never create a reservation for a day that has already
+      // passed at the venue. Staff can: a walk-in gets logged after the fact
+      // and a mistaken entry gets re-entered, so the gate turns on whether the
+      // caller is a verified admin rather than on a flag they send us. The
+      // verification only runs when the date is actually past, and running it
+      // here keeps a past-dated guest request off the hold lookup and the
+      // table scan below.
+      if (body.start_time) {
+        // Parsed *in* the venue zone rather than converted into it: an
+        // offset-aware start_time (what the booking forms send) is unaffected,
+        // and a bare one from some future caller is read as venue wall-clock
+        // instead of the server's, which is the bug this branch exists to fix.
+        const requestedStart = DateTime.fromISO(body.start_time, { zone: venueTimezone });
+        if (!requestedStart.isValid) {
+          return res.status(400).json({ error: 'Invalid start_time' });
+        }
+        const requestedDay = requestedStart.toFormat('yyyy-MM-dd');
+        const todayAtVenue = venueToday(venueTimezone);
+        if (isPastDay(requestedDay, todayAtVenue) && !(await verifyAdmin(req))) {
+          console.warn('[PAST DATE] Rejected reservation for a past date:', { requestedDay, todayAtVenue });
+          return res.status(400).json({
+            error: 'That date has already passed. Please choose an upcoming date.',
+            code: 'DATE_IN_PAST',
+          });
+        }
       }
 
       // Redeem the checkout hold, if the guest has one. The held table wins over

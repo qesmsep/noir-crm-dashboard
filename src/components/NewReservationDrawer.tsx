@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { adminRequestHeaders } from '../lib/adminRequestHeaders';
 import {
   Sheet,
   SheetContent,
@@ -211,9 +212,11 @@ const NewReservationDrawer: React.FC<NewReservationDrawerProps> = ({
 
 
 
+      const headers = await adminRequestHeaders();
+
       const response = await fetch('/api/reservations', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(reservationData),
       });
 

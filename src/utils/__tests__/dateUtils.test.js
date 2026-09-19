@@ -1,4 +1,4 @@
-import { toUTC, fromUTC, formatDateTime, localInputToUTC } from '../dateUtils.ts';
+import { toUTC, fromUTC, formatDateTime, localInputToUTC, createDateTimeFromTimeString } from '../dateUtils.ts';
 
 describe('dateUtils', () => {
   describe('toUTC', () => {
@@ -40,6 +40,30 @@ describe('dateUtils', () => {
 
       expect(result).toBeDefined();
       expect(typeof result).toBe('string');
+    });
+  });
+
+  describe('createDateTimeFromTimeString', () => {
+    it('sets the time on the calendar day that was picked', () => {
+      const picked = new Date(2026, 8, 25); // local midnight, September 25
+      const start = createDateTimeFromTimeString('7:30pm', 'America/Chicago', picked);
+
+      expect(start.toFormat('yyyy-MM-dd HH:mm')).toBe('2026-09-25 19:30');
+      expect(start.zoneName).toBe('America/Chicago');
+    });
+
+    it('does not slip to the previous day for a guest east of the venue', () => {
+      // Reprojecting the instant put a guest one hour east of Central onto the
+      // venue's previous day, which the reservation past-date check then
+      // refuses. 24-hour input takes the same path.
+      const picked = new Date(2026, 8, 25);
+      const start = createDateTimeFromTimeString('19:30', 'America/Chicago', picked);
+
+      expect(start.toFormat('yyyy-MM-dd')).toBe('2026-09-25');
+    });
+
+    it('returns null without a time string', () => {
+      expect(createDateTimeFromTimeString(null, 'America/Chicago', new Date())).toBeNull();
     });
   });
 
