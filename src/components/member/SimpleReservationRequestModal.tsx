@@ -1222,11 +1222,18 @@ export default function SimpleReservationRequestModal({
   // Picker bounds, built from venue calendar days so that react-datepicker —
   // which compares against midnight in the *browser's* zone — never offers a
   // day the venue has already passed.
+  // An admin recording a walk-in after the fact needs to reach a past day, so
+  // the bounds are left off entirely for them — filterDate already skips the
+  // past-day and booking-window checks on the same flag.
   const todayAtVenue = venueToday(locationTimezone);
-  const minDate = calendarDayToDate(earliestBookableDay(todayAtVenue, bookingStartDay));
-  const maxDate = bookingEndDay
-    ? calendarDayToDate(bookingEndDay)
-    : DateTime.fromISO(todayAtVenue).plus({ days: 30 }).startOf('day').toJSDate();
+  const minDate = adminOverride
+    ? undefined
+    : calendarDayToDate(earliestBookableDay(todayAtVenue, bookingStartDay));
+  const maxDate = adminOverride
+    ? undefined
+    : bookingEndDay
+      ? calendarDayToDate(bookingEndDay)
+      : DateTime.fromISO(todayAtVenue).plus({ days: 30 }).startOf('day').toJSDate();
 
   if (!isOpen) return null;
 
