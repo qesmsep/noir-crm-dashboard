@@ -128,6 +128,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
 
+    // A day that has already passed at the venue is never bookable. Returned
+    // as a full-day block so the picker greys it out the same way it greys a
+    // closure, and so a hand-crafted request can't get slots back for it.
+    if (adminOverride !== 'true' && requestDate.toFormat('yyyy-MM-dd') < DateTime.now().setZone(timezone).toFormat('yyyy-MM-dd')) {
+      return res.status(200).json({
+        date,
+        blockedTimeRanges: [{
+          id: 'past-date',
+          title: 'Date has passed',
+          startTime: '12:00 AM',
+          endTime: '11:59 PM',
+          startHour: 0,
+          startMinute: 0,
+          endHour: 23,
+          endMinute: 59,
+          reason: 'past_date',
+        }],
+      });
+    }
+
     // Check for exceptional closures first
     let closuresQuery = supabase
       .from('venue_hours')

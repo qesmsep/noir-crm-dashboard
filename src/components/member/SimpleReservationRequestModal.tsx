@@ -8,6 +8,14 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { supabase } from '@/lib/supabase';
 import { getSundayOfWeek } from '@/utils/dateUtils';
+import {
+  calendarDayToDate,
+  earliestBookableDay,
+  isWithinBookingWindow,
+  toBookingDay,
+  toCalendarDay,
+  venueToday,
+} from '@/utils/bookingDays';
 import type { LocationHours, WeeklyHours } from '@/types/hours';
 import { useReservationHold } from '@/hooks/useReservationHold';
 import HoldCountdown from '@/components/HoldCountdown';
@@ -288,9 +296,9 @@ export default function SimpleReservationRequestModal({
   // Reservation duration state
   const [reservationDuration, setReservationDuration] = useState(2.0);
 
-  // Booking window state
-  const [bookingStartDate, setBookingStartDate] = useState<Date | null>(null);
-  const [bookingEndDate, setBookingEndDate] = useState<Date | null>(null);
+  // Booking window state, held as calendar days (yyyy-MM-dd) at the venue
+  const [bookingStartDay, setBookingStartDay] = useState<string | null>(null);
+  const [bookingEndDay, setBookingEndDay] = useState<string | null>(null);
 
   // Payment state for non-members
   const [showPayment, setShowPayment] = useState(false);
@@ -454,8 +462,11 @@ export default function SimpleReservationRequestModal({
         const effectiveEnd = locationData?.booking_end_date || settingsData?.booking_end_date;
         const effectiveTimezone = locationData?.timezone || 'America/Chicago';
 
-        setBookingStartDate(effectiveStart ? new Date(effectiveStart) : null);
-        setBookingEndDate(effectiveEnd ? new Date(effectiveEnd) : null);
+        // Parsed as venue calendar days. `new Date('2026-09-24')` is midnight
+        // UTC — the evening of the 23rd in Central — which shifted both edges
+        // of the window by a day.
+        setBookingStartDay(toBookingDay(effectiveStart, effectiveTimezone));
+        setBookingEndDay(toBookingDay(effectiveEnd, effectiveTimezone));
         setLocationTimezone(effectiveTimezone);
 
         console.log('📅 [SimpleReservationModal] Booking window:', {
@@ -1158,12 +1169,16 @@ export default function SimpleReservationRequestModal({
 
   const filterDate = useCallback((date: Date) => {
     try {
-      // Check if date is within booking window (skip for admin override)
+      // The day the guest tapped, as a venue calendar day
+      const day = toCalendarDay(date);
+
       if (!adminOverride) {
-        if (bookingStartDate && date < bookingStartDate) {
+        // A day that has already passed at the venue is never bookable,
+        // whatever timezone the guest's device is set to
+        if (day < venueToday(locationTimezone)) {
           return false;
         }
-        if (bookingEndDate && date > bookingEndDate) {
+        if (!isWithinBookingWindow(day, bookingStartDay, bookingEndDay)) {
           return false;
         }
       }
@@ -1189,8 +1204,7 @@ export default function SimpleReservationRequestModal({
       }
 
       // Check if date is blocked (closure or private event)
-      const dateStr = DateTime.fromJSDate(date, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
-      if (blockedDates.has(dateStr)) {
+      if (blockedDates.has(day)) {
         return false;
       }
 
@@ -1199,19 +1213,16 @@ export default function SimpleReservationRequestModal({
       console.error('Error filtering date:', error);
       return false; // Safer to block date on error
     }
-  }, [adminOverride, bookingStartDate, bookingEndDate, loadingHours, weeklyHoursMap, locationHours, locationTimezone, blockedDates]);
+  }, [adminOverride, bookingStartDay, bookingEndDay, loadingHours, weeklyHoursMap, locationHours, locationTimezone, blockedDates]);
 
-  // Use booking window dates if available, otherwise fall back to defaults
-  // Ensure minDate is never in the past (use location's timezone for consistency)
-  const today = DateTime.now().setZone(locationTimezone).startOf('day').toJSDate();
-  const minDate = bookingStartDate
-    ? new Date(Math.max(bookingStartDate.getTime(), today.getTime()))
-    : today;
-  const maxDate = bookingEndDate || (() => {
-    const fallback = new Date();
-    fallback.setDate(fallback.getDate() + 30);
-    return fallback;
-  })();
+  // Picker bounds, built from venue calendar days so that react-datepicker —
+  // which compares against midnight in the *browser's* zone — never offers a
+  // day the venue has already passed.
+  const todayAtVenue = venueToday(locationTimezone);
+  const minDate = calendarDayToDate(earliestBookableDay(todayAtVenue, bookingStartDay));
+  const maxDate = bookingEndDay
+    ? calendarDayToDate(bookingEndDay)
+    : DateTime.fromISO(todayAtVenue).plus({ days: 30 }).startOf('day').toJSDate();
 
   if (!isOpen) return null;
 
