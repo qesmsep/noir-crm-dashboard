@@ -42,6 +42,17 @@ export function toBookingDay(
 }
 
 /**
+ * The start of a picked day, in the venue's zone.
+ *
+ * Use this anywhere a picked `Date` has to be handed to something that reads a
+ * day, a weekday or a week from it. Passing the raw `Date` lets the callee
+ * reproject the instant and land on the day before.
+ */
+export function venueDayStart(picked: Date, timezone: string = VENUE_DEFAULT_TIMEZONE): DateTime {
+  return DateTime.fromISO(toCalendarDay(picked), { zone: timezone });
+}
+
+/**
  * The venue-local instant for a day the guest picked plus a time they chose.
  *
  * `DateTime.fromJSDate(picked, { zone })` would reproject the *instant* — for a
@@ -56,8 +67,7 @@ export function venueDateTime(
   minute: number,
   timezone: string = VENUE_DEFAULT_TIMEZONE
 ): DateTime {
-  return DateTime.fromISO(toCalendarDay(picked), { zone: timezone })
-    .set({ hour, minute, second: 0, millisecond: 0 });
+  return venueDayStart(picked, timezone).set({ hour, minute, second: 0, millisecond: 0 });
 }
 
 /** A day that has already passed at the venue can never be booked. */

@@ -2,6 +2,7 @@ import { DateTime, Settings } from 'luxon';
 import {
   calendarDayToDate,
   venueDateTime,
+  venueDayStart,
   earliestBookableDay,
   isPastDay,
   isWithinBookingWindow,
@@ -62,6 +63,22 @@ describe('bookingDays', () => {
 
       const picked = new Date(2026, 8, 25); // what that browser's picker hands back
       expect(venueDateTime(picked, 20, 30, 'America/Chicago').toFormat('yyyy-MM-dd')).toBe('2026-09-25');
+    });
+  });
+
+  describe('venueDayStart', () => {
+    it('anchors on the picked day rather than reprojecting the instant', () => {
+      const picked = new Date(2026, 8, 25);
+      const start = venueDayStart(picked, 'America/Chicago');
+
+      expect(start.toFormat('yyyy-MM-dd HH:mm')).toBe('2026-09-25 00:00');
+      expect(start.zoneName).toBe('America/Chicago');
+    });
+
+    it('keeps a picked day in its own week for the weekly-hours lookup', () => {
+      // Sunday the 20th: reprojecting could bucket it into the prior week
+      const sunday = new Date(2026, 8, 20);
+      expect(venueDayStart(sunday, 'America/Chicago').weekday).toBe(7);
     });
   });
 

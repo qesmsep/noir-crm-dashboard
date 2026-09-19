@@ -16,6 +16,7 @@ import {
   toBookingDay,
   toCalendarDay,
   venueDateTime,
+  venueDayStart,
   venueToday,
 } from '@/utils/bookingDays';
 import type { LocationHours, WeeklyHours } from '@/types/hours';
@@ -224,7 +225,7 @@ const getHoursForDate = (date: Date, locationHours: LocationHours | null): Array
     if (locationHours.weeklyHours) {
       // Weekly hours are set for a specific week
       // Check if the date is in the same week as the weekly hours
-      const dateWeekSunday = getSundayOfWeek(date, timezone);
+      const dateWeekSunday = getSundayOfWeek(dt, timezone);
 
       // Only use weekly hours if the date is in the same week
       if (dateWeekSunday === locationHours.weeklyHoursWeekStart) {
@@ -639,7 +640,9 @@ export default function SimpleReservationRequestModal({
 
     try {
       // Fetch blocked times for this date
-      const dateStr = DateTime.fromJSDate(targetDate, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
+      // The day the guest picked. Reprojecting the instant here asked the API
+      // about the day before for anyone whose browser runs ahead of the venue.
+      const dateStr = toCalendarDay(targetDate);
       const locationParam = selectedLocation ? `&location=${selectedLocation}` : '';
       const overrideParam = adminOverride ? '&adminOverride=true' : '';
       const partySizeParam = `&partySize=${targetPartySize}`;
@@ -675,7 +678,7 @@ export default function SimpleReservationRequestModal({
     setTime('');
 
     // Update weekly hours for the selected date's week
-    const selectedWeekSunday = getSundayOfWeek(newDate, locationTimezone);
+    const selectedWeekSunday = getSundayOfWeek(venueDayStart(newDate, locationTimezone), locationTimezone);
     const weeklyHoursForSelectedWeek = allWeeklyHours[selectedWeekSunday] || null;
 
     // Update locationHours with the selected week's hours
@@ -1188,10 +1191,7 @@ export default function SimpleReservationRequestModal({
       // Skip if hours are still loading
       if (!loadingHours) {
         // For dates in different weeks, we need to check the appropriate week's data
-        const dateWeekSunday = getSundayOfWeek(
-          DateTime.fromISO(day, { zone: locationTimezone }),
-          locationTimezone
-        );
+        const dateWeekSunday = getSundayOfWeek(venueDayStart(date, locationTimezone), locationTimezone);
         const weeklyHoursForDateWeek = weeklyHoursMap.get(dateWeekSunday) || null;
 
         // Create a temporary locationHours object with the correct week's data

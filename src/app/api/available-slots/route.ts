@@ -128,7 +128,9 @@ export async function POST(request: Request) {
     }
     
     // 1. Check if the venue is open on this date
-    const dayOfWeek = new Date(dateStr + 'T00:00:00').getDay();
+    // Read in the venue's zone rather than from an implicitly-local parse, so
+    // it cannot drift with wherever this runs (Luxon: 1=Mon..7=Sun -> 0=Sun)
+    const dayOfWeek = DateTime.fromISO(dateStr, { zone: venueTimezone }).weekday % 7;
     
     if (DEBUG) console.log('Checking venue hours for:', { dateStr, dayOfWeek });
     
