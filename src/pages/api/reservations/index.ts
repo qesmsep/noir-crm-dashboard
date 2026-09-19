@@ -193,6 +193,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           .single();
         locationId = eventData?.location_id || null;
         console.log('[RSVP Location] Inherited location_id:', locationId);
+
+        // The RSVP path resolves its location from the event rather than a
+        // slug, so the timezone has to be looked up separately. Without this
+        // it silently falls back to the default and the past-date check below
+        // would read the wrong day the moment a venue outside Central exists.
+        if (locationId) {
+          const { data: eventLocation } = await client
+            .from('locations')
+            .select('timezone')
+            .eq('id', locationId)
+            .single();
+          venueTimezone = eventLocation?.timezone || venueTimezone;
+        }
       }
 
       // A reservation can never be created for a day that has already passed at
