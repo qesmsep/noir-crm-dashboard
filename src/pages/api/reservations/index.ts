@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
-import { isPastDay, VENUE_DEFAULT_TIMEZONE } from '../../../utils/bookingDays';
+import { isPastDay, venueToday, VENUE_DEFAULT_TIMEZONE } from '../../../utils/bookingDays';
 import { verifyAdmin } from '../../../lib/admin-auth';
 import {
   checkReservationCapacity,
@@ -221,7 +221,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(400).json({ error: 'Invalid start_time' });
         }
         const requestedDay = requestedStart.toFormat('yyyy-MM-dd');
-        const todayAtVenue = DateTime.now().setZone(venueTimezone).toFormat('yyyy-MM-dd');
+        const todayAtVenue = venueToday(venueTimezone);
         if (isPastDay(requestedDay, todayAtVenue) && !(await verifyAdmin(req))) {
           console.warn('[PAST DATE] Rejected reservation for a past date:', { requestedDay, todayAtVenue });
           return res.status(400).json({

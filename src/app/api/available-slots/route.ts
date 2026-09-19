@@ -7,7 +7,7 @@ import {
   getLocationCapacity,
 } from '../../../lib/capacity';
 import { fetchActiveHolds } from '../../../lib/holds';
-import { isPastDay, isWithinBookingWindow, toBookingDay, VENUE_DEFAULT_TIMEZONE } from '../../../utils/bookingDays';
+import { isPastDay, isWithinBookingWindow, toBookingDay, venueToday, VENUE_DEFAULT_TIMEZONE } from '../../../utils/bookingDays';
 
 // Enable debug by default to help diagnose issues
 const DEBUG = process.env.DEBUG_AVAILABLE_SLOTS === '1' || process.env.NEXT_PUBLIC_DEBUG_AVAILABLE_SLOTS === '1' || true;
@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
     // A day that has already passed at the venue has no slots, whatever the
     // caller's clock says
-    if (isPastDay(dateStr, DateTime.now().setZone(venueTimezone).toFormat('yyyy-MM-dd'))) {
+    if (isPastDay(dateStr, venueToday(venueTimezone))) {
       if (DEBUG) console.log('Requested date is in the past at the venue:', { dateStr, venueTimezone });
       return NextResponse.json({ slots: [] });
     }

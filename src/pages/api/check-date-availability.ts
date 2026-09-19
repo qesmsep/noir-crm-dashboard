@@ -1,7 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
-import { isPastDay } from '../../utils/bookingDays';
+import { isPastDay, venueToday } from '../../utils/bookingDays';
 import {
   calcPeakConcurrentGuests,
   fetchOccupancyReservations,
@@ -140,7 +140,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // request body would be a way past the window for anyone who sends it.
     if (adminOverride !== 'true' && isPastDay(
       requestDate.toFormat('yyyy-MM-dd'),
-      DateTime.now().setZone(timezone).toFormat('yyyy-MM-dd')
+      venueToday(timezone)
     )) {
       return res.status(200).json({
         date,
