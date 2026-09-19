@@ -132,6 +132,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // A day that has already passed at the venue is never bookable. Returned
     // as a full-day block so the picker greys it out the same way it greys a
     // closure, and so a hand-crafted request can't get slots back for it.
+    //
+    // This honours `adminOverride` where /api/available-slots does not: the
+    // surfaces that pass it here are admin-rendered and already use it to skip
+    // closures, private events and capacity, so the flag grants nothing new.
+    // available-slots is the public booking path, where a flag read off the
+    // request body would be a way past the window for anyone who sends it.
     if (adminOverride !== 'true' && isPastDay(
       requestDate.toFormat('yyyy-MM-dd'),
       DateTime.now().setZone(timezone).toFormat('yyyy-MM-dd')
