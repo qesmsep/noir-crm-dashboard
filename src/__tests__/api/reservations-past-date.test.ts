@@ -2,22 +2,27 @@
  * The picker hides days that have already passed at the venue; this is the
  * gate for a request that skips the picker. Covers the enforcement point
  * itself, not just the day helpers it is built on.
+ *
+ * Lives here rather than beside the route: Next treats every file under
+ * `src/pages/api/` as an API route and fails the build on one without a
+ * default export. `tsc --noEmit` does not run that check — only `next build`
+ * does — so a test colocated there passes locally and breaks the deploy.
  */
 import { DateTime } from 'luxon';
 
 const mockFrom = jest.fn();
 
-jest.mock('../../../lib/supabase', () => ({
+jest.mock('../../lib/supabase', () => ({
   supabase: { from: (...args: any[]) => mockFrom(...args) },
   supabaseAdmin: { from: (...args: any[]) => mockFrom(...args) },
 }));
 
-jest.mock('../../../lib/admin-auth', () => ({
+jest.mock('../../lib/admin-auth', () => ({
   verifyAdmin: jest.fn().mockResolvedValue(false),
 }));
 
 import type { NextApiRequest, NextApiResponse } from 'next';
-import handler from '../reservations/index';
+import handler from '../../pages/api/reservations/index';
 
 function locationsChain(timezone: string) {
   return {

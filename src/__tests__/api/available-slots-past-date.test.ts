@@ -4,17 +4,20 @@
 /**
  * The second enforcement point for a day that has already passed at the
  * venue: the slots endpoint behind the public reservation form.
+ *
+ * Kept out of `src/app/api/` for the same reason as its sibling — route
+ * directories are not a safe home for test files.
  */
 import { DateTime } from 'luxon';
 
 const mockFrom = jest.fn();
 
-jest.mock('../../../lib/supabase', () => ({
+jest.mock('../../lib/supabase', () => ({
   supabase: { from: (...args: any[]) => mockFrom(...args) },
   supabaseAdmin: { from: (...args: any[]) => mockFrom(...args) },
 }));
 
-import { POST } from '../available-slots/route';
+import { POST } from '../../app/api/available-slots/route';
 
 function locationsChain(timezone: string) {
   return {
