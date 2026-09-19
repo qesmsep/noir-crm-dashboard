@@ -8,6 +8,16 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
 import { supabase } from '@/lib/supabase';
 import { getSundayOfWeek } from '@/utils/dateUtils';
+import {
+  calendarDayToDate,
+  earliestBookableDay,
+  isWithinBookingWindow,
+  isPastDay,
+  toBookingDay,
+  toCalendarDay,
+  venueDateTime,
+  venueToday,
+} from '@/utils/bookingDays';
 import type { LocationHours, WeeklyHours } from '@/types/hours';
 import { useReservationHold } from '@/hooks/useReservationHold';
 import HoldCountdown from '@/components/HoldCountdown';
@@ -203,7 +213,10 @@ const getHoursForDate = (date: Date, locationHours: LocationHours | null): Array
 
   try {
     const timezone = locationHours.timezone || 'America/Chicago';
-    const dt = DateTime.fromJSDate(date, { zone: timezone });
+    // Anchored on the picked calendar day, not the instant — reprojecting
+    // browser-local midnight into the venue zone can land on the day before
+    // and look up the wrong day's hours.
+    const dt = DateTime.fromISO(toCalendarDay(date), { zone: timezone });
     const dayOfWeek = dt.weekday % 7; // Luxon: 1=Monday, 7=Sunday -> convert to 0=Sunday, 6=Saturday
     const dayName = dt.toFormat('EEEE').toLowerCase(); // "thursday", "friday", etc.
 
@@ -288,9 +301,9 @@ export default function SimpleReservationRequestModal({
   // Reservation duration state
   const [reservationDuration, setReservationDuration] = useState(2.0);
 
-  // Booking window state
-  const [bookingStartDate, setBookingStartDate] = useState<Date | null>(null);
-  const [bookingEndDate, setBookingEndDate] = useState<Date | null>(null);
+  // Booking window state, held as calendar days (yyyy-MM-dd) at the venue
+  const [bookingStartDay, setBookingStartDay] = useState<string | null>(null);
+  const [bookingEndDay, setBookingEndDay] = useState<string | null>(null);
 
   // Payment state for non-members
   const [showPayment, setShowPayment] = useState(false);
@@ -319,8 +332,7 @@ export default function SimpleReservationRequestModal({
       if (period === 'PM' && hour !== 12) hour += 12;
       else if (period === 'AM' && hour === 12) hour = 0;
 
-      const start = DateTime.fromJSDate(date, { zone: locationTimezone })
-        .set({ hour, minute, second: 0, millisecond: 0 });
+      const start = venueDateTime(date, hour, minute, locationTimezone);
       if (!start.isValid) return null;
       const end = start.plus({ hours: reservationDuration });
       if (!end.isValid) return null;
@@ -454,8 +466,11 @@ export default function SimpleReservationRequestModal({
         const effectiveEnd = locationData?.booking_end_date || settingsData?.booking_end_date;
         const effectiveTimezone = locationData?.timezone || 'America/Chicago';
 
-        setBookingStartDate(effectiveStart ? new Date(effectiveStart) : null);
-        setBookingEndDate(effectiveEnd ? new Date(effectiveEnd) : null);
+        // Parsed as venue calendar days. `new Date('2026-09-24')` is midnight
+        // UTC — the evening of the 23rd in Central — which shifted both edges
+        // of the window by a day.
+        setBookingStartDay(toBookingDay(effectiveStart, effectiveTimezone));
+        setBookingEndDay(toBookingDay(effectiveEnd, effectiveTimezone));
         setLocationTimezone(effectiveTimezone);
 
         console.log('📅 [SimpleReservationModal] Booking window:', {
@@ -775,8 +790,7 @@ export default function SimpleReservationRequestModal({
         hour = 0;
       }
 
-      const startDateTime = DateTime.fromJSDate(date!, { zone: locationTimezone })
-        .set({ hour, minute, second: 0, millisecond: 0 });
+      const startDateTime = venueDateTime(date!, hour, minute, locationTimezone);
 
       const endDateTime = startDateTime.plus({ hours: reservationDuration });
 
@@ -972,8 +986,7 @@ export default function SimpleReservationRequestModal({
             hour = 0;
           }
 
-          const startDateTime = DateTime.fromJSDate(date, { zone: locationTimezone })
-            .set({ hour, minute, second: 0, millisecond: 0 });
+          const startDateTime = venueDateTime(date, hour, minute, locationTimezone);
 
           const reservationDate = startDateTime.toFormat('MMMM d, yyyy');
           const locationName = selectedLocation === 'rooftopkc' ? 'RooftopKC' : 'Noir KC';
@@ -1029,8 +1042,7 @@ export default function SimpleReservationRequestModal({
         hour = 0;
       }
 
-      const startDateTime = DateTime.fromJSDate(date, { zone: locationTimezone })
-        .set({ hour, minute, second: 0, millisecond: 0 });
+      const startDateTime = venueDateTime(date, hour, minute, locationTimezone);
 
       // End time is based on location's default reservation duration
       const endDateTime = startDateTime.plus({ hours: reservationDuration });
@@ -1158,12 +1170,16 @@ export default function SimpleReservationRequestModal({
 
   const filterDate = useCallback((date: Date) => {
     try {
-      // Check if date is within booking window (skip for admin override)
+      // The day the guest tapped, as a venue calendar day
+      const day = toCalendarDay(date);
+
       if (!adminOverride) {
-        if (bookingStartDate && date < bookingStartDate) {
+        // A day that has already passed at the venue is never bookable,
+        // whatever timezone the guest's device is set to
+        if (isPastDay(day, venueToday(locationTimezone))) {
           return false;
         }
-        if (bookingEndDate && date > bookingEndDate) {
+        if (!isWithinBookingWindow(day, bookingStartDay, bookingEndDay)) {
           return false;
         }
       }
@@ -1172,7 +1188,10 @@ export default function SimpleReservationRequestModal({
       // Skip if hours are still loading
       if (!loadingHours) {
         // For dates in different weeks, we need to check the appropriate week's data
-        const dateWeekSunday = getSundayOfWeek(date, locationTimezone);
+        const dateWeekSunday = getSundayOfWeek(
+          DateTime.fromISO(day, { zone: locationTimezone }),
+          locationTimezone
+        );
         const weeklyHoursForDateWeek = weeklyHoursMap.get(dateWeekSunday) || null;
 
         // Create a temporary locationHours object with the correct week's data
@@ -1189,8 +1208,7 @@ export default function SimpleReservationRequestModal({
       }
 
       // Check if date is blocked (closure or private event)
-      const dateStr = DateTime.fromJSDate(date, { zone: locationTimezone }).toFormat('yyyy-MM-dd');
-      if (blockedDates.has(dateStr)) {
+      if (blockedDates.has(day)) {
         return false;
       }
 
@@ -1199,19 +1217,16 @@ export default function SimpleReservationRequestModal({
       console.error('Error filtering date:', error);
       return false; // Safer to block date on error
     }
-  }, [adminOverride, bookingStartDate, bookingEndDate, loadingHours, weeklyHoursMap, locationHours, locationTimezone, blockedDates]);
+  }, [adminOverride, bookingStartDay, bookingEndDay, loadingHours, weeklyHoursMap, locationHours, locationTimezone, blockedDates]);
 
-  // Use booking window dates if available, otherwise fall back to defaults
-  // Ensure minDate is never in the past (use location's timezone for consistency)
-  const today = DateTime.now().setZone(locationTimezone).startOf('day').toJSDate();
-  const minDate = bookingStartDate
-    ? new Date(Math.max(bookingStartDate.getTime(), today.getTime()))
-    : today;
-  const maxDate = bookingEndDate || (() => {
-    const fallback = new Date();
-    fallback.setDate(fallback.getDate() + 30);
-    return fallback;
-  })();
+  // Picker bounds, built from venue calendar days so that react-datepicker —
+  // which compares against midnight in the *browser's* zone — never offers a
+  // day the venue has already passed.
+  const todayAtVenue = venueToday(locationTimezone);
+  const minDate = calendarDayToDate(earliestBookableDay(todayAtVenue, bookingStartDay));
+  const maxDate = bookingEndDay
+    ? calendarDayToDate(bookingEndDay)
+    : DateTime.fromISO(todayAtVenue).plus({ days: 30 }).startOf('day').toJSDate();
 
   if (!isOpen) return null;
 

@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
+import { isPastDay, VENUE_DEFAULT_TIMEZONE } from '../../../utils/bookingDays';
 import { verifyAdmin } from '../../../lib/admin-auth';
 import {
   checkReservationCapacity,
@@ -173,13 +174,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       // Get location ID if location_slug is provided
       let locationId: string | null = null;
+      let venueTimezone = VENUE_DEFAULT_TIMEZONE;
       if (body.location_slug) {
         const { data: locationData } = await client
           .from('locations')
-          .select('id')
+          .select('id, timezone')
           .eq('slug', body.location_slug)
           .single();
         locationId = locationData?.id || null;
+        venueTimezone = locationData?.timezone || venueTimezone;
       } else if (body.private_event_id) {
         // For RSVP reservations, inherit location from the private event
         console.log('[RSVP Location] Fetching location_id from private_event:', body.private_event_id);
@@ -480,6 +483,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       if (!adminOverride) {
+        // A reservation can never be created for a day that has already passed
+        // at the venue. The picker hides those days; this is the gate for a
+        // request that skips the picker.
+        const requestedStart = DateTime.fromISO(body.start_time).setZone(venueTimezone);
+        if (!requestedStart.isValid) {
+          return res.status(400).json({ error: 'Invalid start_time' });
+        }
+        const requestedDay = requestedStart.toFormat('yyyy-MM-dd');
+        const todayAtVenue = DateTime.now().setZone(venueTimezone).toFormat('yyyy-MM-dd');
+        if (isPastDay(requestedDay, todayAtVenue)) {
+          console.warn('[PAST DATE] Rejected reservation for a past date:', { requestedDay, todayAtVenue });
+          return res.status(400).json({
+            error: 'That date has already passed. Please choose an upcoming date.',
+            code: 'DATE_IN_PAST',
+          });
+        }
+
         try {
           console.log('[PRIVATE EVENT CHECK] Request body times:', {
             start_time: body.start_time,

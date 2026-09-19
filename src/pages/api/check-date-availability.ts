@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
+import { isPastDay } from '../../utils/bookingDays';
 import {
   calcPeakConcurrentGuests,
   fetchOccupancyReservations,
@@ -125,6 +126,29 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({
         error: 'Invalid date or timezone',
         details: requestDate.invalidReason
+      });
+    }
+
+    // A day that has already passed at the venue is never bookable. Returned
+    // as a full-day block so the picker greys it out the same way it greys a
+    // closure, and so a hand-crafted request can't get slots back for it.
+    if (adminOverride !== 'true' && isPastDay(
+      requestDate.toFormat('yyyy-MM-dd'),
+      DateTime.now().setZone(timezone).toFormat('yyyy-MM-dd')
+    )) {
+      return res.status(200).json({
+        date,
+        blockedTimeRanges: [{
+          id: 'past-date',
+          title: 'Date has passed',
+          startTime: '12:00 AM',
+          endTime: '11:59 PM',
+          startHour: 0,
+          startMinute: 0,
+          endHour: 23,
+          endMinute: 59,
+          reason: 'past_date',
+        }],
       });
     }
 
