@@ -1922,8 +1922,17 @@ const handleExportCSV = () => {
 - `GET/POST/PUT/DELETE /api/admins` - Admin management
 - `GET /api/admins/middleware` - Super admin middleware
 
-**Other**:
-- `GET /api/available-slots` - Check availability
+**Availability & Reservations**:
+- `GET /api/available-slots` - Check availability (legacy)
+- `GET /api/check-date-availability` - **[Updated 2026-08-08]** Check table availability for specific date/party size
+  - Query params: `date` (YYYY-MM-DD), `location` (slug), `partySize`, `adminOverride`
+  - Returns: `blockedTimeRanges` array with unavailable slots
+  - **Fail-closed guarantee**: Returns blocked times on ANY error (database failures, network issues, etc.)
+  - Handles: party size validation, timezone-aware queries, closures, private events, existing reservations
+  - **Critical fix (2026-08-08)**: Now correctly blocks times when:
+    - Party size exceeds all table capacities
+    - Supabase query errors occur
+    - Evening reservations (7-11 PM CST/CDT) overlap
 - `GET /api/find-alternative-times` - Find alternative times
 - `POST /api/release-holds` - Release Stripe holds
 - `GET /api/tables` - List tables
@@ -2114,24 +2123,55 @@ Database-level security via Supabase RLS:
 
 ### Reservation Booking Workflow
 
-1. **User selects date/time/party size**
-   - `ReservationForm.tsx` → `/api/available-slots`
-2. **System checks availability**
-   - Queries `reservations` for conflicts
-   - Checks table capacity
-   - Returns available slots
-3. **For non-members: Payment hold**
+**Updated 2026-08-08** - Enhanced with fail-closed party size validation and timezone fixes
+
+1. **User provides contact info**
+   - First name, last name (email optional for members)
+
+2. **User selects party size** **[New as of 2026-08-08]**
+   - Dropdown: 1-12 guests
+   - Party size is validated BEFORE date/time selection
+   - Frontend: `SimpleReservationRequestModal.tsx`
+
+3. **User selects date**
+   - Calendar shows dates with closures/private events blocked
+   - `GET /api/check-date-availability?date=YYYY-MM-DD&location={slug}` (without partySize)
+   - Returns dates with full-day closures/events
+
+4. **User selects time** **[Enhanced 2026-08-08]**
+   - Only shows times with available tables for selected party size
+   - `GET /api/check-date-availability?date=YYYY-MM-DD&location={slug}&partySize={N}`
+   - Returns `blockedTimeRanges` for unavailable slots
+   - **Fail-closed behavior**: On ANY error (DB failures, network issues), ALL times are blocked
+   - Timezone-aware: Correctly handles evening reservations (7-11 PM CST/CDT)
+
+5. **Availability validation** **[Critical fixes 2026-08-08]**
+   - System blocks times when:
+     - Party size exceeds ALL table capacities (e.g., 12 guests when max table is 10 seats)
+     - Party size exceeds available tables (after filtering excluded tables 4, 8, 12)
+     - All tables booked for selected time
+     - Supabase query errors occur (database failures)
+     - Invalid timezone in location settings
+   - **Guarantee**: User CANNOT proceed to payment without confirmed table availability
+
+6. **For non-members: Payment hold**
    - `CreditCardHoldModal.tsx` → Stripe PaymentElement
    - Creates PaymentIntent with `capture_method: 'manual'`
    - Stores `payment_intent_id` in reservation
-4. **Reservation creation**
+   - **Note**: Payment is only authorized if availability check succeeded
+
+7. **Reservation creation**
    - `POST /api/reservations` creates reservation
+   - Re-validates table availability server-side
    - Assigns table automatically
    - Stores UTC times
-5. **Notifications**
+   - If no tables available: Cancels payment hold, returns error
+
+8. **Notifications**
    - SMS confirmation to customer
    - Admin notification to `admin_notification_phone`
-6. **Reminder scheduling**
+
+9. **Reminder scheduling**
    - `schedule-reservation-reminders` API called
    - Creates `scheduled_reservation_reminders` entries
    - Based on active templates
@@ -4607,6 +4647,114 @@ node scripts/sync-payment-methods.js
    - **Issue**: Times showed as available during private events in production
    - **Root Cause**: UTC hours returned instead of local timezone hours
    - **Fix**: Added `.setZone('America/Chicago')` to convert event times to local timezone
+
+---
+
+### 2026-08-08 - Reservation Flow Party Size Validation & Fail-Closed Error Handling
+
+**Summary**: Comprehensive hardening of public reservation flow to prevent payment authorization when no tables are available. Fixed critical timezone bugs, added fail-closed error handling, and reordered form fields to validate party size before date/time selection.
+
+**GitHub PR**: #56 - 7 commits addressing iterative code review feedback
+
+**Critical Bugs Fixed**:
+
+1. **Timezone Handling for Evening Reservations**
+   - **Issue**: Reservations from 7-11 PM CST were not showing as blocked
+   - **Root Cause**: API parsed date as UTC midnight instead of CST/CDT midnight. Evening reservations stored as next day in UTC (e.g., 7 PM CDT = 2026-08-09 00:00 UTC) were missed by query checking only 2026-08-08 in UTC
+   - **Fix**: Parse dates in location timezone, query for overlapping reservations (not just "starts on this day")
+   - **Files**: `src/pages/api/check-date-availability.ts`
+
+2. **Party Sizes Exceeding Table Capacities**
+   - **Issue**: Users could select 11-12 guests (UI allows up to 12) when largest table seats 10, saw full availability, and reached payment
+   - **Root Cause**: When `gte('seats', partySize)` returned 0 rows, code never entered blocking logic
+   - **Fix**: Added early check for `(!tables || tables.length === 0)` to block all operating hours
+   - **Files**: `src/pages/api/check-date-availability.ts`
+
+3. **Supabase Query Errors Failed Open**
+   - **Issue**: Database errors (network issues, RLS policy errors, timeouts) returned HTTP 200 with partial data, client showed full availability
+   - **Root Cause**: `tablesError` and `resError` branches only logged, didn't block times
+   - **Fix**: Both error branches now call `blockAllSlotsInHours()` with reason `'availability_check_failed'`
+   - **Files**: `src/pages/api/check-date-availability.ts`
+
+4. **Client-Side Fetch Errors Failed Open**
+   - **Issue**: Network errors set `blockedTimes=[]`, showing all times as available
+   - **Root Cause**: Date-scoped state reuse - error on new date kept old date's empty array
+   - **Fix**: On error, set `blockedTimes` to block entire day (0:00-23:59) with reason `'fetch_error'`
+   - **Files**: `src/components/member/SimpleReservationRequestModal.tsx`
+
+5. **Race Conditions from Rapid Party Size Changes**
+   - **Issue**: Changing party size 2→4→8 could show stale availability if responses resolved out of order
+   - **Root Cause**: No request cancellation or response validation
+   - **Fix**: Added `AbortController` ref, cancel previous requests, only update state if response is for latest request
+   - **Files**: `src/components/member/SimpleReservationRequestModal.tsx`
+
+**User Experience Changes**:
+
+1. **Form Field Reordering**
+   - **Old flow**: Name → Date → Time → Party Size
+   - **New flow**: Name → **Party Size** → Date → Time
+   - **Impact**: Party size validated before showing availability, prevents users from entering payment flow for unavailable party sizes
+
+2. **Performance Optimization**
+   - **Old**: Date calendar re-fetched 31 dates on every party size change (31 sequential API calls)
+   - **New**: Date calendar checks closures/events only (runs once). Party size availability checked per-date selection (runs once per date)
+   - **Impact**: ~93% reduction in API calls when changing party size
+
+**Code Quality Improvements**:
+
+1. **Extracted Helper Functions**
+   - `getOperatingHoursForDate(requestDate, locationId)` - Get venue hours (eliminates 20 lines duplication)
+   - `blockAllSlotsInHours(hours, date, timezone, reason, blockedArray)` - Generate blocked slots (eliminates 40 lines duplication)
+   - `BLOCK_ALL_ON_ERROR` constant - Error state object (eliminates 10 lines duplication)
+
+2. **Added Timezone Validation**
+   - Validates `requestDate.isValid` after parsing with location timezone
+   - Returns 400 error if timezone is invalid
+   - Prevents silent failures from bad timezone strings in database
+
+3. **Removed Debug Code**
+   - Cleaned up hardcoded `2026-04-24` debug logging
+   - Removed `[ADMIN OVERRIDE]` console.log statements
+
+**API Changes**:
+
+- `GET /api/check-date-availability`
+  - **Enhancement**: Now blocks times on ANY error condition (fail-closed guarantee)
+  - **New error reasons**: `'party_size_too_large'`, `'availability_check_failed'`, `'fetch_error'`
+  - **New validation**: Timezone validity check
+  - **Fixed**: Timezone-aware date parsing (uses `locations.timezone`)
+  - **Fixed**: Overlap query for reservations (`lt/gt` instead of `gte/lte on start_time`)
+
+**Components Modified**:
+
+- `src/components/member/SimpleReservationRequestModal.tsx`
+  - Reordered form fields (party size before date/time)
+  - Added `AbortController` for request cancellation
+  - Added fail-closed error handling (blocks all times on error)
+  - Extracted `fetchBlockedTimes()` and `handlePartySizeChange()`
+  - Optimized blocked dates fetching (removed `partySize` dependency)
+
+**Locations Affected**:
+
+- ✅ **RooftopKC** (`/rooftopkc`) - Uses `PublicReservationFlow` → `SimpleReservationRequestModal`
+- ✅ **NoirKC** (`/reserve`) - Uses `PublicReservationFlow` → `SimpleReservationRequestModal`
+- ⚠️ **Admin modals** - Separate flow, intentionally bypass these checks for admin flexibility
+
+**Testing Recommendations**:
+
+1. Test with party size 2 (default) - should see most times available
+2. Change party size to 8 - should see fewer times available
+3. Change party size to 12 - should see NO available times (exceeds table capacity)
+4. Verify evening reservations (7-11 PM) correctly show as blocked/available
+5. Test error handling: Simulate network failure (DevTools offline mode) - should block all times
+6. Verify no payment processing occurs when no tables are available
+
+**Deployment Notes**:
+
+- No database migrations required
+- No environment variable changes
+- Backward compatible (existing admin flows unchanged)
+- Works for both NoirKC and RooftopKC locations
    - **Example**: 6pm event (stored as 23:00 UTC) now correctly blocks 6pm time slot (18:00 local)
 
 4. **Subscription Pricing Fixes** (`/api/member/account-subscription.ts`)

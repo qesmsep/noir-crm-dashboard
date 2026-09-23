@@ -778,22 +778,19 @@ async function checkComprehensiveAvailability(startTime, endTime, partySize) {
     const { data: tables, error: tablesError } = await supabase
       .from('tables')
       .select('*')
-      .gte('capacity', partySize);
+      .gte('capacity', partySize)
+      .eq('status', 'active'); // Only include active tables
     
     if (tablesError || !tables || tables.length === 0) {
       console.log('No tables available for party size:', partySize);
       return { available: false, message: 'No tables available for this party size' };
     }
-    
-    // Filter out tables 4, 8, and 12 (not available for reservations)
-    const excludedTableNumbers = [4, 8, 12];
-    const availableTables = (tables || []).filter((t) => {
-      const tableNumber = parseInt(t.table_number || t.tableNumber || 0, 10);
-      return !excludedTableNumbers.includes(tableNumber);
-    });
-    
+
+    // Use only active tables (inactive tables are filtered by database query)
+    const availableTables = tables || [];
+
     if (!availableTables || availableTables.length === 0) {
-      console.log('No tables available after filtering (tables 4, 8, 12 excluded)');
+      console.log('No tables available for this party size');
       return { available: false, message: 'No tables available for this party size' };
     }
 
