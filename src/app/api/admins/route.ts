@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { checkSuperAdminAccess } from './middleware';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,7 +8,10 @@ const supabase = createClient(
 );
 
 // GET /api/admins - List all admins
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const denied = await checkSuperAdminAccess(request);
+  if (denied) return denied;
+
   try {
     // Fetch all admins from the admins table
     const { data: admins, error } = await supabase
@@ -49,6 +53,9 @@ export async function GET() {
 
 // POST /api/admins - Create new admin
 export async function POST(request: NextRequest) {
+  const denied = await checkSuperAdminAccess(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const { email, password, phone, first_name, last_name, access_level } = body;
@@ -145,6 +152,9 @@ export async function POST(request: NextRequest) {
 
 // PUT /api/admins - Update admin
 export async function PUT(request: NextRequest) {
+  const denied = await checkSuperAdminAccess(request);
+  if (denied) return denied;
+
   try {
     const body = await request.json();
     const { id, email, phone, first_name, last_name, access_level } = body;
@@ -199,6 +209,9 @@ export async function PUT(request: NextRequest) {
 
 // DELETE /api/admins - Remove admin
 export async function DELETE(request: NextRequest) {
+  const denied = await checkSuperAdminAccess(request);
+  if (denied) return denied;
+
   try {
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');

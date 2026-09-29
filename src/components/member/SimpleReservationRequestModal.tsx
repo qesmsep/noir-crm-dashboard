@@ -888,9 +888,12 @@ export default function SimpleReservationRequestModal({
         if (reservationId) {
           try {
             // Delete the reservation
-            await fetch(`/api/reservations/${reservationId}`, {
-              method: 'DELETE',
-            });
+            // The PaymentIntent id proves this browser made the booking; the
+            // API refuses a guest delete without it.
+            await fetch(
+              `/api/reservations/${reservationId}?payment_intent_id=${encodeURIComponent(paymentId)}`,
+              { method: 'DELETE' }
+            );
             console.log('Deleted reservation due to payment capture failure');
           } catch (deleteError) {
             console.error('Failed to delete reservation after payment capture failure:', deleteError);
@@ -998,7 +1001,8 @@ export default function SimpleReservationRequestModal({
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              amount: parseInt(partySize) * coverPrice,
+              // The server prices the charge from the location's cover price.
+              location_slug: selectedLocation,
               partySize: parseInt(partySize),
               firstName,
               lastName,

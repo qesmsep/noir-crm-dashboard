@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
 import { isPastDay, venueToday, VENUE_DEFAULT_TIMEZONE } from '../../../utils/bookingDays';
-import { verifyAdmin } from '../../../lib/admin-auth';
+import { verifyAdmin, internalCallHeaders } from '../../../lib/admin-auth';
 import {
   checkReservationCapacity,
   isCapacityError,
@@ -988,7 +988,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000';
                 await fetch(`${siteUrl}/api/reservation-notifications`, {
                   method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
+                  headers: { 'Content-Type': 'application/json', ...internalCallHeaders() },
                   body: JSON.stringify({ reservation_id: finalData.id, action: 'created' })
                 });
               } catch (e) {
@@ -1154,6 +1154,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                ...internalCallHeaders(),
               },
               body: JSON.stringify({
                 reservation_id: data.id,

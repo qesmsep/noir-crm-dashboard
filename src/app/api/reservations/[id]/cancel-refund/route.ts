@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { verifyAdminAccess } from '@/lib/admin-middleware';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
@@ -12,6 +13,9 @@ const supabase = createClient(
 );
 
 export async function POST(request: Request, { params }: any) {
+  const auth = await verifyAdminAccess(request);
+  if (!auth.authorized) return auth.response;
+
   const { id } = await params;
   const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
 

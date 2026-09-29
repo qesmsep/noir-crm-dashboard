@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '../../lib/supabase';
+import { isCronAuthorized } from '@/lib/admin-auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Allow POST and GET requests (GET for testing)
@@ -8,34 +9,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  // Verify this is a legitimate Vercel cron request
-  // Vercel cron jobs automatically add these headers
-  const isVercelCron = req.headers['x-vercel-cron'] === '1' || 
-                      req.headers['user-agent']?.includes('Vercel') ||
-                      req.headers['x-vercel-deployment-url'];
-
-  if (!isVercelCron) {
-    // For manual testing, allow with a secret token
-    let token: string | undefined;
-    
-    // Check Authorization header (for POST requests)
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      token = authHeader.substring(7);
-    }
-    
-    // Check query parameter (for GET requests)
-    if (!token && req.method === 'GET') {
-      token = req.query.token as string;
-    }
-    
-    if (!token) {
-      return res.status(401).json({ error: 'Unauthorized - Only Vercel cron jobs or authorized tokens allowed' });
-    }
-    
-    if (token !== 'cron-secret-token-2024') {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
+  // Only Vercel cron (Authorization: Bearer ${CRON_SECRET}) or a caller holding
+  // that secret. User-agent and x-vercel-* headers can be sent by anyone.
+  if (!isCronAuthorized(req)) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   try {

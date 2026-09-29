@@ -4,6 +4,7 @@ import { memberSchema, updateMemberSchema, validateWithSchema } from '../../lib/
 import { Logger } from '../../lib/logger';
 import Stripe from 'stripe';
 import { DateTime } from 'luxon';
+import { verifyAdmin } from '../../lib/admin-auth';
 
 // Initialize Supabase client with validation
 let supabase;
@@ -96,6 +97,15 @@ export default async function handler(req, res) {
     try {
       const { member_id, phone } = req.query;
 
+      // GET is reachable without a session only because the public booking
+      // flow asks "is this phone a member?" (PublicReservationFlow). A caller
+      // who is not an admin gets that answer and a first name for the greeting
+      // — never the member record, a member by id, or the member list.
+      const isAdminCaller = await verifyAdmin(req);
+      if (!isAdminCaller && !phone) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
       // If phone is provided, search by phone number
       if (phone) {
         // Validate phone format to prevent SQL injection
@@ -143,6 +153,9 @@ export default async function handler(req, res) {
         }
 
         if (memberData) {
+          if (!isAdminCaller) {
+            return res.status(200).json({ members: [{ first_name: memberData.first_name }] });
+          }
           return res.status(200).json({ members: [memberData] });
         } else {
           return res.status(200).json({ members: [] });

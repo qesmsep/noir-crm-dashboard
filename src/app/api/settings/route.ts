@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../lib/supabase';
+import { verifyAdminAccess } from '@/lib/admin-middleware';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await verifyAdminAccess(request);
+  if (!auth.authorized) return auth.response;
+
   try {
     const { data: settings, error } = await supabaseAdmin
       .from('settings')
@@ -58,6 +62,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await verifyAdminAccess(request);
+  if (!auth.authorized) return auth.response;
+
   try {
     const settings = await request.json();
 
@@ -86,6 +93,9 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
+  const auth = await verifyAdminAccess(request);
+  if (!auth.authorized) return auth.response;
+
   try {
     const settings = await request.json();
 
