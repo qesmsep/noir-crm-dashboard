@@ -2,6 +2,7 @@
 
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { authorizeAccountAccessReq } from '../../lib/admin-auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 const supabase = createClient(
@@ -14,10 +15,21 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { account_id, custom_amount, custom_description, custom_date } = req.body;
+  const { account_id } = req.body;
   if (!account_id) {
     return res.status(400).json({ error: 'account_id is required' });
   }
+
+  // Admins may charge any account, including a custom one-off amount. A member
+  // (portal session) may only pay their own account's outstanding balance.
+  const access = await authorizeAccountAccessReq(req, account_id);
+  if (!access.ok) {
+    return res.status(access.status).json({ error: access.error });
+  }
+  const isAdminCaller = access.via === 'admin';
+  const custom_amount = isAdminCaller ? req.body.custom_amount : undefined;
+  const custom_description = isAdminCaller ? req.body.custom_description : undefined;
+  const custom_date = isAdminCaller ? req.body.custom_date : undefined;
 
   // 1) Fetch stripe_customer_id and credit_card_fee_enabled from accounts
   const { data: acct, error: acctErr } = await supabase

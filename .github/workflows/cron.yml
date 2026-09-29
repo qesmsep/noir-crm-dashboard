@@ -10,7 +10,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Call webhook
+        env:
+          WEBHOOK_SECRET: ${{ secrets.WEBHOOK_SECRET }}
         run: |
-          curl -X POST "https://noir-crm-dashboard.vercel.app/api/webhook-process-reminders" \
+          # Fail closed: never call the endpoint without the secret.
+          if [ -z "$WEBHOOK_SECRET" ]; then
+            echo "WEBHOOK_SECRET repository secret is not set" >&2
+            exit 1
+          fi
+          curl --fail-with-body -sS -X POST "https://noir-crm-dashboard.vercel.app/api/webhook-process-reminders" \
             -H "Content-Type: application/json" \
-            -H "x-webhook-secret: ${{ secrets.WEBHOOK_SECRET }}"
+            -H "x-webhook-secret: $WEBHOOK_SECRET"

@@ -10,6 +10,7 @@ import {
   addYears,
   daysBetween,
 } from '@/lib/billing';
+import { isCronAuthorized } from '@/lib/admin-auth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,10 +35,8 @@ const supabase = createClient(
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Security: Verify this is from cron
-  const authHeader = req.headers.authorization;
-  const cronSecret = process.env.CRON_SECRET;
-
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
+  // Fails closed: CRON_SECRET must be set and sent as a Bearer token.
+  if (!isCronAuthorized(req)) {
     console.error('❌ Unauthorized cron request');
     return res.status(401).json({ error: 'Unauthorized' });
   }

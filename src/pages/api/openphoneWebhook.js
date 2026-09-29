@@ -3,6 +3,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
 import { enrollPhone } from './membership/intake-enroll';
+import { internalCallHeaders } from '../../lib/admin-auth';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -1475,6 +1476,7 @@ Thank you.`;
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
+              ...internalCallHeaders(),
             },
             body: JSON.stringify({
               reservation_id: reservationResult.reservation.id,

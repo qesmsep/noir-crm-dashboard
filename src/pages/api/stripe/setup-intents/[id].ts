@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
+import { authorizeStripeCustomerAccess } from '@/lib/admin-auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
@@ -28,6 +29,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const setupIntent = await stripe.setupIntents.retrieve(id, {
       expand: ['latest_attempt', 'latest_attempt.payment_method_details', 'payment_method'],
     });
+
+    // Admin, or the member whose own Stripe customer this SetupIntent is for.
+    const customerId =
+      typeof setupIntent.customer === 'string' ? setupIntent.customer : setupIntent.customer?.id;
+    const access = await authorizeStripeCustomerAccess(req, customerId);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: access.error });
+    }
 
     // Extract Financial Connections account ID if available
     let financialConnectionsAccount = null;

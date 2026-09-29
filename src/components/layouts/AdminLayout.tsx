@@ -3,6 +3,7 @@ import { ReactNode, useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import { useAuth } from '../../lib/auth-context';
+import { supabase } from '../../lib/supabase';
 import { debugLog } from '../../utils/debugLogger';
 import styles from '../../styles/AdminLayout.module.css';
 import {
@@ -31,6 +32,34 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
   const { user, loading, signOut } = useAuth();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  // null = not yet checked. A signed-in Supabase user is not necessarily an
+  // admin (members get Supabase users too), so the layout asks the server
+  // (/api/admin/whoami) before rendering anything. The API enforces the same
+  // rule on every call (src/proxy.ts); this only stops non-admins seeing the
+  // admin shell.
+  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!user) {
+      setIsAdmin(null);
+      return;
+    }
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const res = await fetch('/api/admin/whoami', {
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        });
+        if (!cancelled) setIsAdmin(res.ok);
+      } catch {
+        if (!cancelled) setIsAdmin(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   // Debug: Log component mount and state
   useEffect(() => {
@@ -140,6 +169,25 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
 
   if (!user) {
     return null;
+  }
+
+  if (isAdmin === null) {
+    return (
+      <div className={styles.root}>
+        <div className={styles.loadingState}>Loading...</div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className={styles.root}>
+        <div className={styles.loadingState}>
+          <p>Admin access required.</p>
+          <button type="button" onClick={handleSignOut}>Sign out</button>
+        </div>
+      </div>
+    );
   }
 
   const navItems = [

@@ -8,6 +8,7 @@ import {
   addMonths,
   addYears,
 } from '@/lib/billing';
+import { withAdminAuth } from '@/lib/api-auth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,7 +29,7 @@ const supabase = createClient(
  *   - message: string
  *   - payment_intent_id?: string
  */
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -129,3 +130,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     });
   }
 }
+
+// Admin only (server-side check; see src/lib/api-access-policy.ts).
+export default withAdminAuth(handler);

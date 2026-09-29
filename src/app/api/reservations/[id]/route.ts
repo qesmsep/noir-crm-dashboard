@@ -2,7 +2,7 @@ import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
 import Stripe from 'stripe';
-import { resolveAdmin } from '../../../../lib/admin-auth';
+import { resolveAdmin, internalCallHeaders } from '../../../../lib/admin-auth';
 import { isCapacityError, CAPACITY_ERROR_MESSAGE } from '../../../../lib/capacity';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -258,6 +258,7 @@ export async function PATCH(request: Request, { params }: any) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...internalCallHeaders(),
         },
         body: JSON.stringify({
           reservation_id: reservationId,
@@ -366,6 +367,26 @@ export async function DELETE(request: Request, { params }: any) {
   const { id } = await params;
   try {
     const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
+
+    // Admins may delete any reservation. The public booking flow may delete
+    // only the reservation it just created, when its payment capture failed,
+    // and proves that by sending the reservation's own PaymentIntent id.
+    const token = request.headers.get('authorization')?.split(' ')[1];
+    const admin = await resolveAdmin(token);
+    if (!admin) {
+      const paymentIntentId = new URL(request.url).searchParams.get('payment_intent_id');
+      if (!paymentIntentId) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      const { data: owned } = await supabase
+        .from('reservations')
+        .select('id, payment_intent_id')
+        .eq('id', reservationId)
+        .maybeSingle();
+      if (!owned || !owned.payment_intent_id || owned.payment_intent_id !== paymentIntentId) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
+    }
 
     const { error } = await supabase
       .from('reservations')

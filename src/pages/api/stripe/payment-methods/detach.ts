@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
+import { authorizeStripeCustomerAccess } from '@/lib/admin-auth';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
@@ -29,6 +30,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
+    // Admin, or the member whose own Stripe customer holds this payment method.
+    const paymentMethod = await stripe.paymentMethods.retrieve(payment_method_id);
+    const customerId =
+      typeof paymentMethod.customer === 'string' ? paymentMethod.customer : paymentMethod.customer?.id;
+    const access = await authorizeStripeCustomerAccess(req, customerId);
+    if (!access.ok) {
+      return res.status(access.status).json({ error: access.error });
+    }
+
     // Detach payment method
     await stripe.paymentMethods.detach(payment_method_id);
 
