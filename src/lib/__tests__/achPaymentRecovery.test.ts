@@ -1,5 +1,6 @@
 import {
   activateAccountAfterAchClears,
+  findPendingEntryForAchCharge,
   isAchCharge,
   resolveAccountIdForCharge,
 } from '../achPaymentRecovery';
@@ -19,6 +20,8 @@ function fakeDb(handlers: Record<string, (q: Recorded) => any>) {
         select: () => builder,
         update: (payload: any) => { q.op = 'update'; q.payload = payload; return builder; },
         eq: (col: string, val: any) => { q.filters[col] = val; return builder; },
+        gt: (col: string, val: any) => { q.filters[`${col}>`] = val; return builder; },
+        order: () => builder,
         limit: () => builder,
         maybeSingle: () => Promise.resolve(handlers[table]?.(q) ?? { data: null, error: null }),
         then: (resolve: any) => resolve(handlers[table]?.(q) ?? { data: null, error: null }),
@@ -132,5 +135,55 @@ describe('activateAccountAfterAchClears', () => {
       reason: 'no_account',
     });
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('findPendingEntryForAchCharge', () => {
+  const charge = { ...achCharge, amount: 15000 };
+
+  it('matches the dues row by ledger_entry_key first', async () => {
+    const { db, calls } = fakeDb({
+      ledger: (q) => (q.filters.ledger_entry_key === 'pi_test'
+        ? { data: { id: 'row_key', account_id: 'acct_1' }, error: null }
+        : { data: null, error: null }),
+    });
+    await expect(findPendingEntryForAchCharge(db, charge, 'acct_1'))
+      .resolves.toEqual({ id: 'row_key', account_id: 'acct_1' });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('falls back to a pending row carrying the payment intent id', async () => {
+    const { db } = fakeDb({
+      ledger: (q) => (q.filters.stripe_payment_intent_id === 'pi_test'
+        && q.filters.status === 'pending' && q.filters['amount>'] === 0
+        ? { data: { id: 'row_intent', account_id: 'acct_1' }, error: null }
+        : { data: null, error: null }),
+    });
+    await expect(findPendingEntryForAchCharge(db, charge, 'acct_1'))
+      .resolves.toEqual({ id: 'row_intent', account_id: 'acct_1' });
+  });
+
+  it('falls back to a pending row on the account for the same amount', async () => {
+    // The Aug 2026 duplicate: PENDING "Monthly dues" plus a new cleared
+    // "ACH payment" row, because no Stripe link matched.
+    const { db } = fakeDb({
+      ledger: (q) => (q.filters.account_id === 'acct_1' && q.filters.status === 'pending'
+        && q.filters.amount === 150
+        ? { data: { id: 'row_amount', account_id: 'acct_1' }, error: null }
+        : { data: null, error: null }),
+    });
+    await expect(findPendingEntryForAchCharge(db, charge, 'acct_1'))
+      .resolves.toEqual({ id: 'row_amount', account_id: 'acct_1' });
+  });
+
+  it('returns null only when nothing pending matches, so the caller may insert', async () => {
+    const { db } = fakeDb({});
+    await expect(findPendingEntryForAchCharge(db, charge, 'acct_1')).resolves.toBeNull();
+  });
+
+  it('skips the amount match without an account', async () => {
+    const { db, calls } = fakeDb({});
+    await expect(findPendingEntryForAchCharge(db, charge, null)).resolves.toBeNull();
+    expect(calls.some((c) => 'account_id' in c.filters)).toBe(false);
   });
 });

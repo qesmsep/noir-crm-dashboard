@@ -116,3 +116,63 @@ export async function activateAccountAfterAchClears(
   const activated = Array.isArray(data) ? data.length > 0 : !!data;
   return { activated, reason: activated ? 'activated' : 'not_processing' };
 }
+
+export interface PendingLedgerEntry {
+  id: string;
+  account_id: string | null;
+}
+
+/**
+ * Find the PENDING ledger row an ACH charge settles, so the webhook can flip
+ * it to 'cleared' instead of inserting a second row.
+ *
+ * Inserting was the old behaviour whenever the lookup missed, and it left the
+ * ledger showing the same payment twice -- a PENDING dues row and a cleared
+ * "ACH payment" row -- until staff deleted one by hand. So this tries every
+ * link it has, strongest first, and the caller only inserts when all miss:
+ *
+ *   1. ledger_entry_key = payment intent -- how every writer keys the dues row.
+ *   2. stripe_payment_intent_id = payment intent, still pending, positive.
+ *   3. same account, still pending, same amount, oldest first -- a dues row
+ *      with no usable Stripe link (written before the key convention, or
+ *      re-entered by hand).
+ */
+export async function findPendingEntryForAchCharge(
+  db: AccountsDb,
+  charge: AchCharge & { amount?: number },
+  accountId: string | null | undefined
+): Promise<PendingLedgerEntry | null> {
+  if (charge?.payment_intent) {
+    const { data: byKey } = await db
+      .from('ledger')
+      .select('id, account_id')
+      .eq('ledger_entry_key', charge.payment_intent)
+      .maybeSingle();
+    if (byKey?.id) return byKey;
+
+    const { data: byIntent } = await db
+      .from('ledger')
+      .select('id, account_id')
+      .eq('stripe_payment_intent_id', charge.payment_intent)
+      .eq('status', 'pending')
+      .gt('amount', 0)
+      .limit(1)
+      .maybeSingle();
+    if (byIntent?.id) return byIntent;
+  }
+
+  if (accountId && typeof charge?.amount === 'number') {
+    const { data: byAmount } = await db
+      .from('ledger')
+      .select('id, account_id')
+      .eq('account_id', accountId)
+      .eq('status', 'pending')
+      .eq('amount', charge.amount / 100)
+      .order('date', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (byAmount?.id) return byAmount;
+  }
+
+  return null;
+}

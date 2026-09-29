@@ -5,6 +5,7 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import {
   activateAccountAfterAchClears,
+  findPendingEntryForAchCharge,
   resolveAccountIdForCharge,
 } from '../../lib/achPaymentRecovery';
 
@@ -456,15 +457,11 @@ export default async function handler(req, res) {
           return res.json({ success: true, message: 'Ledger entry already updated' });
         }
 
-        // Find existing ledger entry by payment_intent_id and update it
-        if (charge.payment_intent) {
-          // No `type` filter: billing.ts writes the dues row as type 'credit',
-          // so filtering on 'payment' here never matched a billing-cron charge.
-          const { data: existingEntry, error: findError } = await supabase
-            .from('ledger')
-            .select('id, account_id')
-            .eq('ledger_entry_key', charge.payment_intent)
-            .maybeSingle();
+        // Find the PENDING row this charge settles and flip it to 'cleared'.
+        // Only when every lookup misses do we insert a new row below -- an
+        // insert alongside a pending row shows the same payment twice.
+        {
+          const existingEntry = await findPendingEntryForAchCharge(supabase, charge, achAccountId);
 
           if (existingEntry) {
             // Update the existing entry: add stripe_charge_id and change status to 'cleared'
@@ -493,11 +490,11 @@ export default async function handler(req, res) {
               console.log('✅ Updated account status to "active" for account:', existingEntry.account_id);
             }
 
-            console.log('✅ Updated ledger entry to "cleared" for payment_intent:', charge.payment_intent);
+            console.log('✅ Updated ledger entry to "cleared":', existingEntry.id, 'payment_intent:', charge.payment_intent);
             return res.json({ success: true, message: 'Ledger entry updated to cleared' });
           } else {
-            console.log('⚠️  No pending ledger entry found for payment_intent:', charge.payment_intent);
-            // This might be an old payment or manual charge - fall through to create new entry
+            console.log('⚠️  No pending ledger entry found for ACH charge:', charge.id, 'payment_intent:', charge.payment_intent);
+            // A manual charge, or the pending row was already removed by hand - fall through to create new entry
           }
         }
 
