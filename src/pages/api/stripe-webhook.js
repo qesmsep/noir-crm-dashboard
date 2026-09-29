@@ -460,42 +460,48 @@ export default async function handler(req, res) {
         // Find the PENDING row this charge settles and flip it to 'cleared'.
         // Only when every lookup misses do we insert a new row below -- an
         // insert alongside a pending row shows the same payment twice.
-        {
-          const existingEntry = await findPendingEntryForAchCharge(supabase, charge, achAccountId);
+        let existingEntry;
+        try {
+          existingEntry = await findPendingEntryForAchCharge(supabase, charge, achAccountId);
+        } catch (lookupError) {
+          // Never fall through to the insert on a failed lookup -- that is the
+          // duplicate. A 500 makes Stripe redeliver the event.
+          console.error('Error looking up pending ledger entry:', lookupError);
+          return res.status(500).json({ error: 'Failed to look up ledger' });
+        }
 
-          if (existingEntry) {
-            // Update the existing entry: add stripe_charge_id and change status to 'cleared'
-            const { error: updateError } = await supabase
-              .from('ledger')
-              .update({
-                stripe_charge_id: charge.id,
-                status: 'cleared'
-              })
-              .eq('id', existingEntry.id);
+        if (existingEntry) {
+          // Update the existing entry: add stripe_charge_id and change status to 'cleared'
+          const { error: updateError } = await supabase
+            .from('ledger')
+            .update({
+              stripe_charge_id: charge.id,
+              status: 'cleared'
+            })
+            .eq('id', existingEntry.id);
 
-            if (updateError) {
-              console.error('Error updating ledger entry:', updateError);
-              return res.status(500).json({ error: 'Failed to update ledger' });
-            }
-
-            // Account status from 'processing' to 'active' now that ACH payment cleared
-            const recovery = await activateAccountAfterAchClears(
-              supabase,
-              existingEntry.account_id || achAccountId
-            );
-            if (recovery.reason === 'error') {
-              console.error('Error updating account status:', recovery.error);
-              // Don't fail the entire webhook, just log the error
-            } else if (recovery.activated) {
-              console.log('✅ Updated account status to "active" for account:', existingEntry.account_id);
-            }
-
-            console.log('✅ Updated ledger entry to "cleared":', existingEntry.id, 'payment_intent:', charge.payment_intent);
-            return res.json({ success: true, message: 'Ledger entry updated to cleared' });
-          } else {
-            console.log('⚠️  No pending ledger entry found for ACH charge:', charge.id, 'payment_intent:', charge.payment_intent);
-            // A manual charge, or the pending row was already removed by hand - fall through to create new entry
+          if (updateError) {
+            console.error('Error updating ledger entry:', updateError);
+            return res.status(500).json({ error: 'Failed to update ledger' });
           }
+
+          // Account status from 'processing' to 'active' now that ACH payment cleared
+          const recovery = await activateAccountAfterAchClears(
+            supabase,
+            existingEntry.account_id || achAccountId
+          );
+          if (recovery.reason === 'error') {
+            console.error('Error updating account status:', recovery.error);
+            // Don't fail the entire webhook, just log the error
+          } else if (recovery.activated) {
+            console.log('✅ Updated account status to "active" for account:', existingEntry.account_id);
+          }
+
+          console.log('✅ Updated ledger entry to "cleared":', existingEntry.id, 'payment_intent:', charge.payment_intent);
+          return res.json({ success: true, message: 'Ledger entry updated to cleared' });
+        } else {
+          console.log('⚠️  No pending ledger entry found for ACH charge:', charge.id, 'payment_intent:', charge.payment_intent);
+          // A manual charge, or the pending row was already removed by hand - fall through to create new entry
         }
 
         // Fallback: If no payment_intent or no existing entry found, create a new ledger entry

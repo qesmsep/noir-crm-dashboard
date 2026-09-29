@@ -122,6 +122,9 @@ export interface PendingLedgerEntry {
   account_id: string | null;
 }
 
+/** How far back the amount-only fallback looks for an unlinked pending row. */
+export const UNLINKED_PENDING_WINDOW_DAYS = 30;
+
 /**
  * Find the PENDING ledger row an ACH charge settles, so the webhook can flip
  * it to 'cleared' instead of inserting a second row.
@@ -133,45 +136,70 @@ export interface PendingLedgerEntry {
  *
  *   1. ledger_entry_key = payment intent -- how every writer keys the dues row.
  *   2. stripe_payment_intent_id = payment intent, still pending, positive.
- *   3. same account, still pending, same amount, oldest first -- a dues row
- *      with no usable Stripe link (written before the key convention, or
- *      re-entered by hand).
+ *   3. same account, still pending, same amount, no payment intent of its own,
+ *      dated within the last 30 days, oldest first. A row that carries a
+ *      payment intent belongs to that charge and is never taken by amount --
+ *      that is what keeps an in-flight month from being cleared by another.
+ *
+ * A failed query throws rather than reading as a miss: a miss leads the caller
+ * to insert, which is the duplicate this exists to prevent. The webhook turns
+ * the throw into a 500 so Stripe redelivers.
  */
 export async function findPendingEntryForAchCharge(
   db: AccountsDb,
   charge: AchCharge & { amount?: number },
-  accountId: string | null | undefined
+  accountId: string | null | undefined,
+  today: Date = new Date()
 ): Promise<PendingLedgerEntry | null> {
-  if (charge?.payment_intent) {
-    const { data: byKey } = await db
-      .from('ledger')
-      .select('id, account_id')
-      .eq('ledger_entry_key', charge.payment_intent)
-      .maybeSingle();
-    if (byKey?.id) return byKey;
+  const pick = ({ data, error }: { data: any; error: any }, step: string) => {
+    if (error) throw new Error(`Pending ledger lookup (${step}) failed: ${error.message || error}`);
+    return data?.id ? (data as PendingLedgerEntry) : null;
+  };
 
-    const { data: byIntent } = await db
-      .from('ledger')
-      .select('id, account_id')
-      .eq('stripe_payment_intent_id', charge.payment_intent)
-      .eq('status', 'pending')
-      .gt('amount', 0)
-      .limit(1)
-      .maybeSingle();
-    if (byIntent?.id) return byIntent;
+  if (charge?.payment_intent) {
+    const byKey = pick(
+      await db
+        .from('ledger')
+        .select('id, account_id')
+        .eq('ledger_entry_key', charge.payment_intent)
+        .maybeSingle(),
+      'ledger_entry_key'
+    );
+    if (byKey) return byKey;
+
+    const byIntent = pick(
+      await db
+        .from('ledger')
+        .select('id, account_id')
+        .eq('stripe_payment_intent_id', charge.payment_intent)
+        .eq('status', 'pending')
+        .gt('amount', 0)
+        .order('date', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      'stripe_payment_intent_id'
+    );
+    if (byIntent) return byIntent;
   }
 
-  if (accountId && typeof charge?.amount === 'number') {
-    const { data: byAmount } = await db
-      .from('ledger')
-      .select('id, account_id')
-      .eq('account_id', accountId)
-      .eq('status', 'pending')
-      .eq('amount', charge.amount / 100)
-      .order('date', { ascending: true })
-      .limit(1)
-      .maybeSingle();
-    if (byAmount?.id) return byAmount;
+  if (accountId && Number.isInteger(charge?.amount)) {
+    const since = new Date(today);
+    since.setDate(since.getDate() - UNLINKED_PENDING_WINDOW_DAYS);
+    const byAmount = pick(
+      await db
+        .from('ledger')
+        .select('id, account_id')
+        .eq('account_id', accountId)
+        .eq('status', 'pending')
+        .eq('amount', ((charge.amount as number) / 100).toFixed(2))
+        .is('stripe_payment_intent_id', null)
+        .gte('date', since.toISOString().split('T')[0])
+        .order('date', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+      'account + amount'
+    );
+    if (byAmount) return byAmount;
   }
 
   return null;
