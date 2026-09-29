@@ -135,6 +135,8 @@ export const UNLINKED_PENDING_WINDOW_DAYS = 30;
  * link it has, strongest first, and the caller only inserts when all miss:
  *
  *   1. ledger_entry_key = payment intent -- how every writer keys the dues row.
+ *      No status filter: staff may already have set it cleared by hand, and
+ *      missing it there would fall through to the insert.
  *   2. stripe_payment_intent_id = payment intent, still pending, positive.
  *   3. same account, still pending, same amount, no payment intent of its own,
  *      dated within the last 30 days, oldest first. A row that carries a
@@ -184,22 +186,29 @@ export async function findPendingEntryForAchCharge(
 
   if (accountId && Number.isInteger(charge?.amount)) {
     const since = new Date(today);
-    since.setDate(since.getDate() - UNLINKED_PENDING_WINDOW_DAYS);
-    const byAmount = pick(
-      await db
-        .from('ledger')
-        .select('id, account_id')
-        .eq('account_id', accountId)
-        .eq('status', 'pending')
-        .eq('amount', ((charge.amount as number) / 100).toFixed(2))
-        .is('stripe_payment_intent_id', null)
-        .gte('date', since.toISOString().split('T')[0])
-        .order('date', { ascending: true })
-        .limit(1)
-        .maybeSingle(),
-      'account + amount'
-    );
-    if (byAmount) return byAmount;
+    since.setUTCDate(since.getUTCDate() - UNLINKED_PENDING_WINDOW_DAYS);
+    const { data, error } = await db
+      .from('ledger')
+      .select('id, account_id')
+      .eq('account_id', accountId)
+      .eq('status', 'pending')
+      .eq('amount', ((charge.amount as number) / 100).toFixed(2))
+      .is('stripe_payment_intent_id', null)
+      .gte('date', since.toISOString().split('T')[0])
+      .order('date', { ascending: true })
+      .limit(2);
+    if (error) throw new Error(`Pending ledger lookup (account + amount) failed: ${error.message || error}`);
+    const candidates = (Array.isArray(data) ? data : []) as PendingLedgerEntry[];
+    if (candidates.length > 0) {
+      // Taking the oldest when two tie still leaves one line per payment; the
+      // next settlement clears the other. Skipping would insert, which is the
+      // duplicate. The warning is what lets staff check which date cleared.
+      console.warn(
+        `ACH charge ${charge.id} matched pending ledger row ${candidates[0].id} by amount only` +
+          (candidates.length > 1 ? ' (more than one candidate; took the oldest)' : '')
+      );
+      return candidates[0];
+    }
   }
 
   return null;

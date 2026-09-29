@@ -476,6 +476,8 @@ export default async function handler(req, res) {
             .from('ledger')
             .update({
               stripe_charge_id: charge.id,
+              // Links a row matched by amount, so later events find it by intent
+              ...(charge.payment_intent ? { stripe_payment_intent_id: charge.payment_intent } : {}),
               status: 'cleared'
             })
             .eq('id', existingEntry.id);
@@ -499,10 +501,10 @@ export default async function handler(req, res) {
 
           console.log('✅ Updated ledger entry to "cleared":', existingEntry.id, 'payment_intent:', charge.payment_intent);
           return res.json({ success: true, message: 'Ledger entry updated to cleared' });
-        } else {
-          console.log('⚠️  No pending ledger entry found for ACH charge:', charge.id, 'payment_intent:', charge.payment_intent);
-          // A manual charge, or the pending row was already removed by hand - fall through to create new entry
         }
+
+        // A manual charge, or the pending row was already removed by hand - fall through to create new entry
+        console.log('⚠️  No pending ledger entry found for ACH charge:', charge.id, 'payment_intent:', charge.payment_intent);
 
         // Fallback: If no payment_intent or no existing entry found, create a new ledger entry
         // This handles old payments or manual ACH charges

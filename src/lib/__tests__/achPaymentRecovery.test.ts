@@ -173,7 +173,7 @@ describe('findPendingEntryForAchCharge', () => {
     const { db, calls } = fakeDb({
       ledger: (q) => (q.filters.account_id === 'acct_1' && q.filters.status === 'pending'
         && q.filters.amount === '150.00'
-        ? { data: { id: 'row_amount', account_id: 'acct_1' }, error: null }
+        ? { data: [{ id: 'row_amount', account_id: 'acct_1' }], error: null }
         : none),
     });
     await expect(findPendingEntryForAchCharge(db, charge, 'acct_1', today))
@@ -183,6 +183,19 @@ describe('findPendingEntryForAchCharge', () => {
     // in-flight month cannot be cleared by a different charge.
     expect(amountQuery.filters['stripe_payment_intent_id is']).toBeNull();
     expect(amountQuery.filters['date>=']).toBe('2026-08-30');
+  });
+
+  it('takes the oldest when two unlinked rows tie, and warns', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const { db } = fakeDb({
+      ledger: (q) => ('account_id' in q.filters
+        ? { data: [{ id: 'row_old', account_id: 'acct_1' }, { id: 'row_new', account_id: 'acct_1' }], error: null }
+        : none),
+    });
+    await expect(findPendingEntryForAchCharge(db, charge, 'acct_1', today))
+      .resolves.toEqual({ id: 'row_old', account_id: 'acct_1' });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('more than one candidate'));
+    warn.mockRestore();
   });
 
   it('returns null only when nothing pending matches, so the caller may insert', async () => {
