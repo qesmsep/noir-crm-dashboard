@@ -1,5 +1,6 @@
 import {
   activateAccountAfterAchClears,
+  findPendingEntryForAchCharge,
   isAchCharge,
   resolveAccountIdForCharge,
 } from '../achPaymentRecovery';
@@ -19,6 +20,10 @@ function fakeDb(handlers: Record<string, (q: Recorded) => any>) {
         select: () => builder,
         update: (payload: any) => { q.op = 'update'; q.payload = payload; return builder; },
         eq: (col: string, val: any) => { q.filters[col] = val; return builder; },
+        gt: (col: string, val: any) => { q.filters[`${col}>`] = val; return builder; },
+        gte: (col: string, val: any) => { q.filters[`${col}>=`] = val; return builder; },
+        is: (col: string, val: any) => { q.filters[`${col} is`] = val; return builder; },
+        order: () => builder,
         limit: () => builder,
         maybeSingle: () => Promise.resolve(handlers[table]?.(q) ?? { data: null, error: null }),
         then: (resolve: any) => resolve(handlers[table]?.(q) ?? { data: null, error: null }),
@@ -133,4 +138,87 @@ describe('activateAccountAfterAchClears', () => {
     });
     expect(calls).toHaveLength(0);
   });
+});
+
+describe('findPendingEntryForAchCharge', () => {
+  const charge = { ...achCharge, amount: 15000 };
+  const today = new Date('2026-09-29T12:00:00Z');
+  const none = { data: null, error: null };
+
+  it('matches the dues row by ledger_entry_key first', async () => {
+    const { db, calls } = fakeDb({
+      ledger: (q) => (q.filters.ledger_entry_key === 'pi_test'
+        ? { data: { id: 'row_key', account_id: 'acct_1' }, error: null }
+        : none),
+    });
+    await expect(findPendingEntryForAchCharge(db, charge, 'acct_1', today))
+      .resolves.toEqual({ id: 'row_key', account_id: 'acct_1' });
+    expect(calls).toHaveLength(1);
+  });
+
+  it('falls back to a pending row carrying the payment intent id', async () => {
+    const { db } = fakeDb({
+      ledger: (q) => (q.filters.stripe_payment_intent_id === 'pi_test'
+        && q.filters.status === 'pending' && q.filters['amount>'] === 0
+        ? { data: { id: 'row_intent', account_id: 'acct_1' }, error: null }
+        : none),
+    });
+    await expect(findPendingEntryForAchCharge(db, charge, 'acct_1', today))
+      .resolves.toEqual({ id: 'row_intent', account_id: 'acct_1' });
+  });
+
+  it('matches by amount only an unlinked pending row from the last 30 days', async () => {
+    // The Aug 2026 duplicate: PENDING "Monthly dues" plus a new cleared
+    // "ACH payment" row, because no Stripe link matched.
+    const { db, calls } = fakeDb({
+      ledger: (q) => (q.filters.account_id === 'acct_1' && q.filters.status === 'pending'
+        && q.filters.amount === '150.00'
+        ? { data: [{ id: 'row_amount', account_id: 'acct_1' }], error: null }
+        : none),
+    });
+    await expect(findPendingEntryForAchCharge(db, charge, 'acct_1', today))
+      .resolves.toEqual({ id: 'row_amount', account_id: 'acct_1' });
+    const amountQuery = calls.find((c) => 'account_id' in c.filters)!;
+    // A row linked to its own payment intent is never taken by amount, so an
+    // in-flight month cannot be cleared by a different charge.
+    expect(amountQuery.filters['stripe_payment_intent_id is']).toBeNull();
+    expect(amountQuery.filters['date>=']).toBe('2026-08-30');
+  });
+
+  it('takes the oldest when two unlinked rows tie, and warns', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    const { db } = fakeDb({
+      ledger: (q) => ('account_id' in q.filters
+        ? { data: [{ id: 'row_old', account_id: 'acct_1' }, { id: 'row_new', account_id: 'acct_1' }], error: null }
+        : none),
+    });
+    await expect(findPendingEntryForAchCharge(db, charge, 'acct_1', today))
+      .resolves.toEqual({ id: 'row_old', account_id: 'acct_1' });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('more than one candidate'));
+    warn.mockRestore();
+  });
+
+  it('returns null only when nothing pending matches, so the caller may insert', async () => {
+    const { db } = fakeDb({});
+    await expect(findPendingEntryForAchCharge(db, charge, 'acct_1', today)).resolves.toBeNull();
+  });
+
+  it('skips the amount match without an account', async () => {
+    const { db, calls } = fakeDb({});
+    await expect(findPendingEntryForAchCharge(db, charge, null, today)).resolves.toBeNull();
+    expect(calls.some((c) => 'account_id' in c.filters)).toBe(false);
+  });
+
+  it.each(['ledger_entry_key', 'stripe_payment_intent_id', 'account_id'])(
+    'throws instead of reporting a miss when the %s lookup errors',
+    async (failing) => {
+      const { db } = fakeDb({
+        ledger: (q) => (failing in q.filters
+          ? { data: null, error: { message: 'connection reset' } }
+          : none),
+      });
+      await expect(findPendingEntryForAchCharge(db, charge, 'acct_1', today))
+        .rejects.toThrow('connection reset');
+    }
+  );
 });
