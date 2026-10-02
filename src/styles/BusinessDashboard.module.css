@@ -649,3 +649,54 @@
     display: none;
   }
 }
+
+/* Compact table: five narrow columns that fit a phone-width card with no
+   horizontal scroll. Overrides .dataTable's min-width. */
+.compactTable {
+  min-width: 0;
+  table-layout: fixed;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.compactTable th,
+.compactTable td {
+  padding: 0.4rem 0.2rem;
+  white-space: nowrap;
+}
+
+.compactTable th {
+  font-size: 0.625rem;
+  letter-spacing: 0;
+}
+
+.compactTable th.textRight {
+  text-align: right;
+}
+
+.compactTable th:first-child,
+.compactTable td:first-child {
+  width: 15%;
+  padding-left: 0;
+}
+
+.compactTable th:last-child,
+.compactTable td:last-child {
+  padding-right: 0;
+}
+
+.compactHint {
+  margin-top: 0.5rem;
+  font-size: 0.6875rem;
+  color: #86868b;
+  line-height: 1.4;
+}
+
+@media (min-width: 768px) {
+  .compactTable {
+    font-size: 0.8125rem;
+  }
+  .compactTable th {
+    font-size: 0.6875rem;
+  }
+}
