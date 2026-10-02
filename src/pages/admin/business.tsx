@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Spinner } from '@/components/ui/spinner';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import styles from '../../styles/BusinessDashboard.module.css';
@@ -117,8 +117,13 @@ function fmtCurrency(n: number): string {
 
 // Compact currency for tight spaces (chart labels): $12.2k, $950
 function fmtCurrencyShort(n: number): string {
-  if (Math.abs(n) >= 1000) return `$${(n / 1000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '')}k`;
-  return fmtCurrency(n);
+  const abs = Math.abs(n);
+  if (abs < 1000) return fmtCurrency(n);
+  const k = abs / 1000;
+  const body = k >= 999.5
+    ? `${(k / 1000).toFixed(1).replace(/\.0$/, '')}M`
+    : `${k.toFixed(k >= 100 ? 0 : 1).replace(/\.0$/, '')}k`;
+  return `${n < 0 ? '-' : ''}$${body}`;
 }
 
 function fmtCurrencyDec(n: number): string {
@@ -232,16 +237,28 @@ function WeeklyGainLossChart({ data, currentWeekStart }: { data: WeeklyPoint[]; 
 // ---------------------------------------------------------------------------
 
 function LocationTrendChart({ data, currentMonth }: { data: TrendPoint[]; currentMonth: string }) {
+  // Lay the chart out at the card's real pixel width so text stays a fixed
+  // size: on phones it shrinks to fit (no horizontal scroll), on wide cards
+  // the bars spread out instead of the whole chart scaling up.
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [boxWidth, setBoxWidth] = useState(0);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(([entry]) => setBoxWidth(Math.round(entry.contentRect.width)));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   if (!data || data.length === 0) return <div className={styles.emptyState}>No data</div>;
 
-  // Sized for a phone-width card (~340px) and scaled via viewBox, so it fits
-  // any width with no horizontal scroll; wider screens scale it up.
   const height = 150;
   const top = 16;
   const yAxisWidth = 34;
-  const barWidth = 34;
-  const gap = 14;
-  const chartWidth = yAxisWidth + data.length * (barWidth + gap) + gap;
+  const minChartWidth = yAxisWidth + data.length * (34 + 14) + 14;
+  const chartWidth = Math.max(minChartWidth, boxWidth);
+  const barWidth = Math.min(56, ((chartWidth - yAxisWidth) / data.length) * 0.7);
+  const gap = (chartWidth - yAxisWidth - data.length * barWidth) / (data.length + 1);
   const svgHeight = top + height + 20;
 
   const totals = data.map(d => d.noir + d.rooftop + d.other);
@@ -257,11 +274,11 @@ function LocationTrendChart({ data, currentMonth }: { data: TrendPoint[]; curren
   const yFor = (v: number) => top + height - (v / maxVal) * height;
 
   return (
-    <div>
+    <div ref={boxRef}>
       <svg
         width="100%"
         viewBox={`0 0 ${chartWidth} ${svgHeight}`}
-        style={{ display: 'block', maxHeight: 260 }}
+        style={{ display: 'block' }}
         role="img"
         aria-label="Member spend by location, last 6 months"
       >
@@ -564,7 +581,7 @@ export default function BusinessDashboard() {
                 </table>
                 <div className={styles.compactHint}>
                   Location comes from ledger purchase notes until purchases carry a location id. RooftopKC includes the
-                  $20 cover (first cocktail included).
+                  $20 cover (first cocktail included) until Toast imports split cover vs. drinks.
                 </div>
               </div>
             </div>
