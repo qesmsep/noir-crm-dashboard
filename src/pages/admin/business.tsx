@@ -115,6 +115,12 @@ function fmtCurrency(n: number): string {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
+// Compact currency for tight spaces (chart labels): $12.2k, $950
+function fmtCurrencyShort(n: number): string {
+  if (Math.abs(n) >= 1000) return `$${(n / 1000).toFixed(n >= 100000 ? 0 : 1).replace(/\.0$/, '')}k`;
+  return fmtCurrency(n);
+}
+
 function fmtCurrencyDec(n: number): string {
   return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -228,46 +234,48 @@ function WeeklyGainLossChart({ data, currentWeekStart }: { data: WeeklyPoint[]; 
 function LocationTrendChart({ data, currentMonth }: { data: TrendPoint[]; currentMonth: string }) {
   if (!data || data.length === 0) return <div className={styles.emptyState}>No data</div>;
 
-  const height = 200;
-  const yAxisWidth = 52;
-  const barWidth = 44;
-  const gap = 28;
+  // Sized for a phone-width card (~340px) and scaled via viewBox, so it fits
+  // any width with no horizontal scroll; wider screens scale it up.
+  const height = 150;
+  const top = 16;
+  const yAxisWidth = 34;
+  const barWidth = 34;
+  const gap = 14;
   const chartWidth = yAxisWidth + data.length * (barWidth + gap) + gap;
+  const svgHeight = top + height + 20;
 
   const totals = data.map(d => d.noir + d.rooftop + d.other);
   const maxTotal = Math.max(...totals, 1);
-  // Nice tick increment: 1/2/5 × 10^k so ~4 gridlines
-  const rawStep = maxTotal / 4;
+  // Nice tick increment: 1/2/5 × 10^k so ~3 gridlines
+  const rawStep = maxTotal / 3;
   const pow = Math.pow(10, Math.floor(Math.log10(rawStep)));
   const step = [1, 2, 5, 10].map(m => m * pow).find(s => s >= rawStep) || rawStep;
   const maxVal = Math.ceil(maxTotal / step) * step;
   const ticks: number[] = [];
   for (let t = 0; t <= maxVal; t += step) ticks.push(t);
 
-  const yFor = (v: number) => height - (v / maxVal) * height;
+  const yFor = (v: number) => top + height - (v / maxVal) * height;
 
   return (
-    <div className={styles.chartContainer}>
-      {/* Fixed pixel width inside the scrollable container: on phones the
-          chart scrolls horizontally instead of shrinking labels illegibly */}
+    <div>
       <svg
-        width={chartWidth}
-        height={height + 34}
-        viewBox={`0 0 ${chartWidth} ${height + 34}`}
+        width="100%"
+        viewBox={`0 0 ${chartWidth} ${svgHeight}`}
+        style={{ display: 'block', maxHeight: 260 }}
         role="img"
         aria-label="Member spend by location, last 6 months"
       >
         {ticks.map(t => (
           <g key={t}>
             <line x1={yAxisWidth} y1={yFor(t)} x2={chartWidth} y2={yFor(t)} stroke="rgba(0,0,0,0.06)" strokeWidth={1} />
-            <text x={yAxisWidth - 6} y={yFor(t) + 3} textAnchor="end" fontSize="10" fill="#86868b">
+            <text x={yAxisWidth - 4} y={yFor(t) + 3} textAnchor="end" fontSize="9" fill="#86868b">
               {t >= 1000 ? `$${t / 1000}k` : `$${t}`}
             </text>
           </g>
         ))}
         {data.map((d, i) => {
           const x = yAxisWidth + gap + i * (barWidth + gap);
-          let cumY = height;
+          let cumY = top + height;
           const isMTD = d.month === currentMonth;
           return (
             <g key={d.month}>
@@ -282,7 +290,7 @@ function LocationTrendChart({ data, currentMonth }: { data: TrendPoint[]; curren
                     x={x}
                     y={y}
                     width={barWidth}
-                    height={Math.max(barH - 2, 1)}
+                    height={Math.max(barH - 1.5, 1)}
                     rx={2}
                     fill={s.color}
                     opacity={isMTD ? 0.55 : 0.9}
@@ -293,29 +301,29 @@ function LocationTrendChart({ data, currentMonth }: { data: TrendPoint[]; curren
               })}
               <text
                 x={x + barWidth / 2}
-                y={cumY - 5}
+                y={cumY - 4}
                 textAnchor="middle"
                 fontSize="9"
                 fontWeight="600"
                 fill="#6e6e73"
               >
-                {fmtCurrency(d.noir + d.rooftop + d.other)}
+                {fmtCurrencyShort(d.noir + d.rooftop + d.other)}
               </text>
-              <text x={x + barWidth / 2} y={height + 14} textAnchor="middle" fontSize="10" fill="#86868b">
+              <text x={x + barWidth / 2} y={top + height + 13} textAnchor="middle" fontSize="9.5" fill="#86868b">
                 {fmtMonthShort(d.month)}{isMTD ? '*' : ''}
               </text>
             </g>
           );
         })}
       </svg>
-      <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '0.25rem 0.75rem', marginTop: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
         {SERIES.map(s => (
           <div key={s.key} style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.6875rem', color: '#6e6e73' }}>
             <span style={{ width: 10, height: 10, borderRadius: 2, background: s.color, display: 'inline-block' }} />
             {s.label}
           </div>
         ))}
-        <span style={{ fontSize: '0.6875rem', color: '#86868b' }}>* current month is month-to-date</span>
+        <span style={{ fontSize: '0.6875rem', color: '#86868b' }}>* month-to-date</span>
       </div>
     </div>
   );
@@ -532,34 +540,31 @@ export default function BusinessDashboard() {
               <div className={styles.chartCard}>
                 <div className={styles.chartTitle}>Member Spend by Location (Last 6 Months)</div>
                 <LocationTrendChart data={m.locations.trend} currentMonth={m.month} />
-                <div className={styles.chartContainer} style={{ marginTop: '0.75rem' }}>
-                <table className={styles.dataTable}>
+                <table className={`${styles.dataTable} ${styles.compactTable}`} style={{ marginTop: '0.75rem' }}>
                   <thead>
                     <tr>
                       <th>Month</th>
                       <th className={styles.textRight}>Noir</th>
-                      <th className={styles.textRight}>RooftopKC</th>
-                      <th className={styles.textRight}>Events &amp; Other</th>
+                      <th className={styles.textRight}>Rooftop</th>
+                      <th className={styles.textRight}>Events</th>
                       <th className={styles.textRight}>Total</th>
                     </tr>
                   </thead>
                   <tbody>
                     {m.locations.trend.map(t => (
                       <tr key={t.month}>
-                        <td>{fmtMonthShort(t.month)}{t.month === m.month ? ' (MTD)' : ''}</td>
+                        <td>{fmtMonthShort(t.month)}{t.month === m.month ? '*' : ''}</td>
                         <td className={styles.textRight}>{fmtCurrency(t.noir)}</td>
                         <td className={styles.textRight}>{fmtCurrency(t.rooftop)}</td>
                         <td className={styles.textRight}>{fmtCurrency(t.other)}</td>
-                        <td className={styles.textRight}>{fmtCurrency(t.noir + t.rooftop + t.other)}</td>
+                        <td className={styles.textRight}><strong>{fmtCurrency(t.noir + t.rooftop + t.other)}</strong></td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
-                </div>
-                <div className={styles.modalHint}>
-                  Location is derived from ledger purchase notes (Noir Attendance/Visit, RooftopKC) until purchases carry a
-                  location id. RooftopKC totals include the $20 cover (first cocktail included) — Toast imports will let us
-                  split cover vs. drink sales.
+                <div className={styles.compactHint}>
+                  Location comes from ledger purchase notes until purchases carry a location id. RooftopKC includes the
+                  $20 cover (first cocktail included).
                 </div>
               </div>
             </div>
