@@ -290,3 +290,49 @@ export function aggregateLedger(
 
   return agg;
 }
+
+// ---------------------------------------------------------------------------
+// Birthdays & celebrations — the next 7 days (today included, Chicago time)
+// ---------------------------------------------------------------------------
+
+/** Chicago calendar date (YYYY-MM-DD) of an ISO timestamp. */
+export function chicagoDateOf(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: CHICAGO_TZ });
+}
+
+function isLeapYear(y: number): boolean {
+  return (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+}
+
+/**
+ * Date of the next birthday on or after today, as YYYY-MM-DD, or null when the
+ * dob can't be read. A Feb 29 birthday falls on Feb 28 in non-leap years.
+ */
+export function nextBirthday(dob: string | null | undefined, today: string): string | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(dob || '');
+  if (!m) return null;
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
+  const year = Number(today.slice(0, 4));
+  const onYear = (y: number) => {
+    const d = month === 2 && day === 29 && !isLeapYear(y) ? 28 : day;
+    return `${y}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  };
+  const thisYear = onYear(year);
+  return thisYear >= today ? thisYear : onYear(year + 1);
+}
+
+/** Reservation occasions that count as a celebration. */
+export const CELEBRATION_TYPES = new Set([
+  'birthday',
+  'anniversary',
+  'engagement',
+  'party',
+  'graduation',
+  'bachelor',
+]);
+
+export function isCelebration(eventType: string | null | undefined): boolean {
+  return CELEBRATION_TYPES.has((eventType || '').trim().toLowerCase());
+}

@@ -18,6 +18,9 @@ import {
   shiftMonth,
   weekStartOf,
   round2,
+  nextBirthday,
+  isCelebration,
+  chicagoDateOf,
 } from '../../../lib/businessMetricsCore';
 
 /**
@@ -103,20 +106,35 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const nextMonthStart = shiftMonth(monthStart, 1);
     const lastMonthStart = shiftMonth(monthStart, -1);
 
-    const [ledger, accountsRes, membersRes, plansRes] = await Promise.all([
+    // Birthdays & celebrations window: today through 6 days out (Chicago).
+    // Reservations are fetched with a day of slack either side of the UTC
+    // range, then trimmed to the window by their Chicago date.
+    const upcomingEnd = addDays(today, 6);
+
+    const [ledger, accountsRes, membersRes, plansRes, reservationsRes, locationsRes] = await Promise.all([
       fetchAllLedger(),
       supabaseAdmin
         .from('accounts')
         .select('account_id, monthly_dues, subscription_status, next_billing_date, subscription_cancel_at, membership_plan_id'),
       supabaseAdmin
         .from('members')
-        .select('member_id, account_id, first_name, last_name, status, join_date'),
+        .select('member_id, account_id, first_name, last_name, status, join_date, dob'),
       supabaseAdmin.from('subscription_plans').select('id, plan_name, interval'),
+      supabaseAdmin
+        .from('reservations')
+        .select('id, member_id, first_name, last_name, start_time, party_size, event_type, status, location_id')
+        .not('member_id', 'is', null)
+        .not('event_type', 'is', null)
+        .gte('start_time', `${addDays(today, -1)}T00:00:00Z`)
+        .lt('start_time', `${addDays(upcomingEnd, 2)}T00:00:00Z`),
+      supabaseAdmin.from('locations').select('id, name'),
     ]);
 
     if (accountsRes.error) throw new Error(`accounts fetch: ${accountsRes.error.message}`);
     if (membersRes.error) throw new Error(`members fetch: ${membersRes.error.message}`);
     if (plansRes.error) throw new Error(`plans fetch: ${plansRes.error.message}`);
+    if (reservationsRes.error) throw new Error(`reservations fetch: ${reservationsRes.error.message}`);
+    if (locationsRes.error) throw new Error(`locations fetch: ${locationsRes.error.message}`);
 
     const accounts = (accountsRes.data || []).map((a: any): AccountRow => ({
       ...a,
@@ -369,6 +387,38 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       atRisk: atRisk.slice(0, 20),
     };
 
+    // ------------------------------------------------------------------
+    // Birthdays & celebrations — the next 7 days
+    // ------------------------------------------------------------------
+    const memberName = (r: { first_name?: string | null; last_name?: string | null }) =>
+      `${r.first_name || ''} ${r.last_name || ''}`.trim() || 'Unknown';
+
+    const birthdays = (activeMembers as any[])
+      .map(mb => ({ mb, date: nextBirthday(mb.dob, today) }))
+      .filter((x): x is { mb: any; date: string } => !!x.date && x.date <= upcomingEnd)
+      .map(({ mb, date }) => ({ member_id: mb.member_id as string, name: memberName(mb), date }))
+      .sort((a, b) => a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+
+    const locationName = new Map<string, string>();
+    for (const l of locationsRes.data || []) locationName.set(l.id, l.name || '');
+
+    const celebrations = (reservationsRes.data || [])
+      .filter((r: any) => r.status !== 'cancelled' && isCelebration(r.event_type))
+      .map((r: any) => ({
+        reservation_id: r.id as string,
+        member_id: r.member_id as string,
+        name: memberName(r),
+        date: chicagoDateOf(r.start_time),
+        startTime: r.start_time as string,
+        occasion: String(r.event_type).trim().toLowerCase(),
+        partySize: Number(r.party_size) || 0,
+        location: (r.location_id && locationName.get(r.location_id)) || null,
+      }))
+      .filter(c => c.date >= today && c.date <= upcomingEnd)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+
+    const upcoming = { from: today, to: upcomingEnd, birthdays, celebrations };
+
     const payload = {
       generatedAt: new Date().toISOString(),
       today,
@@ -386,6 +436,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       },
       balances,
       engagement,
+      upcoming,
       // Data-quality signals: nonzero values mean a figure above is degraded
       // (stale plan id => annual dues counted as monthly; empty purchase
       // notes => spend silently bucketed under "Events & Other").

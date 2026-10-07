@@ -39,6 +39,23 @@ interface WeeklyPoint {
   net: number;
 }
 
+interface UpcomingBirthday {
+  member_id: string;
+  name: string;
+  date: string; // YYYY-MM-DD (Chicago)
+}
+
+interface UpcomingCelebration {
+  reservation_id: string;
+  member_id: string;
+  name: string;
+  date: string; // YYYY-MM-DD (Chicago)
+  startTime: string; // ISO
+  occasion: string;
+  partySize: number;
+  location: string | null;
+}
+
 interface Metrics {
   generatedAt: string;
   today: string;
@@ -100,6 +117,12 @@ interface Metrics {
     atRiskCount: number;
     atRisk: AtRiskRow[];
   };
+  upcoming?: {
+    from: string;
+    to: string;
+    birthdays: UpcomingBirthday[];
+    celebrations: UpcomingCelebration[];
+  };
   dataQuality?: {
     unknownPlanAccounts: number;
     purchasesWithEmptyNote: number;
@@ -151,6 +174,28 @@ const SERIES = [
 // Gain/loss polarity colors (status semantics: gained = good, lost = bad)
 const GAINED_COLOR = '#1e7e45';
 const LOST_COLOR = '#c93a34';
+
+const OCCASION_LABELS: Record<string, string> = {
+  birthday: '🎂 Birthday',
+  anniversary: '🥂 Anniversary',
+  engagement: '💍 Engagement',
+  party: '🎉 Celebration',
+  graduation: '🎓 Graduation',
+  bachelor: '🥳 Bachelor/ette',
+};
+
+// "Today", "Tomorrow", else "Fri, Oct 9" — dateStr is a Chicago calendar date
+function fmtUpcomingDay(dateStr: string, today: string): string {
+  if (dateStr === today) return 'Today';
+  const d = new Date(dateStr + 'T12:00:00Z');
+  const t = new Date(today + 'T12:00:00Z');
+  if (Math.round((d.getTime() - t.getTime()) / 86400000) === 1) return 'Tomorrow';
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+function fmtChicagoTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/Chicago' });
+}
 
 function fmtWeek(weekStart: string): string {
   const d = new Date(weekStart + 'T12:00:00Z');
@@ -472,6 +517,69 @@ export default function BusinessDashboard() {
                 </div>
               </div>
             </div>
+
+            {/* ------------------------------------------------------- */}
+            {m.upcoming && (
+              <>
+                <h2 className={styles.sectionTitle}>Birthdays &amp; Celebrations — Next 7 Days</h2>
+                <div className={styles.tablesGrid}>
+                  <div className={styles.tableCard}>
+                    <div className={styles.tableTitle}>🎂 Member Birthdays</div>
+                    {m.upcoming.birthdays.length === 0 ? (
+                      <div className={styles.emptyState}>No member birthdays this week</div>
+                    ) : (
+                      <table className={styles.dataTable}>
+                        <tbody>
+                          {m.upcoming.birthdays.map(b => (
+                            <tr key={b.member_id}>
+                              <td>
+                                <a href={`/admin/members/${b.member_id}`} style={{ color: '#A59480', textDecoration: 'none' }}>
+                                  {b.name}
+                                </a>
+                              </td>
+                              <td className={styles.textRight}>
+                                {b.date === m.today ? <strong>Today</strong> : fmtUpcomingDay(b.date, m.today)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                  <div className={styles.tableCard}>
+                    <div className={styles.tableTitle}>🥂 Member Celebration Reservations</div>
+                    {m.upcoming.celebrations.length === 0 ? (
+                      <div className={styles.emptyState}>No celebrations booked this week</div>
+                    ) : (
+                      <table className={styles.dataTable}>
+                        <tbody>
+                          {m.upcoming.celebrations.map(c => (
+                            <tr key={c.reservation_id}>
+                              <td>
+                                <a href={`/admin/members/${c.member_id}`} style={{ color: '#A59480', textDecoration: 'none' }}>
+                                  {c.name}
+                                </a>
+                                <div className={styles.compactHint} style={{ marginTop: '0.125rem' }}>
+                                  {OCCASION_LABELS[c.occasion] || c.occasion} · party of {c.partySize}
+                                  {c.location ? ` · ${c.location}` : ''}
+                                </div>
+                              </td>
+                              <td className={styles.textRight} style={{ whiteSpace: 'nowrap' }}>
+                                {c.date === m.today ? <strong>Today</strong> : fmtUpcomingDay(c.date, m.today)}
+                                <div className={styles.compactHint} style={{ marginTop: '0.125rem' }}>{fmtChicagoTime(c.startTime)}</div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                    <div className={styles.compactHint}>
+                      Member reservations tagged birthday, anniversary, engagement, celebration, graduation or bachelor/ette.
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* ------------------------------------------------------- */}
             <h2 className={styles.sectionTitle}>Revenue</h2>

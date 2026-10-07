@@ -12,6 +12,9 @@ import {
   shiftMonth,
   weekStartOf,
   round2,
+  nextBirthday,
+  isCelebration,
+  chicagoDateOf,
 } from '../businessMetricsCore';
 
 describe('classifyPlan', () => {
@@ -233,5 +236,45 @@ describe('aggregateLedger', () => {
       row({ note: 'Noir Attendance', date: '2026-08-05' }),
     ], MONTH, NEXT, LAST, TREND);
     expect(agg.purchasesWithEmptyNote).toBe(2);
+  });
+});
+
+describe('nextBirthday', () => {
+  it('returns this year when the birthday is today or later', () => {
+    expect(nextBirthday('1990-10-07', '2026-10-07')).toBe('2026-10-07');
+    expect(nextBirthday('1985-10-12', '2026-10-07')).toBe('2026-10-12');
+  });
+
+  it('rolls to next year once the birthday has passed', () => {
+    expect(nextBirthday('1990-10-06', '2026-10-07')).toBe('2027-10-06');
+  });
+
+  it('crosses the year boundary', () => {
+    expect(nextBirthday('1990-01-02', '2026-12-29')).toBe('2027-01-02');
+  });
+
+  it('puts Feb 29 on Feb 28 in non-leap years', () => {
+    expect(nextBirthday('1992-02-29', '2026-02-20')).toBe('2026-02-28');
+    expect(nextBirthday('1992-02-29', '2028-02-20')).toBe('2028-02-29');
+  });
+
+  it('ignores missing or malformed dates', () => {
+    expect(nextBirthday(null, '2026-10-07')).toBeNull();
+    expect(nextBirthday('', '2026-10-07')).toBeNull();
+    expect(nextBirthday('10/07/1990', '2026-10-07')).toBeNull();
+  });
+});
+
+describe('isCelebration / chicagoDateOf', () => {
+  it('counts celebratory occasions only', () => {
+    expect(isCelebration('birthday')).toBe(true);
+    expect(isCelebration('Anniversary')).toBe(true);
+    expect(isCelebration('corporate')).toBe(false);
+    expect(isCelebration(null)).toBe(false);
+  });
+
+  it('reads a late-night UTC timestamp as the Chicago date', () => {
+    // 02:00 UTC Oct 8 = 9pm Oct 7 in Chicago (CDT)
+    expect(chicagoDateOf('2026-10-08T02:00:00Z')).toBe('2026-10-07');
   });
 });
