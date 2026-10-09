@@ -363,11 +363,12 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
     setNotice(null);
     setError(null);
     try {
-      const r = await api<{ days_imported: number; lines_imported: number; days_closed_no_sales: number; skipped_manual: string[] }>('/api/inventory/toast/sync', { method: 'POST' });
+      const r = await api<{ days_imported: number; lines_imported: number; days_closed_no_sales: number; skipped_manual: string[]; stopped_early: boolean }>('/api/inventory/toast/sync', { method: 'POST' });
       setNotice(
         (r.days_imported ? `Imported ${r.days_imported} day(s), ${r.lines_imported} items sold.` : 'Up to date — no new days on the Toast server.') +
           (r.days_closed_no_sales ? ` ${r.days_closed_no_sales} day(s) had nothing to take out of stock and were closed automatically.` : '') +
-          (r.skipped_manual?.length ? ` Skipped ${r.skipped_manual.join(', ')} — already imported from a hand-uploaded report.` : '')
+          (r.skipped_manual?.length ? ` Skipped ${r.skipped_manual.join(', ')} — already imported from a hand-uploaded report.` : '') +
+          (r.stopped_early ? ' More days are waiting on the server — tap Sync now again.' : '')
       );
       await load();
     } catch (e) {

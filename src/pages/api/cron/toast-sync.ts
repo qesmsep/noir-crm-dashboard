@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { timingSafeEqual } from 'crypto';
 import { runToastSync, ToastSyncBusyError } from '../../../lib/toast/sync';
 
 /**
@@ -8,7 +9,9 @@ import { runToastSync, ToastSyncBusyError } from '../../../lib/toast/sync';
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const cronSecret = process.env.CRON_SECRET;
-  if (!cronSecret || req.headers.authorization !== `Bearer ${cronSecret}`) {
+  const expected = Buffer.from(`Bearer ${cronSecret}`);
+  const given = Buffer.from(req.headers.authorization || '');
+  if (!cronSecret || given.length !== expected.length || !timingSafeEqual(given, expected)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

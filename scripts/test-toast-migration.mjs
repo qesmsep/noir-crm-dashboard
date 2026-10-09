@@ -79,6 +79,14 @@ await db.exec(`insert into toast_sales_lines(item_selection_id,business_date,toa
 try { await db.query(`select * from apply_toast_sales('2026-10-08', array['c'], $1::jsonb, 'tim')`, [JSON.stringify([{ item_id: gin, quantity_change: 2 }])]); ok(false, 'positive should fail'); }
 catch (e) { ok(/must be negative/.test(e.message), 'positive sales adjustment rejected'); }
 
+// One sync at a time
+await db.exec(`insert into toast_sync_runs(trigger, status) values ('cron','running')`);
+try { await db.exec(`insert into toast_sync_runs(trigger, status) values ('manual','running')`); ok(false, 'second running sync'); }
+catch (e) { ok(/uniq_toast_sync_runs_one_running|duplicate/.test(e.message), 'only one sync can be running'); }
+await db.exec(`update toast_sync_runs set status='success'`);
+await db.exec(`insert into toast_sync_runs(trigger, status) values ('manual','running')`);
+ok(true, 'a new sync can start once the last one finished');
+
 // Counts
 const [{ id: cnt }] = (await db.query(`insert into inventory_counts(location_id, started_by) values($1,'tim') returning id`, [loc])).rows;
 try { await db.query(`insert into inventory_counts(location_id) values($1)`, [loc]); ok(false, 'second open count'); } catch { ok(true, 'one open count per location'); }

@@ -184,6 +184,9 @@ CREATE TABLE IF NOT EXISTS toast_sync_runs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_toast_sync_runs_started ON toast_sync_runs(started_at DESC);
+-- At most one sync runs at a time: inserting a second 'running' row fails.
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_toast_sync_runs_one_running
+  ON toast_sync_runs(status) WHERE status = 'running';
 
 -- ----------------------------------------
 -- 3. Physical counts

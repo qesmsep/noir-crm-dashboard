@@ -12,40 +12,56 @@ export interface ToastSyncResult {
   days_closed_no_sales: number;
   skipped_manual: string[];
   gaps_texted: number;
+  stopped_early: boolean;
 }
 
 const CHUNK = 500;
 
+/** A run still marked running after this long was cut off (e.g. by the function time limit). */
+const STALE_RUN_MS = 5 * 60 * 1000;
+
 /**
- * Pull every day on the Toast export server that isn't fully imported yet.
- * Safe to run any number of times: lines are keyed by Toast's selection id,
- * and a day whose stored line count already matches the file is skipped.
+ * Stop starting new days after this long so the run finishes well inside the
+ * 60s function limit; anything left is picked up by the next run.
  */
+const TIME_BUDGET_MS = 40_000;
+
 export class ToastSyncBusyError extends Error {
   constructor() {
     super('A Toast sync is already running — try again in a minute.');
   }
 }
 
-/** A run still marked running after this long is treated as crashed and doesn't block. */
-const RUN_LOCK_MS = 5 * 60 * 1000;
-
+/**
+ * Pull every day on the Toast export server that isn't fully imported yet.
+ * Safe to run any number of times: lines are keyed by Toast's selection id,
+ * and a day whose stored line count already matches the file is skipped.
+ * Only one run at a time: the unique index on running rows makes the insert
+ * below the lock.
+ */
 export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyncResult> {
-  const { data: running } = await supabaseAdmin
+  // A run killed by the time limit never reaches its catch: close it out here,
+  // so it stops blocking, and report it.
+  const { data: stale } = await supabaseAdmin
     .from('toast_sync_runs')
-    .select('id')
+    .update({ status: 'error', error: 'Did not finish (cut off by the time limit)', finished_at: new Date().toISOString() })
     .eq('status', 'running')
-    .gt('started_at', new Date(Date.now() - RUN_LOCK_MS).toISOString())
-    .limit(1)
-    .maybeSingle();
-  if (running) throw new ToastSyncBusyError();
+    .lt('started_at', new Date(Date.now() - STALE_RUN_MS).toISOString())
+    .select('id');
+  if (stale && stale.length > 0) await notifySyncFailure('the previous sync was cut off before it finished');
 
-  const { data: run } = await supabaseAdmin
+  const { data: run, error: lockErr } = await supabaseAdmin
     .from('toast_sync_runs')
-    .insert({ trigger })
+    .insert({ trigger, status: 'running' })
     .select('id')
     .single();
+  if (lockErr) {
+    if (lockErr.code === '23505') throw new ToastSyncBusyError();
+    throw new Error(`toast_sync_runs: ${lockErr.message}`);
+  }
   const runId: string | null = run?.id ?? null;
+  const startedAt = Date.now();
+  let stoppedEarly = false;
 
   let daysImported = 0;
   let linesImported = 0;
@@ -77,6 +93,10 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
         (manualRanges || []).some(r => date >= (r.period_start || r.business_date) && date <= r.business_date);
 
       for (const folder of folders) {
+        if (Date.now() - startedAt > TIME_BUDGET_MS) {
+          stoppedEarly = true;
+          break;
+        }
         const businessDate = folderToBusinessDate(folder);
         if (!businessDate) continue;
 
@@ -91,7 +111,9 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
             .from('toast_sales_lines')
             .select('item_selection_id', { count: 'exact', head: true })
             .eq('business_date', businessDate);
-          if ((count ?? 0) >= prior.line_count) continue; // fully imported
+          // Fully imported. Toast writes each day's file once and doesn't re-export
+          // later edits, so a day is only ever topped up, never reconciled down.
+          if ((count ?? 0) >= prior.line_count) continue;
         }
 
         const csv = await readDayFile(sftp, root, folder, 'ItemSelectionDetails.csv');
@@ -143,6 +165,7 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
       days_closed_no_sales: closed.length,
       skipped_manual: skippedManual,
       gaps_texted: notice.sent ? notice.new_gaps : 0,
+      stopped_early: stoppedEarly,
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
