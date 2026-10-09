@@ -1,9 +1,9 @@
 import type { NextApiResponse } from 'next';
 import { z } from 'zod';
 import { supabaseAdmin } from '../../../../lib/supabase';
-import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../../lib/api-auth';
+import { withStrictRateLimitAndAuth, AuthenticatedRequest } from '../../../../lib/api-auth';
 import { detectSalesFormat, parseItemSelectionCsv, parseProductMix, productMixKey } from '../../../../lib/toastSalesCore';
-import { settleDaysWithNothingToApprove } from '../../../../lib/toast/settle';
+import { reopenIfPending, settleDaysWithNothingToApprove } from '../../../../lib/toast/settle';
 import { notifyNewGaps } from '../../../../lib/toast/notify';
 
 export const config = { api: { bodyParser: { sizeLimit: '5mb' } } };
@@ -139,6 +139,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
     }
 
+    await reopenIfPending(end);
     const closed = await settleDaysWithNothingToApprove([end]);
     await notifyNewGaps();
     return res.status(201).json({ imported: true, format, business_date: end, closed_no_sales: closed.length > 0 });
@@ -148,4 +149,4 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   }
 }
 
-export default withRateLimitAndAuth(handler);
+export default withStrictRateLimitAndAuth(handler);

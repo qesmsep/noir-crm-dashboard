@@ -42,3 +42,25 @@ export async function settleDaysWithNothingToApprove(dates?: string[], ctx?: Pla
   }
   return closed;
 }
+
+/**
+ * After new lines land on a day that was already closed (applied, or empty
+ * because there was nothing to deduct), put it back up for review so it
+ * isn't hidden. Returns the new status, or null if nothing changed.
+ */
+export async function reopenIfPending(date: string): Promise<'pending' | 'partial' | null> {
+  const { data: day } = await supabaseAdmin.from('toast_sales_days').select('status').eq('business_date', date).maybeSingle();
+  if (!day || (day.status !== 'applied' && day.status !== 'empty')) return null;
+  const { count } = await supabaseAdmin
+    .from('toast_sales_lines')
+    .select('item_selection_id', { count: 'exact', head: true })
+    .eq('business_date', date)
+    .is('applied_at', null)
+    .eq('voided', false)
+    .gt('qty', 0);
+  if (!count) return null;
+  const status = day.status === 'applied' ? 'partial' : 'pending';
+  const { error } = await supabaseAdmin.from('toast_sales_days').update({ status }).eq('business_date', date).eq('status', day.status);
+  if (error) throw new Error(`toast_sales_days ${date}: ${error.message}`);
+  return status;
+}

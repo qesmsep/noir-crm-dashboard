@@ -1,6 +1,6 @@
 import type { NextApiResponse } from 'next';
-import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../../lib/api-auth';
-import { runToastSync } from '../../../../lib/toast/sync';
+import { withStrictRateLimitAndAuth, AuthenticatedRequest } from '../../../../lib/api-auth';
+import { runToastSync, ToastSyncBusyError } from '../../../../lib/toast/sync';
 
 /** POST /api/inventory/toast/sync — "Sync now" from the Sales tab. */
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
@@ -8,9 +8,10 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     return res.status(200).json(await runToastSync('manual'));
   } catch (err) {
+    if (err instanceof ToastSyncBusyError) return res.status(409).json({ error: err.message });
     console.error('toast manual sync error:', err);
     return res.status(502).json({ error: err instanceof Error ? err.message : 'Toast sync failed' });
   }
 }
 
-export default withRateLimitAndAuth(handler);
+export default withStrictRateLimitAndAuth(handler);

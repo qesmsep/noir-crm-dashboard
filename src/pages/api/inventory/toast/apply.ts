@@ -23,7 +23,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const adjustments = Array.from(plan.totals.entries())
       .map(([item_id, units]) => ({ item_id, quantity_change: -Math.round(units * 10000) / 10000 }))
-      .filter(a => a.quantity_change < 0);
+      .filter(a => a.quantity_change < 0)
+      // Lock rows in a fixed order (complete_inventory_count does the same) so the two can't deadlock.
+      .sort((a, b) => a.item_id.localeCompare(b.item_id));
 
     const { data, error } = await supabaseAdmin.rpc('apply_toast_sales', {
       p_business_date: date,

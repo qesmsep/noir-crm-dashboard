@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../supabase';
 import { folderToBusinessDate, parseItemSelectionCsv } from '../toastSalesCore';
 import { withToastSftp, exportRoot, listDayFolders, readDayFile } from './sftp';
-import { settleDaysWithNothingToApprove } from './settle';
+import { reopenIfPending, settleDaysWithNothingToApprove } from './settle';
 import { notifyNewGaps } from './notify';
 
 export interface ToastSyncResult {
@@ -21,7 +21,25 @@ const CHUNK = 500;
  * Safe to run any number of times: lines are keyed by Toast's selection id,
  * and a day whose stored line count already matches the file is skipped.
  */
+export class ToastSyncBusyError extends Error {
+  constructor() {
+    super('A Toast sync is already running — try again in a minute.');
+  }
+}
+
+/** A run still marked running after this long is treated as crashed and doesn't block. */
+const RUN_LOCK_MS = 5 * 60 * 1000;
+
 export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyncResult> {
+  const { data: running } = await supabaseAdmin
+    .from('toast_sync_runs')
+    .select('id')
+    .eq('status', 'running')
+    .gt('started_at', new Date(Date.now() - RUN_LOCK_MS).toISOString())
+    .limit(1)
+    .maybeSingle();
+  if (running) throw new ToastSyncBusyError();
+
   const { data: run } = await supabaseAdmin
     .from('toast_sync_runs')
     .insert({ trigger })
@@ -92,19 +110,8 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
           if (error) throw new Error(`toast_sales_lines ${businessDate}: ${error.message}`);
         }
 
-        // New lines on a day already applied reopen it for review.
-        if (prior?.status === 'applied') {
-          const { count: pending } = await supabaseAdmin
-            .from('toast_sales_lines')
-            .select('item_selection_id', { count: 'exact', head: true })
-            .eq('business_date', businessDate)
-            .is('applied_at', null)
-            .eq('voided', false)
-            .gt('qty', 0);
-          if ((pending ?? 0) > 0) {
-            await supabaseAdmin.from('toast_sales_days').update({ status: 'partial' }).eq('business_date', businessDate);
-          }
-        }
+        // New lines on a day already closed (applied, or empty) reopen it for review.
+        if (prior) await reopenIfPending(businessDate);
 
         daysImported++;
         linesImported += lines.length;

@@ -239,6 +239,7 @@ RETURNS TABLE(item_id UUID, old_quantity NUMERIC, new_quantity NUMERIC)
 AS $$
 DECLARE
   v_locked   INTEGER;
+  v_wanted   INTEGER;
   v_adj      JSONB;
   v_item_id  UUID;
   v_change   NUMERIC;
@@ -253,6 +254,8 @@ BEGIN
 
   -- Every line in the plan must still be pending; otherwise the plan is stale
   -- (someone else applied part of this day) and nothing is written.
+  SELECT COUNT(DISTINCT u.id) INTO v_wanted FROM unnest(p_line_ids) AS u(id);
+
   SELECT COUNT(*) INTO v_locked
   FROM (
     SELECT 1 FROM toast_sales_lines l
@@ -262,11 +265,14 @@ BEGIN
       AND l.voided = FALSE
     FOR UPDATE
   ) s;
-  IF v_locked <> COALESCE(cardinality(p_line_ids), 0) THEN
-    RAISE EXCEPTION 'STALE_PLAN: % of % lines are still pending — reload and try again', v_locked, COALESCE(cardinality(p_line_ids), 0);
+  IF v_locked <> v_wanted THEN
+    RAISE EXCEPTION 'STALE_PLAN: % of % lines are still pending — reload and try again', v_locked, v_wanted;
   END IF;
 
-  FOR v_adj IN SELECT * FROM jsonb_array_elements(COALESCE(p_adjustments, '[]'::jsonb))
+  -- Item rows are locked in item_id order (as complete_inventory_count does) so the two can't deadlock.
+  FOR v_adj IN
+    SELECT e FROM jsonb_array_elements(COALESCE(p_adjustments, '[]'::jsonb)) AS e
+    ORDER BY e->>'item_id' COLLATE "C"
   LOOP
     v_item_id := (v_adj->>'item_id')::UUID;
     v_change  := (v_adj->>'quantity_change')::NUMERIC;
@@ -297,7 +303,8 @@ BEGIN
 
   UPDATE toast_sales_lines
   SET applied_at = NOW(), applied_by = p_created_by
-  WHERE item_selection_id = ANY(p_line_ids);
+  WHERE item_selection_id = ANY(p_line_ids)
+    AND business_date = p_business_date;
 
   UPDATE toast_sales_days d
   SET status = CASE WHEN EXISTS (
@@ -339,6 +346,7 @@ BEGIN
     SELECT cl.item_id AS line_item_id, cl.counted_qty AS line_counted
     FROM inventory_count_lines cl
     WHERE cl.count_id = p_count_id AND cl.counted_qty IS NOT NULL
+    ORDER BY cl.item_id::TEXT COLLATE "C"
   LOOP
     SELECT i.quantity, i.location_id INTO v_cur, v_location
     FROM inventory_items i WHERE i.id = v_line.line_item_id FOR UPDATE;
