@@ -18,6 +18,7 @@ import {
   shiftMonth,
   weekStartOf,
   round2,
+  nextYearlyOccurrence,
 } from '../../../lib/businessMetricsCore';
 
 /**
@@ -110,7 +111,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .select('account_id, monthly_dues, subscription_status, next_billing_date, subscription_cancel_at, membership_plan_id'),
       supabaseAdmin
         .from('members')
-        .select('member_id, account_id, first_name, last_name, status, join_date'),
+        .select('member_id, account_id, first_name, last_name, status, join_date, dob'),
       supabaseAdmin.from('subscription_plans').select('id, plan_name, interval'),
     ]);
 
@@ -369,6 +370,42 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       atRisk: atRisk.slice(0, 20),
     };
 
+    // ------------------------------------------------------------------
+    // Celebrations — birthdays and membership anniversaries, next 4 weeks
+    // ------------------------------------------------------------------
+    const CELEBRATION_WINDOW_DAYS = 28;
+    const upcomingBirthdays = (activeMembers as any[])
+      .map(m => {
+        const next = nextYearlyOccurrence(m.dob, today, CELEBRATION_WINDOW_DAYS);
+        return next && {
+          member_id: m.member_id,
+          name: `${m.first_name || ''} ${m.last_name || ''}`.trim() || 'Unknown',
+          ...next,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.daysAway - b.daysAway || a.name.localeCompare(b.name));
+
+    // Anniversary = the account's first member join date; active accounts only
+    const upcomingAnniversaries = activeAccounts
+      .map(a => {
+        const next = nextYearlyOccurrence(accountEarliestJoin.get(a.account_id), today, CELEBRATION_WINDOW_DAYS);
+        return next && next.years >= 1 && {
+          account_id: a.account_id,
+          member_id: accountPrimaryMemberId.get(a.account_id) || null,
+          name: accountName.get(a.account_id) || 'Unknown',
+          ...next,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.daysAway - b.daysAway || a.name.localeCompare(b.name));
+
+    const celebrations = {
+      windowDays: CELEBRATION_WINDOW_DAYS,
+      birthdays: upcomingBirthdays,
+      anniversaries: upcomingAnniversaries,
+    };
+
     const payload = {
       generatedAt: new Date().toISOString(),
       today,
@@ -386,6 +423,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       },
       balances,
       engagement,
+      celebrations,
       // Data-quality signals: nonzero values mean a figure above is degraded
       // (stale plan id => annual dues counted as monthly; empty purchase
       // notes => spend silently bucketed under "Events & Other").

@@ -39,6 +39,14 @@ interface WeeklyPoint {
   net: number;
 }
 
+interface CelebrationRow {
+  member_id: string | null;
+  name: string;
+  date: string; // YYYY-MM-DD
+  daysAway: number;
+  years: number;
+}
+
 interface Metrics {
   generatedAt: string;
   today: string;
@@ -99,6 +107,11 @@ interface Metrics {
     visitRateMTD: number;
     atRiskCount: number;
     atRisk: AtRiskRow[];
+  };
+  celebrations?: {
+    windowDays: number;
+    birthdays: CelebrationRow[];
+    anniversaries: CelebrationRow[];
   };
   dataQuality?: {
     unknownPlanAccounts: number;
@@ -347,6 +360,56 @@ function LocationTrendChart({ data, currentMonth }: { data: TrendPoint[]; curren
 }
 
 // ---------------------------------------------------------------------------
+// Upcoming birthdays / anniversaries list
+// ---------------------------------------------------------------------------
+
+function ordinal(n: number): string {
+  const s = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (s[(v - 20) % 10] || s[v] || s[0]);
+}
+
+function fmtWhen(r: CelebrationRow): string {
+  if (r.daysAway === 0) return 'Today';
+  if (r.daysAway === 1) return 'Tomorrow';
+  const d = new Date(r.date + 'T12:00:00Z');
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+function CelebrationList({
+  title,
+  rows,
+  detail,
+  empty,
+}: {
+  title: string;
+  rows: CelebrationRow[];
+  detail: (r: CelebrationRow) => string;
+  empty: string;
+}) {
+  return (
+    <div className={styles.chartCard}>
+      <div className={styles.chartTitle}>{title} ({rows.length})</div>
+      {rows.length === 0 ? (
+        <div className={styles.emptyState}>{empty}</div>
+      ) : (
+        <ul className={styles.dateList}>
+          {rows.map(r => (
+            <li key={`${r.member_id}-${r.date}-${r.name}`} className={styles.dateRow}>
+              <span className={styles.dateRowName}>
+                {r.member_id ? <a href={`/admin/members/${r.member_id}`}>{r.name}</a> : r.name}
+                <span className={styles.dateRowDetail}> · {detail(r)}</span>
+              </span>
+              <span className={r.daysAway <= 7 ? styles.dateRowWhenSoon : styles.dateRowWhen}>{fmtWhen(r)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -412,6 +475,26 @@ export default function BusinessDashboard() {
 
         {m && (
           <>
+            {m.celebrations && (
+              <>
+                <h2 className={styles.sectionTitle}>Coming Up — Next {m.celebrations.windowDays / 7} Weeks</h2>
+                <div className={styles.chartsGrid}>
+                  <CelebrationList
+                    title="🎂 Birthdays"
+                    rows={m.celebrations.birthdays}
+                    detail={r => `turning ${r.years}`}
+                    empty="No member birthdays in the next 4 weeks"
+                  />
+                  <CelebrationList
+                    title="🥂 Membership Anniversaries"
+                    rows={m.celebrations.anniversaries}
+                    detail={r => `${ordinal(r.years)} year`}
+                    empty="No membership anniversaries in the next 4 weeks"
+                  />
+                </div>
+              </>
+            )}
+
             {/* ------------------------------------------------------- */}
             <h2 className={styles.sectionTitle}>Membership</h2>
             <div className={styles.kpiGrid}>

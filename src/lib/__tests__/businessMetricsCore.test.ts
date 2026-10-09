@@ -12,6 +12,7 @@ import {
   shiftMonth,
   weekStartOf,
   round2,
+  nextYearlyOccurrence,
 } from '../businessMetricsCore';
 
 describe('classifyPlan', () => {
@@ -233,5 +234,39 @@ describe('aggregateLedger', () => {
       row({ note: 'Noir Attendance', date: '2026-08-05' }),
     ], MONTH, NEXT, LAST, TREND);
     expect(agg.purchasesWithEmptyNote).toBe(2);
+  });
+});
+
+describe('nextYearlyOccurrence', () => {
+  it('finds a date later this year within the window', () => {
+    expect(nextYearlyOccurrence('1990-10-20', '2026-10-09', 28)).toEqual({ date: '2026-10-20', daysAway: 11, years: 36 });
+  });
+
+  it('counts today as 0 days away', () => {
+    expect(nextYearlyOccurrence('1985-10-09', '2026-10-09', 28)).toEqual({ date: '2026-10-09', daysAway: 0, years: 41 });
+  });
+
+  it('rolls into next year across the year boundary', () => {
+    expect(nextYearlyOccurrence('2024-01-03', '2026-12-20', 28)).toEqual({ date: '2027-01-03', daysAway: 14, years: 3 });
+  });
+
+  it('returns null outside the window or for a date already passed this year', () => {
+    expect(nextYearlyOccurrence('1990-11-07', '2026-10-09', 28)).toBeNull();
+    expect(nextYearlyOccurrence('1990-10-08', '2026-10-09', 28)).toBeNull();
+  });
+
+  it('moves Feb 29 to Feb 28 in non-leap years', () => {
+    expect(nextYearlyOccurrence('2000-02-29', '2027-02-20', 28)).toEqual({ date: '2027-02-28', daysAway: 8, years: 27 });
+    expect(nextYearlyOccurrence('2000-02-29', '2028-02-20', 28)).toEqual({ date: '2028-02-29', daysAway: 9, years: 28 });
+  });
+
+  it('handles missing or malformed input', () => {
+    expect(nextYearlyOccurrence(null, '2026-10-09', 28)).toBeNull();
+    expect(nextYearlyOccurrence('', '2026-10-09', 28)).toBeNull();
+    expect(nextYearlyOccurrence('not-a-date', '2026-10-09', 28)).toBeNull();
+  });
+
+  it('accepts timestamps', () => {
+    expect(nextYearlyOccurrence('2025-10-15T05:00:00+00:00', '2026-10-09', 28)?.years).toBe(1);
   });
 });

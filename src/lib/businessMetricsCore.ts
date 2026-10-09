@@ -290,3 +290,47 @@ export function aggregateLedger(
 
   return agg;
 }
+
+// ---------------------------------------------------------------------------
+// Upcoming yearly dates (birthdays, membership anniversaries) (pure)
+// ---------------------------------------------------------------------------
+
+export interface UpcomingDate {
+  date: string; // YYYY-MM-DD of the next occurrence
+  daysAway: number; // 0 = today
+  years: number; // age turning / anniversary year
+}
+
+/**
+ * Next occurrence of a yearly date (month/day of `originDate`) on or after
+ * `today`, if it falls within `windowDays`. Feb 29 falls on Feb 28 in
+ * non-leap years. Returns null for missing/invalid input or out of window.
+ */
+export function nextYearlyOccurrence(
+  originDate: string | null | undefined,
+  today: string,
+  windowDays: number
+): UpcomingDate | null {
+  if (!originDate) return null;
+  const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(originDate);
+  if (!match) return null;
+  const [oy, om, od] = match.slice(1).map(Number);
+  if (om < 1 || om > 12 || od < 1 || od > 31) return null;
+
+  const ty = Number(today.slice(0, 4));
+  const occurrence = (year: number) => {
+    const lastDay = new Date(Date.UTC(year, om, 0)).getUTCDate();
+    const day = Math.min(od, lastDay);
+    return `${year}-${String(om).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  };
+
+  let year = ty;
+  let date = occurrence(year);
+  if (date < today) date = occurrence(++year);
+
+  const daysAway = Math.round(
+    (Date.parse(date + 'T12:00:00Z') - Date.parse(today + 'T12:00:00Z')) / 86_400_000
+  );
+  if (daysAway > windowDays) return null;
+  return { date, daysAway, years: year - oy };
+}
