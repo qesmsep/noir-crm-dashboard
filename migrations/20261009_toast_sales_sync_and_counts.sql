@@ -23,7 +23,7 @@
 --
 -- Breaking changes: NO. New tables and functions only; the transaction_type
 -- check on inventory_transactions is widened (never narrowed). The existing,
--- unused toast_sync_status table gains two indexes and loses its
+-- unused toast_sync_status table gains a unique index and loses its
 -- allow-everyone policy (the app uses the service role, which bypasses RLS).
 -- Rollback: 20261009_toast_sales_sync_and_counts_ROLLBACK.sql
 -- ========================================
@@ -180,8 +180,8 @@ CREATE TABLE IF NOT EXISTS toast_item_links (
 );
 
 -- Sync runs are logged in the existing toast_sync_status table (sync_type =
--- 'cron' | 'manual'; its old rows are 'webhook'), so no new table.
-CREATE INDEX IF NOT EXISTS idx_toast_sync_status_started ON toast_sync_status(started_at DESC);
+-- 'cron' | 'manual'; its old rows are 'webhook'), so no new table. It already
+-- has an index on started_at.
 -- At most one sync runs at a time: inserting a second 'running' row fails.
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_toast_sync_status_one_running
   ON toast_sync_status(status) WHERE status = 'running';
