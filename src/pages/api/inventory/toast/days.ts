@@ -4,6 +4,9 @@ import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../../lib/api-
 import { toastSftpConfigured } from '../../../../lib/toast/sftp';
 import { loadPlanContext, pendingLines, planFor } from '../../../../lib/toast/plan';
 
+// toast_sync_status predates this feature and also holds old 'webhook' rows.
+const SYNC_TYPES = ['cron', 'manual'];
+
 /**
  * GET /api/inventory/toast/days
  * Imported Toast sales days (newest first), with what's still waiting for
@@ -21,8 +24,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .order('business_date', { ascending: false })
         .limit(60),
       supabaseAdmin
-        .from('toast_sync_runs')
-        .select('trigger, status, days_imported, lines_imported, error, started_at, finished_at')
+        .from('toast_sync_status')
+        .select('sync_type, status, records_processed, error_message, started_at, completed_at')
+        .in('sync_type', SYNC_TYPES)
         .order('started_at', { ascending: false })
         .limit(1)
         .maybeSingle(),
@@ -49,8 +53,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Toast keeps export files for 7 days: two days without a successful sync
     // (cron not running, SFTP failing) is worth a warning before data is lost.
     const { data: lastOk } = await supabaseAdmin
-      .from('toast_sync_runs')
-      .select('finished_at')
+      .from('toast_sync_status')
+      .select('completed_at')
+      .in('sync_type', SYNC_TYPES)
       .eq('status', 'success')
       .order('started_at', { ascending: false })
       .limit(1)
@@ -64,9 +69,18 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(200).json({
       configured: toastSftpConfigured(),
       empty_days: emptyDays ?? 0,
-      last_success_at: lastOk?.finished_at || null,
+      last_success_at: lastOk?.completed_at || null,
       allowance: ctx.allowance,
-      last_run: runRes.data || null,
+      last_run: runRes.data
+        ? {
+            trigger: runRes.data.sync_type,
+            status: runRes.data.status,
+            lines_imported: runRes.data.records_processed ?? 0,
+            error: runRes.data.error_message,
+            started_at: runRes.data.started_at,
+            finished_at: runRes.data.completed_at,
+          }
+        : null,
       days: days.map(d => ({
         ...d,
         ...(summary.get(d.business_date) || { pending_drinks: 0, ready_drinks: 0, needs_attention: 0 }),

@@ -29,7 +29,6 @@ interface DaySummary {
 interface SyncRun {
   trigger: string;
   status: 'running' | 'success' | 'error';
-  days_imported: number;
   lines_imported: number;
   error: string | null;
   started_at: string;

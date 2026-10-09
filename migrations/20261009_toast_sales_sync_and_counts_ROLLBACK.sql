@@ -9,9 +9,13 @@ DROP FUNCTION IF EXISTS complete_inventory_count(UUID, TEXT);
 DROP FUNCTION IF EXISTS apply_toast_sales(DATE, TEXT[], JSONB, TEXT);
 DROP FUNCTION IF EXISTS import_product_mix(DATE, DATE, TEXT, JSONB);
 
+-- toast_sync_status existed before this migration: only its indexes go. Its
+-- old allow-everyone policy is deliberately not restored.
+DROP INDEX IF EXISTS uniq_toast_sync_status_one_running;
+DROP INDEX IF EXISTS idx_toast_sync_status_started;
+
 DROP TABLE IF EXISTS inventory_count_lines;
 DROP TABLE IF EXISTS inventory_counts;
-DROP TABLE IF EXISTS toast_sync_runs;
 DROP TABLE IF EXISTS toast_item_links;
 DROP TABLE IF EXISTS toast_sales_lines;
 DROP TABLE IF EXISTS toast_sales_days;

@@ -7,7 +7,8 @@
 --    selection, keyed by Toast's own id so a day can be re-pulled safely.
 -- 2. toast_item_links — each Toast menu item linked once to a recipe, a
 --    bottle (with a pour), or ignored.
--- 3. toast_sync_runs — log of every pull.
+-- 3. toast_sync_status (existing, unused until now) — log of every pull; a
+--    unique index on running rows makes it the one-sync-at-a-time lock.
 -- 4. inventory_counts / inventory_count_lines — "Take Inventory" sessions by
 --    location.
 -- 5. apply_toast_sales() — applies an approved day's deductions atomically.
@@ -21,7 +22,9 @@
 -- match what this migration builds on.
 --
 -- Breaking changes: NO. New tables and functions only; the transaction_type
--- check on inventory_transactions is widened (never narrowed).
+-- check on inventory_transactions is widened (never narrowed). The existing,
+-- unused toast_sync_status table gains two indexes and loses its
+-- allow-everyone policy (the app uses the service role, which bypasses RLS).
 -- Rollback: 20261009_toast_sales_sync_and_counts_ROLLBACK.sql
 -- ========================================
 
@@ -34,8 +37,8 @@ DO $$
 DECLARE
   missing TEXT := '';
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'inventory_transactions' AND column_name = 'quantity_change') THEN
-    missing := missing || ' inventory_transactions.quantity_change';
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'inventory_transactions' AND column_name = 'quantity') THEN
+    missing := missing || ' inventory_transactions.quantity';
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'inventory_transactions' AND column_name = 'location_id') THEN
     missing := missing || ' inventory_transactions.location_id';
@@ -54,6 +57,10 @@ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'system_settings') THEN
     missing := missing || ' system_settings';
+  END IF;
+  IF (SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'toast_sync_status'
+      AND column_name IN ('sync_type', 'status', 'records_processed', 'error_message', 'started_at', 'completed_at')) <> 6 THEN
+    missing := missing || ' toast_sync_status(sync_type, status, records_processed, error_message, started_at, completed_at)';
   END IF;
   IF missing <> '' THEN
     RAISE EXCEPTION 'Preflight failed — schema is missing:%. Nothing was changed.', missing;
@@ -172,21 +179,12 @@ CREATE TABLE IF NOT EXISTS toast_item_links (
   updated_by        TEXT
 );
 
-CREATE TABLE IF NOT EXISTS toast_sync_runs (
-  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  trigger        TEXT NOT NULL CHECK (trigger IN ('cron', 'manual')),
-  status         TEXT NOT NULL DEFAULT 'running' CHECK (status IN ('running', 'success', 'error')),
-  days_imported  INTEGER NOT NULL DEFAULT 0,
-  lines_imported INTEGER NOT NULL DEFAULT 0,
-  error          TEXT,
-  started_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  finished_at    TIMESTAMPTZ
-);
-
-CREATE INDEX IF NOT EXISTS idx_toast_sync_runs_started ON toast_sync_runs(started_at DESC);
+-- Sync runs are logged in the existing toast_sync_status table (sync_type =
+-- 'cron' | 'manual'; its old rows are 'webhook'), so no new table.
+CREATE INDEX IF NOT EXISTS idx_toast_sync_status_started ON toast_sync_status(started_at DESC);
 -- At most one sync runs at a time: inserting a second 'running' row fails.
-CREATE UNIQUE INDEX IF NOT EXISTS uniq_toast_sync_runs_one_running
-  ON toast_sync_runs(status) WHERE status = 'running';
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_toast_sync_status_one_running
+  ON toast_sync_status(status) WHERE status = 'running';
 
 -- ----------------------------------------
 -- 3. Physical counts
@@ -225,9 +223,13 @@ CREATE TABLE IF NOT EXISTS inventory_count_lines (
 ALTER TABLE toast_sales_days      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE toast_sales_lines     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE toast_item_links      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE toast_sync_runs       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE toast_sync_status     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_counts      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_count_lines ENABLE ROW LEVEL SECURITY;
+
+-- toast_sync_status's old policy let anyone (anon included) read and write it,
+-- which would let the anon key fake a running sync and block the real one.
+DROP POLICY IF EXISTS "Admins can manage toast sync status" ON toast_sync_status;
 
 -- ----------------------------------------
 -- 5. apply_toast_sales
@@ -293,7 +295,7 @@ BEGIN
     UPDATE inventory_items SET quantity = v_new, updated_at = NOW() WHERE id = v_item_id;
 
     INSERT INTO inventory_transactions (
-      item_id, location_id, transaction_type, quantity_change,
+      item_id, location_id, transaction_type, quantity,
       quantity_before, quantity_after, notes, created_by
     ) VALUES (
       v_item_id, v_location, 'sales', v_change,
@@ -322,6 +324,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 REVOKE EXECUTE ON FUNCTION apply_toast_sales(DATE, TEXT[], JSONB, TEXT) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION apply_toast_sales(DATE, TEXT[], JSONB, TEXT) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION apply_toast_sales(DATE, TEXT[], JSONB, TEXT) FROM anon;
 GRANT EXECUTE ON FUNCTION apply_toast_sales(DATE, TEXT[], JSONB, TEXT) TO service_role;
 
 COMMENT ON FUNCTION apply_toast_sales IS 'Applies an approved day of Toast sales: deducts stock (may go negative), logs sales transactions, marks lines applied. All or nothing.';
@@ -388,6 +391,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 REVOKE EXECUTE ON FUNCTION import_product_mix(DATE, DATE, TEXT, JSONB) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION import_product_mix(DATE, DATE, TEXT, JSONB) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION import_product_mix(DATE, DATE, TEXT, JSONB) FROM anon;
 GRANT EXECUTE ON FUNCTION import_product_mix(DATE, DATE, TEXT, JSONB) TO service_role;
 
 COMMENT ON FUNCTION import_product_mix IS 'Imports a hand-uploaded Toast Product Mix report (day + lines) in one transaction, refusing any date range already imported.';
@@ -433,7 +437,7 @@ BEGIN
 
     IF v_line.line_counted <> v_cur THEN
       INSERT INTO inventory_transactions (
-        item_id, location_id, transaction_type, quantity_change,
+        item_id, location_id, transaction_type, quantity,
         quantity_before, quantity_after, notes, created_by
       ) VALUES (
         v_line.line_item_id, v_location, 'count', v_line.line_counted - v_cur,
@@ -453,6 +457,7 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
 
 REVOKE EXECUTE ON FUNCTION complete_inventory_count(UUID, TEXT) FROM PUBLIC;
 REVOKE EXECUTE ON FUNCTION complete_inventory_count(UUID, TEXT) FROM authenticated;
+REVOKE EXECUTE ON FUNCTION complete_inventory_count(UUID, TEXT) FROM anon;
 GRANT EXECUTE ON FUNCTION complete_inventory_count(UUID, TEXT) TO service_role;
 
 COMMENT ON FUNCTION complete_inventory_count IS 'Closes an inventory count: sets each counted item to the shelf count and logs the difference as a count transaction. All or nothing.';

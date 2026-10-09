@@ -43,21 +43,21 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
   // A run killed by the time limit never reaches its catch: close it out here,
   // so it stops blocking, and report it.
   const { data: stale } = await supabaseAdmin
-    .from('toast_sync_runs')
-    .update({ status: 'error', error: 'Did not finish (cut off by the time limit)', finished_at: new Date().toISOString() })
+    .from('toast_sync_status')
+    .update({ status: 'error', error_message: 'Did not finish (cut off by the time limit)', completed_at: new Date().toISOString() })
     .eq('status', 'running')
     .lt('started_at', new Date(Date.now() - STALE_RUN_MS).toISOString())
     .select('id');
   if (stale && stale.length > 0) await notifySyncFailure('the previous sync was cut off before it finished');
 
   const { data: run, error: lockErr } = await supabaseAdmin
-    .from('toast_sync_runs')
-    .insert({ trigger, status: 'running' })
+    .from('toast_sync_status')
+    .insert({ sync_type: trigger, status: 'running' })
     .select('id')
     .single();
   if (lockErr) {
     if (lockErr.code === '23505') throw new ToastSyncBusyError();
-    throw new Error(`toast_sync_runs: ${lockErr.message}`);
+    throw new Error(`toast_sync_status: ${lockErr.message}`);
   }
   const runId: string | null = run?.id ?? null;
   const startedAt = Date.now();
@@ -147,13 +147,12 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
 
     if (runId) {
       await supabaseAdmin
-        .from('toast_sync_runs')
+        .from('toast_sync_status')
         .update({
           status: 'success',
-          days_imported: daysImported,
-          lines_imported: linesImported,
-          finished_at: new Date().toISOString(),
-          error: notice.error ? `Sync OK; gap text not sent: ${notice.error}` : null,
+          records_processed: linesImported,
+          completed_at: new Date().toISOString(),
+          error_message: notice.error ? `Sync OK; gap text not sent: ${notice.error}` : null,
         })
         .eq('id', runId);
     }
@@ -172,8 +171,8 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
     await notifySyncFailure(message);
     if (runId) {
       await supabaseAdmin
-        .from('toast_sync_runs')
-        .update({ status: 'error', error: message.slice(0, 2000), days_imported: daysImported, lines_imported: linesImported, finished_at: new Date().toISOString() })
+        .from('toast_sync_status')
+        .update({ status: 'error', error_message: message.slice(0, 2000), records_processed: linesImported, completed_at: new Date().toISOString() })
         .eq('id', runId);
     }
     throw err;

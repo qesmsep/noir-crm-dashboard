@@ -98,7 +98,7 @@ async function scoreCount(countId: string, locationId: string) {
     for (let from = 0; ; from += 1000) {
       const { data: sales, error } = await supabaseAdmin
         .from('inventory_transactions')
-        .select('id, item_id, quantity_change, notes')
+        .select('id, item_id, quantity, notes')
         .eq('location_id', locationId)
         .eq('transaction_type', 'sales')
         .gte('created_at', `${fromDate}T00:00:00Z`)
@@ -109,7 +109,7 @@ async function scoreCount(countId: string, locationId: string) {
         const day = saleDateFromNote(t.notes);
         if (!day || day < fromDate || day >= toDate) continue;
         const s = pouredCounted.get(t.item_id);
-        if (s) pouredSalesValue += -Number(t.quantity_change) * s.cost_per_unit;
+        if (s) pouredSalesValue += -Number(t.quantity) * s.cost_per_unit;
       }
       if (!sales || sales.length < 1000) break;
     }

@@ -41,15 +41,15 @@ describe('runToastSync lock', () => {
   });
 
   it('reports busy when another sync holds the lock', async () => {
-    insertResult = { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "uniq_toast_sync_runs_one_running"' } };
+    insertResult = { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "uniq_toast_sync_status_one_running"' } };
     await expect(runToastSync('manual')).rejects.toBeInstanceOf(ToastSyncBusyError);
     expect(mockWithSftp).not.toHaveBeenCalled();
     expect(mockNotifyFailure).not.toHaveBeenCalled();
   });
 
   it('surfaces any other insert failure as an error', async () => {
-    insertResult = { data: null, error: { code: '42P01', message: 'relation "toast_sync_runs" does not exist' } };
-    await expect(runToastSync('cron')).rejects.toThrow('toast_sync_runs');
+    insertResult = { data: null, error: { code: '42P01', message: 'relation "toast_sync_status" does not exist' } };
+    await expect(runToastSync('cron')).rejects.toThrow('toast_sync_status');
     expect(mockWithSftp).not.toHaveBeenCalled();
   });
 });
