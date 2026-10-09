@@ -12,6 +12,8 @@ import {
   detectSalesFormat,
   parseProductMix,
   productMixKey,
+  businessDateOf,
+  saleDateFromNote,
   StockItem,
   ToastLink,
   RecipeRef,
@@ -267,6 +269,19 @@ describe('suggestLink / defaultServing', () => {
     expect(defaultServing('Red Wine', 'Pinot', { category: 'wine', unit: 'bottle' })).toEqual({ amount: 5, amount_unit: 'oz' });
     expect(defaultServing('Can Beer', 'Stella', { category: 'beer', unit: 'can' })).toEqual({ amount: 1, amount_unit: 'unit' });
     expect(defaultServing('THC', 'Juicy Grapefruit', { category: 'other', unit: 'can' })).toEqual({ amount: 0.5, amount_unit: 'unit' });
+  });
+});
+
+describe('business dates for count windows', () => {
+  it('treats the hours before the 4am closeout as the previous business day', () => {
+    expect(businessDateOf('2026-10-10T06:30:00Z')).toBe('2026-10-09'); // 1:30am CDT Sat → Friday's business day
+    expect(businessDateOf('2026-10-10T10:00:00Z')).toBe('2026-10-10'); // 5am CDT Sat
+    expect(businessDateOf('2026-12-12T09:30:00Z')).toBe('2026-12-11'); // 3:30am CST
+  });
+  it('reads the business date back out of a sales transaction note', () => {
+    expect(saleDateFromNote('Toast sales 2026-10-08')).toBe('2026-10-08');
+    expect(saleDateFromNote('Inventory count')).toBeNull();
+    expect(saleDateFromNote(null)).toBeNull();
   });
 });
 

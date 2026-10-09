@@ -75,3 +75,41 @@ export async function notifyNewGaps(ctx?: PlanContext): Promise<{ sent: boolean;
     return { sent: false, new_gaps: 0, error: err instanceof Error ? err.message : String(err) };
   }
 }
+
+const FAILURE_KEY = 'toast_sync_failure_notice';
+
+/**
+ * Text the admin number when the Toast sync fails — once per outage, not
+ * once per failed run. Cleared by the next successful sync. Never throws.
+ */
+export async function notifySyncFailure(message: string): Promise<void> {
+  try {
+    const { data: row } = await supabaseAdmin.from('system_settings').select('value').eq('key', FAILURE_KEY).maybeSingle();
+    if (row?.value?.notified_at) return; // already told about this outage
+
+    const phone = await adminPhone();
+    if (!phone) return;
+    const base = (process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
+    const result = await sendSMS({
+      to: phone,
+      content: `Noir inventory: the Toast sales sync failed — ${message.slice(0, 240)}` + (base ? `\n${base}/admin/inventory` : ''),
+    });
+    if (!result.success) return;
+
+    const now = new Date().toISOString();
+    const value = { notified_at: now, message: message.slice(0, 500) };
+    if (row) await supabaseAdmin.from('system_settings').update({ value, updated_at: now }).eq('key', FAILURE_KEY);
+    else await supabaseAdmin.from('system_settings').insert({ key: FAILURE_KEY, value, created_at: now, updated_at: now });
+  } catch (err) {
+    console.error('toast sync failure notify error:', err);
+  }
+}
+
+/** A successful sync ends the outage, so the next failure texts again. */
+export async function clearSyncFailure(): Promise<void> {
+  try {
+    await supabaseAdmin.from('system_settings').delete().eq('key', FAILURE_KEY);
+  } catch (err) {
+    console.error('toast sync failure clear error:', err);
+  }
+}

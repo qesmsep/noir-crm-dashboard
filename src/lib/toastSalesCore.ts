@@ -560,6 +560,17 @@ export function summarizeCount(lines: CountLine[]): CountVariance {
   return { counted_lines: counted, uncounted_lines: uncounted, variance_value: round2(value), poured_variance_value: round2(pouredValue) };
 }
 
+/** Toast closes its business day at 4am Chicago: a timestamp's business date is its Chicago date 4 hours earlier. */
+export function businessDateOf(iso: string): string {
+  return new Date(new Date(iso).getTime() - 4 * 3600 * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+}
+
+/** The business date apply_toast_sales() writes into a sales transaction's note ("Toast sales YYYY-MM-DD"). */
+export function saleDateFromNote(note: string | null | undefined): string | null {
+  const m = /^Toast sales (\d{4}-\d{2}-\d{2})/.exec(note || '');
+  return m ? m[1] : null;
+}
+
 /**
  * Real loss rate on poured stock between two counts.
  *

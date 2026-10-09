@@ -2,7 +2,7 @@ import { supabaseAdmin } from '../supabase';
 import { folderToBusinessDate, parseItemSelectionCsv } from '../toastSalesCore';
 import { withToastSftp, exportRoot, listDayFolders, readDayFile } from './sftp';
 import { reopenIfPending, settleDaysWithNothingToApprove } from './settle';
-import { notifyNewGaps } from './notify';
+import { clearSyncFailure, notifyNewGaps, notifySyncFailure } from './notify';
 
 export interface ToastSyncResult {
   run_id: string | null;
@@ -121,6 +121,7 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
     // Closed nights and untracked-only days never wait for approval.
     const closed = await settleDaysWithNothingToApprove();
     const notice = await notifyNewGaps();
+    await clearSyncFailure();
 
     if (runId) {
       await supabaseAdmin
@@ -145,6 +146,7 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
     };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    await notifySyncFailure(message);
     if (runId) {
       await supabaseAdmin
         .from('toast_sync_runs')

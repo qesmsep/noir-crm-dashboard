@@ -17,6 +17,9 @@ interface CountSummary {
   variance_value: number;
   poured_variance_value: number;
   since: string | null;
+  window_from?: string | null;
+  window_to?: string;
+  pending_days?: number;
   poured_sales_value: number;
   allowance_pct: number;
   measured_loss_pct: number | null;
@@ -290,14 +293,19 @@ function CountDetail({ countId, onBack, onCompleted }: { countId: string; onBack
 
           <div className={t.notice} style={{ background: '#F7F6F2', color: '#1F1F1F' }}>
             {s.measured_loss_pct === null ? (
-              s.since ? (
+              s.pending_days ? (
+                <>
+                  {s.pending_days} day(s) of Toast sales between the last count and this one are still waiting for approval, so pour loss
+                  can’t be measured yet. Approve them on the Sales tab, then reopen this count.
+                </>
+              ) : s.since ? (
                 <>No Toast sales of the counted poured items since the last count, so there’s nothing to measure loss against yet.</>
               ) : (
                 <>This is the first completed count here, so it sets the baseline. The next count will measure your real pour loss against the {s.allowance_pct}% allowance.</>
               )
             ) : (
               <>
-                Since the last count ({fmtWhen(s.since)}), Toast sales took ${s.poured_sales_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of poured stock at cost,
+                For sales from {s.window_from || fmtWhen(s.since)} up to {s.window_to || 'this count'}, Toast sales took ${s.poured_sales_value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of poured stock at cost,
                 including the {s.allowance_pct}% allowance. The shelf shows the real loss rate was <strong>{s.measured_loss_pct}%</strong>.{' '}
                 {allowanceSaved ? (
                   <strong>Allowance updated.</strong>
