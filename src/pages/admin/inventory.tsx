@@ -8,6 +8,8 @@ import RecipeBuilder from '../../components/inventory/RecipeBuilder';
 import RecipeDrawer from '../../components/inventory/RecipeDrawer';
 import EnhancedSalesUpload from '../../components/inventory/EnhancedSalesUpload';
 import InventorySettings from '../../components/inventory/InventorySettings';
+import ToastSalesPanel from '../../components/inventory/ToastSalesPanel';
+import InventoryCounts from '../../components/inventory/InventoryCounts';
 import { supabase } from '../../lib/supabase';
 import {
   Package,
@@ -23,6 +25,7 @@ import {
   Settings,
   MapPin,
   ArrowRightLeft,
+  ClipboardCheck,
 } from 'lucide-react';
 import type {
   InventoryItem,
@@ -639,6 +642,13 @@ export default function InventoryPage() {
           <span className={styles.tabBadge}>{salesHistory.length}</span>
         </button>
         <button
+          className={`${styles.tab} ${activeTab === 'counts' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('counts')}
+        >
+          <ClipboardCheck size={16} />
+          Counts
+        </button>
+        <button
           className={`${styles.tab} ${activeTab === 'history' ? styles.tabActive : ''}`}
           onClick={() => setActiveTab('history')}
         >
@@ -674,6 +684,34 @@ export default function InventoryPage() {
           onEdit={handleEditRecipe}
           onAdd={handleAddRecipe}
         />
+      )}
+
+      {activeTab === 'sales' && (
+        <ToastSalesPanel
+          inventory={allInventory}
+          locations={locationsData}
+          onApplied={() => {
+            fetchInventory();
+            fetchAllInventory();
+          }}
+        />
+      )}
+
+      {activeTab === 'counts' && (
+        <InventoryCounts
+          locations={locationsData}
+          currentLocation={currentLocation}
+          onCompleted={() => {
+            fetchInventory();
+            fetchAllInventory();
+          }}
+        />
+      )}
+
+      {activeTab === 'sales' && (
+        <p style={{ fontSize: '0.75rem', fontWeight: 600, letterSpacing: '0.04em', textTransform: 'uppercase', color: '#868686', margin: '0.5rem 0' }}>
+          Manual upload (backup)
+        </p>
       )}
 
       {activeTab === 'sales' && (
