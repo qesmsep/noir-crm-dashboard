@@ -6,8 +6,9 @@ import InventoryPhotoScanner from '../../components/inventory/InventoryPhotoScan
 import InventoryTransferModal from '../../components/inventory/InventoryTransferModal';
 import RecipeBuilder from '../../components/inventory/RecipeBuilder';
 import RecipeDrawer from '../../components/inventory/RecipeDrawer';
-import EnhancedSalesUpload from '../../components/inventory/EnhancedSalesUpload';
 import InventorySettings from '../../components/inventory/InventorySettings';
+import ToastSalesPanel from '../../components/inventory/ToastSalesPanel';
+import InventoryCounts from '../../components/inventory/InventoryCounts';
 import { supabase } from '../../lib/supabase';
 import {
   Package,
@@ -23,6 +24,7 @@ import {
   Settings,
   MapPin,
   ArrowRightLeft,
+  ClipboardCheck,
 } from 'lucide-react';
 import type {
   InventoryItem,
@@ -32,7 +34,6 @@ import type {
   Recipe,
   RecipeFormData,
   RecipeCategory,
-  SalesRecord,
   ScannedItem,
   LocationSlug,
   UILocationSlug,
@@ -78,9 +79,6 @@ export default function InventoryPage() {
 
   // Settings state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-
-  // Sales state
-  const [salesHistory, setSalesHistory] = useState<SalesRecord[]>([]);
 
   // Locations data for badges
   const [locationsData, setLocationsData] = useState<Array<{ id: string; slug: string; name: string }>>([]);
@@ -161,24 +159,11 @@ export default function InventoryPage() {
     }
   }, [currentLocation]);
 
-  const fetchSalesHistory = useCallback(async () => {
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch('/api/inventory/sales', { headers });
-      if (res.ok) {
-        const data = await res.json();
-        setSalesHistory(data.data || []);
-      }
-    } catch (err) {
-      console.error('Failed to fetch sales history:', err);
-    }
-  }, []);
-
   useEffect(() => {
-    Promise.all([fetchInventory(), fetchAllInventory(), fetchRecipes(), fetchSalesHistory()]).finally(
+    Promise.all([fetchInventory(), fetchAllInventory(), fetchRecipes()]).finally(
       () => setLoading(false)
     );
-  }, [fetchInventory, fetchAllInventory, fetchRecipes, fetchSalesHistory]);
+  }, [fetchInventory, fetchAllInventory, fetchRecipes]);
 
   // Computed stats
   const totalItems = inventory.length;
@@ -494,23 +479,6 @@ export default function InventoryPage() {
     setIsRecipeDrawerOpen(true);
   };
 
-  // Sales processing
-  const handleProcessSales = async (record: SalesRecord) => {
-    try {
-      const headers = await getAuthHeaders();
-      const res = await fetch('/api/inventory/sales', {
-        method: 'PUT',
-        headers,
-        body: JSON.stringify(record),
-      });
-      if (res.ok) {
-        await Promise.all([fetchInventory(), fetchSalesHistory()]);
-      }
-    } catch (err) {
-      console.error('Failed to process sales:', err);
-    }
-  };
-
   if (loading) {
     return (
       <AdminLayout>
@@ -636,7 +604,13 @@ export default function InventoryPage() {
         >
           <TrendingDown size={16} />
           Sales
-          <span className={styles.tabBadge}>{salesHistory.length}</span>
+        </button>
+        <button
+          className={`${styles.tab} ${activeTab === 'counts' ? styles.tabActive : ''}`}
+          onClick={() => setActiveTab('counts')}
+        >
+          <ClipboardCheck size={16} />
+          Counts
         </button>
         <button
           className={`${styles.tab} ${activeTab === 'history' ? styles.tabActive : ''}`}
@@ -677,15 +651,27 @@ export default function InventoryPage() {
       )}
 
       {activeTab === 'sales' && (
-        <EnhancedSalesUpload
-          currentLocation={currentLocation}
-          onUploadComplete={() => {
+        <ToastSalesPanel
+          inventory={allInventory}
+          locations={locationsData}
+          onApplied={() => {
             fetchInventory();
             fetchAllInventory();
-            fetchRecipes();
           }}
         />
       )}
+
+      {activeTab === 'counts' && (
+        <InventoryCounts
+          locations={locationsData}
+          currentLocation={currentLocation}
+          onCompleted={() => {
+            fetchInventory();
+            fetchAllInventory();
+          }}
+        />
+      )}
+
 
       {/* Modals */}
       <InventoryItemModal

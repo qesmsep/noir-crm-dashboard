@@ -3,6 +3,9 @@ const nextConfig = {
   // Temporarily disable React Strict Mode to avoid double-mounting in dev
   // Re-enable this for production builds to catch potential issues
   reactStrictMode: process.env.NODE_ENV === 'production',
+  // ssh2 (Toast SFTP export) ships optional native bindings; load it from
+  // node_modules at runtime instead of bundling it.
+  serverExternalPackages: ['ssh2', 'ssh2-sftp-client'],
   async redirects() {
     return [
       // Old dashboards merged into the Business page

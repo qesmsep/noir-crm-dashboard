@@ -24,6 +24,10 @@
     {
       "path": "/api/cron/retry-failed-payments",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/cron/toast-sync",
+      "schedule": "30 12 * * *"
     }
   ],
   "functions": {
@@ -41,6 +45,12 @@
     },
     "src/pages/api/inventory/scan.ts": {
       "maxDuration": 30
+    },
+    "src/pages/api/cron/toast-sync.ts": {
+      "maxDuration": 60
+    },
+    "src/pages/api/inventory/toast/sync.ts": {
+      "maxDuration": 60
     }
   },
   "rewrites": [

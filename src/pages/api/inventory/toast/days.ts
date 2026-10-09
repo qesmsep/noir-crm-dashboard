@@ -1,0 +1,95 @@
+import type { NextApiResponse } from 'next';
+import { supabaseAdmin } from '../../../../lib/supabase';
+import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../../lib/api-auth';
+import { toastSftpConfigured } from '../../../../lib/toast/sftp';
+import { loadPlanContext, pendingLines, planFor } from '../../../../lib/toast/plan';
+
+// toast_sync_status predates this feature and also holds old 'webhook' rows.
+const SYNC_TYPES = ['cron', 'manual'];
+
+/**
+ * GET /api/inventory/toast/days
+ * Imported Toast sales days (newest first), with what's still waiting for
+ * approval on each, the last sync run, and the loss allowance in force.
+ */
+async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const [daysRes, runRes] = await Promise.all([
+      supabaseAdmin
+        .from('toast_sales_days')
+        .select('business_date, status, source, period_start, line_count, imported_at, last_applied_at, last_applied_by')
+        .neq('status', 'empty')
+        .order('business_date', { ascending: false })
+        .limit(60),
+      supabaseAdmin
+        .from('toast_sync_status')
+        .select('sync_type, status, records_processed, error_message, started_at, completed_at')
+        .in('sync_type', SYNC_TYPES)
+        .order('started_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+    if (daysRes.error) throw new Error(daysRes.error.message);
+
+    const days = daysRes.data || [];
+    const open = days.filter(d => d.status !== 'applied').map(d => d.business_date as string);
+    const ctx = await loadPlanContext();
+    const lines = await pendingLines(open);
+
+    const summary = new Map<string, { pending_drinks: number; ready_drinks: number; needs_attention: number }>();
+    for (const date of open) {
+      const dayLines = lines.filter(l => l.business_date === date);
+      const plan = planFor(dayLines, ctx);
+      const qtyById = new Map(dayLines.map(l => [l.item_selection_id, l.qty]));
+      summary.set(date, {
+        pending_drinks: dayLines.reduce((s, l) => s + l.qty, 0),
+        ready_drinks: plan.resolved.reduce((s, r) => s + (qtyById.get(r.item_selection_id) || 0), 0),
+        needs_attention: plan.unresolved.length,
+      });
+    }
+
+    // Toast keeps export files for 7 days: two days without a successful sync
+    // (cron not running, SFTP failing) is worth a warning before data is lost.
+    const { data: lastOk } = await supabaseAdmin
+      .from('toast_sync_status')
+      .select('completed_at')
+      .in('sync_type', SYNC_TYPES)
+      .eq('status', 'success')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const { count: emptyDays } = await supabaseAdmin
+      .from('toast_sales_days')
+      .select('business_date', { count: 'exact', head: true })
+      .eq('status', 'empty');
+
+    return res.status(200).json({
+      configured: toastSftpConfigured(),
+      empty_days: emptyDays ?? 0,
+      last_success_at: lastOk?.completed_at || null,
+      allowance: ctx.allowance,
+      last_run: runRes.data
+        ? {
+            trigger: runRes.data.sync_type,
+            status: runRes.data.status,
+            lines_imported: runRes.data.records_processed ?? 0,
+            error: runRes.data.error_message,
+            started_at: runRes.data.started_at,
+            finished_at: runRes.data.completed_at,
+          }
+        : null,
+      days: days.map(d => ({
+        ...d,
+        ...(summary.get(d.business_date) || { pending_drinks: 0, ready_drinks: 0, needs_attention: 0 }),
+      })),
+    });
+  } catch (err) {
+    console.error('toast days error:', err);
+    return res.status(500).json({ error: err instanceof Error ? err.message : 'Failed to load Toast sales' });
+  }
+}
+
+export default withRateLimitAndAuth(handler);

@@ -163,35 +163,6 @@ export interface RecipeFormData {
 }
 
 // ========================================
-// Sales Types
-// ========================================
-
-export interface SalesItem {
-  name: string;
-  quantity_sold: number;
-  revenue: number;
-  matched_recipe_id: string;
-  matched_inventory_items: {
-    id: string;
-    name: string;
-    quantity_deducted: number;
-  }[];
-}
-
-export interface SalesRecord {
-  id: string;
-  upload_date: string;
-  period_start: string;
-  period_end: string;
-  source_filename: string;
-  items: SalesItem[];
-  total_revenue: number;
-  total_cost: number;
-  status: 'pending' | 'reviewing' | 'processed' | 'error';
-  created_at: string;
-}
-
-// ========================================
 // AI Scan Types
 // ========================================
 
@@ -224,7 +195,7 @@ export interface ScannedItem {
 // Tab & UI Types
 // ========================================
 
-export type InventoryTab = 'inventory' | 'recipes' | 'sales' | 'history';
+export type InventoryTab = 'inventory' | 'recipes' | 'sales' | 'counts' | 'history';
 
 export interface InventoryStats {
   total_items: number;

@@ -1,0 +1,245 @@
+/* Toast sales sync + inventory counts. Buttons, tables, drawers and badges
+   come from Inventory.module.css; this file only adds what those don't cover. */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.syncBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  background: white;
+  border: 1px solid #ECEAE5;
+  border-radius: 16px;
+  padding: 1rem 1.25rem;
+  box-shadow: 0 4px 12px rgba(165, 148, 128, 0.08);
+}
+
+.syncTitle {
+  font-family: 'Montserrat', sans-serif;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  color: #1F1F1F;
+  margin: 0;
+}
+
+.syncMeta {
+  font-size: 0.75rem;
+  color: #868686;
+  margin: 0.125rem 0 0;
+}
+
+.syncActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.notice {
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.noticeError {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.sectionTitle {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #868686;
+  margin: 0.5rem 0 0.25rem;
+}
+
+.scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.negative {
+  color: #991B1B;
+  font-weight: 600;
+}
+
+.muted {
+  color: #868686;
+  font-size: 0.75rem;
+}
+
+.rowList {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border: 1px solid #ECEAE5;
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #F0EDE8;
+  min-height: 44px;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rowMain {
+  min-width: 0;
+  flex: 1;
+}
+
+.rowTitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1F1F1F;
+  overflow-wrap: anywhere;
+}
+
+.rowSub {
+  font-size: 0.75rem;
+  color: #868686;
+  margin-top: 0.125rem;
+  overflow-wrap: anywhere;
+}
+
+.reason {
+  font-size: 0.75rem;
+  color: #991B1B;
+  margin-top: 0.25rem;
+}
+
+.groupHeader {
+  padding: 0.5rem 1rem;
+  background: #F7F6F2;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #868686;
+  border-bottom: 1px solid #ECEAE5;
+}
+
+.countInput {
+  width: 5.5rem;
+  min-height: 44px;
+  padding: 0.5rem;
+  border: 1px solid #ECEAE5;
+  border-radius: 10px;
+  font-size: 1rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.countInput:focus {
+  outline: none;
+  border-color: #A59480;
+  box-shadow: 0 0 0 3px rgba(165, 148, 128, 0.15);
+}
+
+.countInputDone {
+  background: #F2FBF6;
+  border-color: #A7D7BC;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.stat {
+  background: white;
+  border: 1px solid #ECEAE5;
+  border-radius: 12px;
+  padding: 0.75rem 1rem;
+}
+
+.statValue {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1F1F1F;
+  font-variant-numeric: tabular-nums;
+}
+
+.statLabel {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #868686;
+  margin-top: 0.125rem;
+}
+
+.inlineForm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.pctInput {
+  width: 4.5rem;
+  min-height: 36px;
+  padding: 0.375rem 0.5rem;
+  border: 1px solid #ECEAE5;
+  border-radius: 8px;
+  text-align: right;
+}
+
+.segmented {
+  display: flex;
+  gap: 0.25rem;
+  background: #F7F6F2;
+  border-radius: 10px;
+  padding: 0.25rem;
+}
+
+.segment {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 0.8125rem;
+  color: #6B6B6B;
+  cursor: pointer;
+}
+
+.segmentActive {
+  background: white;
+  color: #1F1F1F;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 768px) {
+  .syncBar {
+    padding: 0.875rem 1rem;
+  }
+}
