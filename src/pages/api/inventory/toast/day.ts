@@ -15,7 +15,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     const { data: day, error } = await supabaseAdmin
       .from('toast_sales_days')
-      .select('business_date, status, line_count, imported_at, last_applied_at, last_applied_by')
+      .select('business_date, status, source, period_start, line_count, imported_at, last_applied_at, last_applied_by')
       .eq('business_date', date)
       .maybeSingle();
     if (error) throw new Error(error.message);

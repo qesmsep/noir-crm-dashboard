@@ -16,7 +16,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const [daysRes, runRes] = await Promise.all([
       supabaseAdmin
         .from('toast_sales_days')
-        .select('business_date, status, line_count, imported_at, last_applied_at, last_applied_by')
+        .select('business_date, status, source, period_start, line_count, imported_at, last_applied_at, last_applied_by')
+        .neq('status', 'empty')
         .order('business_date', { ascending: false })
         .limit(60),
       supabaseAdmin
@@ -45,8 +46,14 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
+    const { count: emptyDays } = await supabaseAdmin
+      .from('toast_sales_days')
+      .select('business_date', { count: 'exact', head: true })
+      .eq('status', 'empty');
+
     return res.status(200).json({
       configured: toastSftpConfigured(),
+      empty_days: emptyDays ?? 0,
       allowance: ctx.allowance,
       last_run: runRes.data || null,
       days: days.map(d => ({

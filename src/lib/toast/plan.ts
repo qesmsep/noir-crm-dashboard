@@ -27,9 +27,9 @@ async function all<T>(label: string, q: PromiseLike<{ data: T[] | null; error: {
 export async function loadPlanContext(): Promise<PlanContext> {
   const [links, recipeRows, itemRows, locations, allowance] = await Promise.all([
     all<ToastLink>('toast_item_links', supabaseAdmin.from('toast_item_links').select('toast_item_id, link_type, recipe_id, inventory_item_id, amount, amount_unit')),
-    all<{ id: string; name: string; is_active: boolean | null; ingredients: unknown }>(
+    all<{ id: string; name: string; category: string | null; is_active: boolean | null; ingredients: unknown }>(
       'inventory_recipes',
-      supabaseAdmin.from('inventory_recipes').select('id, name, is_active, ingredients')
+      supabaseAdmin.from('inventory_recipes').select('id, name, category, is_active, ingredients')
     ),
     all<StockItem>(
       'inventory_items',
@@ -44,6 +44,7 @@ export async function loadPlanContext(): Promise<PlanContext> {
     recipes: recipeRows.map(r => ({
       id: r.id,
       name: r.name,
+      category: r.category,
       is_active: r.is_active !== false,
       ingredients: safeJSONParse(r.ingredients as string | RecipeIngredientRef[], [] as RecipeIngredientRef[]).map(i => ({
         ...i,

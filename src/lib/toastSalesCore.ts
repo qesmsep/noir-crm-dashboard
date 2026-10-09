@@ -78,6 +78,81 @@ export function parseItemSelectionCsv(csv: string, businessDate: string): ToastS
 }
 
 // ---------------------------------------------------------------------------
+// Hand-uploaded reports
+// ---------------------------------------------------------------------------
+
+export type SalesFileFormat = 'item_selections' | 'product_mix';
+
+function headerFields(text: string): string[] {
+  const first = text.replace(/^\uFEFF/, '').split(/\r?\n/).find(l => l.trim()) || '';
+  return first.split(first.includes('\t') ? '\t' : ',').map(h => h.trim().replace(/^"|"$/g, ''));
+}
+
+/** Toast's nightly ItemSelectionDetails.csv, or the Product Mix report exported from Toast Web. */
+export function detectSalesFormat(text: string): SalesFileFormat | null {
+  const h = new Set(headerFields(text));
+  if (h.has('Item Selection Id') && h.has('Item Id')) return 'item_selections';
+  if (h.has('Menu Item') && h.has('Item Qty')) return 'product_mix';
+  return null;
+}
+
+export interface ProductMixRow {
+  menu_item: string;
+  menu_group: string;
+  menu: string;
+  qty: number;
+  gross: number;
+  discount: number;
+  net: number;
+}
+
+/**
+ * Product Mix rows, one per menu item per menu. "Item Qty" already leaves out
+ * voids (gross = qty × price; voids are listed separately), and comped or
+ * discounted drinks still count — they were poured. Rows naming the same item
+ * twice are added together.
+ */
+export function parseProductMix(text: string): ProductMixRow[] {
+  const parsed = Papa.parse<Record<string, string>>(text.replace(/^\uFEFF/, ''), {
+    header: true,
+    skipEmptyLines: true,
+    dynamicTyping: false,
+    transformHeader: h => h.trim(),
+  });
+  const byKey = new Map<string, ProductMixRow>();
+  for (const r of parsed.data) {
+    const menuItem = (r['Menu Item'] || '').trim();
+    const qty = num(r['Item Qty']);
+    if (!menuItem || !(qty > 0)) continue;
+    const row: ProductMixRow = {
+      menu_item: menuItem,
+      menu_group: (r['Menu Group'] || '').trim(),
+      menu: (r['Menu'] || '').trim(),
+      qty,
+      gross: num(r['Gross Amount']),
+      discount: num(r['Discount Amount']),
+      net: num(r['Net Amount']),
+    };
+    const key = productMixKey(row);
+    const prev = byKey.get(key);
+    if (prev) {
+      prev.qty += row.qty;
+      prev.gross += row.gross;
+      prev.discount += row.discount;
+      prev.net += row.net;
+    } else {
+      byKey.set(key, row);
+    }
+  }
+  return Array.from(byKey.values());
+}
+
+/** Name key for a Toast item when its Toast id isn't known (Product Mix has no ids). */
+export function productMixKey(r: { menu: string; menu_group: string; menu_item: string }): string {
+  return `${r.menu}|${r.menu_group}|${r.menu_item}`.toLowerCase();
+}
+
+// ---------------------------------------------------------------------------
 // Sale location
 // ---------------------------------------------------------------------------
 
@@ -183,8 +258,23 @@ export interface RecipeIngredientRef {
 export interface RecipeRef {
   id: string;
   name: string;
+  category?: string | null;
   is_active?: boolean;
   ingredients: RecipeIngredientRef[];
+}
+
+/**
+ * A cocktail or shot must name its spirit in the recipe — there is no house
+ * spirit to fall back on. Mocktails are exempt. The recipe's own category
+ * decides; when it's blank or generic, the Toast menu group does.
+ */
+export function needsSpirit(recipeCategory: string | null | undefined, toastMenuGroup: string): boolean {
+  const cat = (recipeCategory || '').toLowerCase();
+  if (/mocktail/.test(cat)) return false;
+  if (/cocktail|shot/.test(cat)) return true;
+  if (cat && cat !== 'other') return false;
+  const group = toastMenuGroup.toLowerCase();
+  return /cocktail|signature|libation/.test(group) && !/mocktail/.test(group);
 }
 
 export interface LossAllowance {
@@ -239,6 +329,7 @@ function servingDeductions(
   link: ToastLink | undefined,
   locationId: string,
   locationName: string,
+  menuGroup: string,
   ctx: {
     recipes: Map<string, RecipeRef>;
     items: Map<string, StockItem>;
@@ -283,6 +374,12 @@ function servingDeductions(
     } else if (!recipe.ingredients || recipe.ingredients.length === 0) {
       reasons.push(`Recipe "${recipe.name}" has no ingredients`);
     } else {
+      if (
+        needsSpirit(recipe.category, menuGroup) &&
+        !recipe.ingredients.some(i => ctx.items.get(i.inventory_item_id)?.category === 'spirits')
+      ) {
+        reasons.push(`Recipe "${recipe.name}" lists no spirit`);
+      }
       for (const ing of recipe.ingredients) {
         const label = `Recipe "${recipe.name}" — ${ing.name || 'ingredient'}`;
         if (!ing.inventory_item_id) {
@@ -335,7 +432,7 @@ export function buildDeductionPlan(
     let result = perServing.get(key);
     if (!result) {
       result = loc
-        ? servingDeductions(linkMap.get(line.toast_item_id), loc.id, loc.name, ctx)
+        ? servingDeductions(linkMap.get(line.toast_item_id), loc.id, loc.name, line.menu_group, ctx)
         : { reasons: [`No "${slug}" location set up in the app`] };
       perServing.set(key, result);
     }

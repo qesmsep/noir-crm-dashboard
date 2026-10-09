@@ -4,6 +4,7 @@ import type { InventoryItem, Recipe } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
 import t from '../../styles/ToastInventory.module.css';
 import { getAuthHeaders } from '../../lib/client-auth';
+import ManualSalesUpload from './ManualSalesUpload';
 
 // ---------------------------------------------------------------------------
 // Types (mirror /api/inventory/toast/*)
@@ -14,6 +15,8 @@ type DayStatus = 'pending' | 'partial' | 'applied';
 interface DaySummary {
   business_date: string;
   status: DayStatus;
+  source: 'sftp' | 'manual_items' | 'manual_pmix';
+  period_start: string | null;
   line_count: number;
   imported_at: string;
   last_applied_at: string | null;
@@ -123,6 +126,7 @@ function fmtQty(n: number): string {
 }
 
 const STATUS_LABEL: Record<DayStatus, string> = { pending: 'Waiting', partial: 'Partly applied', applied: 'Applied' };
+// 'empty' days never reach the panel: the API hides them.
 const STATUS_CLASS: Record<DayStatus, string> = { pending: styles.statusPending, partial: styles.statusReviewing, applied: styles.statusProcessed };
 
 // ---------------------------------------------------------------------------
@@ -291,6 +295,7 @@ function LinkEditor({
 export default function ToastSalesPanel({ inventory, locations, onApplied }: Props) {
   const [recipes, setRecipes] = useState<Recipe[]>([]); // every location's recipes, for linking
   const [days, setDays] = useState<DaySummary[]>([]);
+  const [emptyDays, setEmptyDays] = useState(0);
   const [lastRun, setLastRun] = useState<SyncRun | null>(null);
   const [configured, setConfigured] = useState(true);
   const [allowance, setAllowance] = useState<Allowance | null>(null);
@@ -315,12 +320,13 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
     setError(null);
     try {
       const [d, l, r] = await Promise.all([
-        api<{ configured: boolean; allowance: Allowance; last_run: SyncRun | null; days: DaySummary[] }>('/api/inventory/toast/days'),
+        api<{ configured: boolean; allowance: Allowance; last_run: SyncRun | null; days: DaySummary[]; empty_days: number }>('/api/inventory/toast/days'),
         api<{ data: ToastItemRow[] }>('/api/inventory/toast/links'),
         api<{ data: Recipe[] }>('/api/inventory/recipes'),
       ]);
       setRecipes(r.data || []);
       setDays(d.days);
+      setEmptyDays(d.empty_days || 0);
       setLastRun(d.last_run);
       setConfigured(d.configured);
       setAllowance(d.allowance);
@@ -357,8 +363,12 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
     setNotice(null);
     setError(null);
     try {
-      const r = await api<{ days_imported: number; lines_imported: number }>('/api/inventory/toast/sync', { method: 'POST' });
-      setNotice(r.days_imported ? `Imported ${r.days_imported} day(s), ${r.lines_imported} items sold.` : 'Up to date — no new days on the Toast server.');
+      const r = await api<{ days_imported: number; lines_imported: number; days_closed_no_sales: number; skipped_manual: string[] }>('/api/inventory/toast/sync', { method: 'POST' });
+      setNotice(
+        (r.days_imported ? `Imported ${r.days_imported} day(s), ${r.lines_imported} items sold.` : 'Up to date — no new days on the Toast server.') +
+          (r.days_closed_no_sales ? ` ${r.days_closed_no_sales} day(s) had nothing to take out of stock and were closed automatically.` : '') +
+          (r.skipped_manual?.length ? ` Skipped ${r.skipped_manual.join(', ')} — already imported from a hand-uploaded report.` : '')
+      );
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Sync failed');
@@ -538,8 +548,9 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
             <div key={d.business_date} className={t.row}>
               <div className={t.rowMain}>
                 <div className={t.rowTitle}>
-                  {fmtDate(d.business_date)}{' '}
+                  {d.period_start && d.period_start !== d.business_date ? `${fmtDate(d.period_start)} – ${fmtDate(d.business_date)}` : fmtDate(d.business_date)}{' '}
                   <span className={`${styles.statusBadge} ${STATUS_CLASS[d.status]}`}>{STATUS_LABEL[d.status]}</span>
+                  {d.source !== 'sftp' && <span className={t.muted}> · uploaded by hand</span>}
                 </div>
                 <div className={t.rowSub}>
                   {d.status === 'applied'
@@ -555,6 +566,18 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
           ))}
         </div>
       )}
+
+      {emptyDays > 0 && (
+        <p className={t.muted} style={{ margin: 0 }}>
+          {emptyDays} day(s) with nothing to take out of stock (closed nights, voids or untracked items only) were closed automatically.
+        </p>
+      )}
+      <ManualSalesUpload
+        onImported={async message => {
+          setNotice(message);
+          await load();
+        }}
+      />
 
       {/* Toast items */}
       <h3 className={t.sectionTitle}>

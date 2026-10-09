@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabaseAdmin } from '../../../../lib/supabase';
 import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../../lib/api-auth';
 import { loadPlanContext } from '../../../../lib/toast/plan';
+import { settleDaysWithNothingToApprove } from '../../../../lib/toast/settle';
 import { saleLocationSlug, suggestLink } from '../../../../lib/toastSalesCore';
 
 const LOOKBACK_DAYS = 60;
@@ -99,7 +100,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       };
       const { error } = await supabaseAdmin.from('toast_item_links').upsert(row, { onConflict: 'toast_item_id' });
       if (error) throw new Error(error.message);
-      return res.status(200).json({ data: row });
+      const closed = await settleDaysWithNothingToApprove();
+      return res.status(200).json({ data: row, days_closed: closed });
     }
 
     if (req.method === 'DELETE') {

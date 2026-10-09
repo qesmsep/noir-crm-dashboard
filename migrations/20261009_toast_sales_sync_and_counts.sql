@@ -98,15 +98,37 @@ END $$;
 -- ----------------------------------------
 -- 2. Toast sales
 -- ----------------------------------------
+-- status: pending / partial need approval; applied is done; empty means the
+-- day had nothing to take out of stock (closed night, voids only, untracked
+-- items only) and was closed without asking anyone.
+-- source: sftp = nightly export; manual_items = ItemSelectionDetails.csv
+-- uploaded by hand (same rows as the export, so they de-duplicate);
+-- manual_pmix = a Product Mix report covering period_start..business_date.
 CREATE TABLE IF NOT EXISTS toast_sales_days (
   business_date   DATE PRIMARY KEY,
-  export_folder   TEXT NOT NULL,
+  export_folder   TEXT,
+  source          TEXT NOT NULL DEFAULT 'sftp',
+  period_start    DATE,
   line_count      INTEGER NOT NULL DEFAULT 0,
-  status          TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'partial', 'applied')),
+  status          TEXT NOT NULL DEFAULT 'pending',
   imported_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_applied_at TIMESTAMPTZ,
   last_applied_by TEXT
 );
+
+-- Safe whether or not an earlier draft of this file was already run.
+ALTER TABLE toast_sales_days ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'sftp';
+ALTER TABLE toast_sales_days ADD COLUMN IF NOT EXISTS period_start DATE;
+ALTER TABLE toast_sales_days ALTER COLUMN export_folder DROP NOT NULL;
+ALTER TABLE toast_sales_days DROP CONSTRAINT IF EXISTS toast_sales_days_status_check;
+ALTER TABLE toast_sales_days ADD CONSTRAINT toast_sales_days_status_check
+  CHECK (status IN ('pending', 'partial', 'applied', 'empty'));
+ALTER TABLE toast_sales_days DROP CONSTRAINT IF EXISTS toast_sales_days_source_check;
+ALTER TABLE toast_sales_days ADD CONSTRAINT toast_sales_days_source_check
+  CHECK (source IN ('sftp', 'manual_items', 'manual_pmix'));
+ALTER TABLE toast_sales_days DROP CONSTRAINT IF EXISTS toast_sales_days_period_check;
+ALTER TABLE toast_sales_days ADD CONSTRAINT toast_sales_days_period_check
+  CHECK (period_start IS NULL OR period_start <= business_date);
 
 CREATE TABLE IF NOT EXISTS toast_sales_lines (
   item_selection_id TEXT PRIMARY KEY,

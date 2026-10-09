@@ -1,12 +1,17 @@
 import { supabaseAdmin } from '../supabase';
 import { folderToBusinessDate, parseItemSelectionCsv } from '../toastSalesCore';
 import { withToastSftp, exportRoot, listDayFolders, readDayFile } from './sftp';
+import { settleDaysWithNothingToApprove } from './settle';
+import { notifyNewGaps } from './notify';
 
 export interface ToastSyncResult {
   run_id: string | null;
   days_imported: number;
   lines_imported: number;
   folders_seen: number;
+  days_closed_no_sales: number;
+  skipped_manual: string[];
+  gaps_texted: number;
 }
 
 const CHUNK = 500;
@@ -27,6 +32,7 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
   let daysImported = 0;
   let linesImported = 0;
   let foldersSeen = 0;
+  const skippedManual: string[] = [];
 
   try {
     await withToastSftp(async sftp => {
@@ -42,9 +48,24 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
       if (existingErr) throw new Error(`toast_sales_days read: ${existingErr.message}`);
       const known = new Map((existing || []).map(d => [d.business_date as string, d]));
 
+      // Dates already covered by a hand-uploaded Product Mix report: importing
+      // the export on top would count those drinks twice.
+      const { data: manualRanges, error: manualErr } = await supabaseAdmin
+        .from('toast_sales_days')
+        .select('business_date, period_start')
+        .eq('source', 'manual_pmix');
+      if (manualErr) throw new Error(`toast_sales_days manual read: ${manualErr.message}`);
+      const coveredByManual = (date: string) =>
+        (manualRanges || []).some(r => date >= (r.period_start || r.business_date) && date <= r.business_date);
+
       for (const folder of folders) {
         const businessDate = folderToBusinessDate(folder);
         if (!businessDate) continue;
+
+        if (coveredByManual(businessDate)) {
+          skippedManual.push(businessDate);
+          continue;
+        }
 
         const prior = known.get(businessDate);
         if (prior) {
@@ -61,7 +82,7 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
 
         const { error: dayErr } = await supabaseAdmin
           .from('toast_sales_days')
-          .upsert({ business_date: businessDate, export_folder: folder, line_count: lines.length }, { onConflict: 'business_date' });
+          .upsert({ business_date: businessDate, export_folder: folder, source: 'sftp', line_count: lines.length }, { onConflict: 'business_date' });
         if (dayErr) throw new Error(`toast_sales_days ${businessDate}: ${dayErr.message}`);
 
         for (let i = 0; i < lines.length; i += CHUNK) {
@@ -90,13 +111,31 @@ export async function runToastSync(trigger: 'cron' | 'manual'): Promise<ToastSyn
       }
     });
 
+    // Closed nights and untracked-only days never wait for approval.
+    const closed = await settleDaysWithNothingToApprove();
+    const notice = await notifyNewGaps();
+
     if (runId) {
       await supabaseAdmin
         .from('toast_sync_runs')
-        .update({ status: 'success', days_imported: daysImported, lines_imported: linesImported, finished_at: new Date().toISOString() })
+        .update({
+          status: 'success',
+          days_imported: daysImported,
+          lines_imported: linesImported,
+          finished_at: new Date().toISOString(),
+          error: notice.error ? `Sync OK; gap text not sent: ${notice.error}` : null,
+        })
         .eq('id', runId);
     }
-    return { run_id: runId, days_imported: daysImported, lines_imported: linesImported, folders_seen: foldersSeen };
+    return {
+      run_id: runId,
+      days_imported: daysImported,
+      lines_imported: linesImported,
+      folders_seen: foldersSeen,
+      days_closed_no_sales: closed.length,
+      skipped_manual: skippedManual,
+      gaps_texted: notice.sent ? notice.new_gaps : 0,
+    };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     if (runId) {

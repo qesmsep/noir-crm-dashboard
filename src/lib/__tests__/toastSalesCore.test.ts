@@ -8,6 +8,10 @@ import {
   defaultServing,
   summarizeCount,
   measuredLossPct,
+  needsSpirit,
+  detectSalesFormat,
+  parseProductMix,
+  productMixKey,
   StockItem,
   ToastLink,
   RecipeRef,
@@ -43,6 +47,35 @@ describe('parseItemSelectionCsv', () => {
 
   it('drops rows with no selection id', () => {
     expect(parseItemSelectionCsv(`${HEADER}\n,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,`, '2026-10-08')).toHaveLength(0);
+  });
+});
+
+describe('hand-uploaded reports', () => {
+  const PMIX = [
+    'Menu Item\tMenu Group\tMenu\tAvg Price\tItem Qty\tGross Amount\tVoid Qty\tVoid Amount\tDiscount Amount\tNet Amount\t# Orders\tTax',
+    'Afterglow\tRooftopKC Cocktails\tRooftopKC\t$17.00\t16\t$272.00\t2\t$34.00\t$187.00\t$85.00\t12\t$8.45',
+    'Espresso Martini\tClassic Cocktails\tCocktails\t$20.00\t51\t"$1,020.00"\t0\t$0.00\t$0.00\t"$1,020.00"\t24\t$101.59',
+    'Tes\tOpen Drink\tNo Menu\t$0.00\t0\t$0.00\t1\t$0.00\t$0.00\t$0.00\t1\t$0.00',
+  ].join('\n');
+
+  it('tells the two Toast formats apart', () => {
+    expect(detectSalesFormat(PMIX)).toBe('product_mix');
+    expect(detectSalesFormat(CSV)).toBe('item_selections');
+    expect(detectSalesFormat('Name,Qty\nX,1')).toBeNull();
+  });
+
+  it('reads Product Mix (tabs or commas), skipping zero-qty rows', () => {
+    const rows = parseProductMix(PMIX);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ menu_item: 'Afterglow', menu: 'RooftopKC', qty: 16, net: 85 });
+    expect(rows[1]).toMatchObject({ menu_item: 'Espresso Martini', qty: 51, gross: 1020 });
+    expect(parseProductMix(PMIX.replace(/\t/g, ','))).toHaveLength(2);
+  });
+
+  it('adds duplicate rows together and keys by menu, group and item', () => {
+    const dup = PMIX.split('\n').slice(0, 2).concat(PMIX.split('\n')[1]).join('\n');
+    expect(parseProductMix(dup)[0].qty).toBe(32);
+    expect(productMixKey({ menu: 'RooftopKC', menu_group: 'Spirits', menu_item: "Tito's" })).toBe("rooftopkc|spirits|tito's");
   });
 });
 
@@ -180,6 +213,39 @@ describe('buildDeductionPlan', () => {
       'Recipe "Bad" — Gin: the linked bottle no longer exists',
       'Recipe "Empty" has no ingredients',
     ]);
+  });
+});
+
+describe('cocktails must name their spirit', () => {
+  const lemon = item({ id: 'lem-n', name: 'Lemon Juice', category: 'mixers' });
+  const sour: RecipeRef = {
+    id: 'r-sour',
+    name: 'Whiskey Sour',
+    category: 'Classic Cocktails',
+    ingredients: [{ inventory_item_id: 'lem-n', name: 'Lemon', quantity: 1, unit: 'oz' }],
+  };
+  const link: ToastLink = { toast_item_id: 'T-S', link_type: 'recipe', recipe_id: 'r-sour', inventory_item_id: null, amount: null, amount_unit: null };
+
+  it('holds back a cocktail whose recipe has no spirit', () => {
+    const plan = buildDeductionPlan([line('a', 'T-S', 'Cocktails')], [link], [sour], [...ITEMS, lemon], LOCS, NO_ALLOWANCE);
+    expect(plan.resolved).toHaveLength(0);
+    expect(plan.unresolved[0].reasons).toEqual(['Recipe "Whiskey Sour" lists no spirit']);
+  });
+
+  it('applies it once the spirit is in the recipe', () => {
+    const fixed = { ...sour, ingredients: [...sour.ingredients, { inventory_item_id: 'vod-n', name: 'Vodka', quantity: 2, unit: 'oz' }] };
+    const plan = buildDeductionPlan([line('a', 'T-S', 'Cocktails')], [link], [fixed], [...ITEMS, lemon], LOCS, NO_ALLOWANCE);
+    expect(plan.unresolved).toHaveLength(0);
+  });
+
+  it('exempts mocktails and decides by recipe category, then Toast group', () => {
+    expect(needsSpirit('Mocktails', 'Specialty Mocktails')).toBe(false);
+    expect(needsSpirit('cocktail', 'x')).toBe(true);
+    expect(needsSpirit('Shots', 'x')).toBe(true);
+    expect(needsSpirit('Wine', 'Classic Cocktails')).toBe(false);
+    expect(needsSpirit('', 'Noir Signatures')).toBe(true);
+    expect(needsSpirit('other', 'Seasonal Cocktails')).toBe(true);
+    expect(needsSpirit(null, 'Mocktails')).toBe(false);
   });
 });
 
