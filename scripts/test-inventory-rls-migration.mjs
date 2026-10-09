@@ -6,7 +6,9 @@
  *   npm run test:migration:inventory-rls
  *
  * The fixture mirrors production (checked 2026-10-09): the "any authenticated
- * user" policies on inventory_items / inventory_transactions, Supabase's
+ * user" policies on inventory_items / inventory_transactions / inventory_recipes
+ * / inventory_recipe_ingredients, the open policies on inventory_sales, RLS off
+ * on inventory_sales_records, Supabase's
  * default table grants to anon and authenticated, and the previous grants on
  * process_inventory_receipt. auth.uid() / auth.role() read request.jwt.claims
  * as Supabase's do.
@@ -49,6 +51,23 @@ create policy "Enable update for authenticated users" on inventory_items for upd
 create policy "Enable delete for authenticated users" on inventory_items for delete using (auth.role() = 'authenticated');
 create policy "Enable read access for all authenticated users" on inventory_transactions for select using (auth.role() = 'authenticated');
 create policy "Enable insert for authenticated users" on inventory_transactions for insert with check (auth.role() = 'authenticated');
+create table inventory_recipes (id uuid primary key default gen_random_uuid(), name varchar not null);
+create table inventory_recipe_ingredients (id uuid primary key default gen_random_uuid(), recipe_id uuid references inventory_recipes(id), item_id uuid);
+create table inventory_sales (id uuid primary key default gen_random_uuid(), source_filename text);
+create table inventory_sales_records (id uuid primary key default gen_random_uuid(), report_date date);
+do $f$ declare t text; begin
+  foreach t in array array['inventory_recipes', 'inventory_recipe_ingredients'] loop
+    execute format('alter table %I enable row level security', t);
+    execute format('create policy %I on %I for select using (auth.role() = %L)', 'Enable read access for all authenticated users', t, 'authenticated');
+    execute format('create policy %I on %I for insert with check (auth.role() = %L)', 'Enable insert for authenticated users', t, 'authenticated');
+    execute format('create policy %I on %I for update using (auth.role() = %L)', 'Enable update for authenticated users', t, 'authenticated');
+    execute format('create policy %I on %I for delete using (auth.role() = %L)', 'Enable delete for authenticated users', t, 'authenticated');
+  end loop;
+end $f$;
+alter table inventory_sales enable row level security;
+create policy anon_read on inventory_sales for select to anon using (true);
+create policy authenticated_all on inventory_sales for all to authenticated using (true);
+create policy service_role_all on inventory_sales for all to service_role using (true);
 grant all on all tables in schema public to anon, authenticated, service_role;
 
 create function process_inventory_receipt(p_receipt_id uuid, p_user_id uuid) returns boolean language plpgsql as $$ begin return true; end; $$;
@@ -62,6 +81,22 @@ await db.exec(base);
 const [{ id: loc }] = (await db.query(`insert into locations(name) values('Noir') returning id`)).rows;
 const [{ id: item }] = (await db.query(`insert into inventory_items(name, quantity, location_id) values('Vodka', 5, $1) returning id`, [loc])).rows;
 await db.query(`insert into inventory_transactions(item_id, transaction_type, quantity, location_id) values($1, 'add', 5, $2)`, [item, loc]);
+await db.exec(`insert into inventory_recipes(name) values('Martini'); insert into inventory_sales(source_filename) values('old.csv'); insert into inventory_sales_records(report_date) values('2026-01-01');`);
+
+/** Rows each side table shows the caller, and whether it may write to it. */
+async function sideAccess(who) {
+  return as(who, async () => {
+    const r = {};
+    for (const t of ['inventory_recipes', 'inventory_sales', 'inventory_sales_records']) {
+      r[t] = (await db.query(`select count(*)::int n from ${t}`)).rows[0].n;
+    }
+    r.recipeWrite = (await db.query(`update inventory_recipes set name = name`)).affectedRows ?? 0;
+    try { await db.query(`insert into inventory_sales_records(report_date) values('2026-02-02')`); r.salesRecordsInsert = true; } catch { r.salesRecordsInsert = false; }
+    try { await db.query(`insert into inventory_recipe_ingredients(recipe_id) values(null)`); r.ingredientInsert = true; } catch { r.ingredientInsert = false; }
+    return r;
+  });
+}
+const resetSide = () => db.exec(`delete from inventory_sales_records where report_date = '2026-02-02'; delete from inventory_recipe_ingredients;`);
 
 async function as(who, fn) {
   const claims = who === 'anon' ? '{"role":"anon"}' : JSON.stringify({ sub: who === 'admin' ? ADMIN : MEMBER, role: 'authenticated' });
@@ -96,6 +131,21 @@ const before = await access('member');
 ok(before.read === 1 && before.insert && before.update === 1 && before.delete === 1 && before.insertTx && before.rpc,
   `before: a member can read, insert, update, delete items and write history (${JSON.stringify(before)})`);
 await resetData();
+const sideBeforeAnon = await sideAccess('anon');
+ok(sideBeforeAnon.inventory_sales === 1 && sideBeforeAnon.inventory_sales_records === 1 && sideBeforeAnon.salesRecordsInsert,
+  `before: anon can read inventory_sales and read/write inventory_sales_records (${JSON.stringify(sideBeforeAnon)})`);
+await resetSide();
+const sideBeforeMember = await sideAccess('member');
+ok(sideBeforeMember.inventory_recipes === 1 && sideBeforeMember.recipeWrite === 1 && sideBeforeMember.ingredientInsert,
+  `before: a member can edit recipes and ingredients (${JSON.stringify(sideBeforeMember)})`);
+await resetSide();
+
+// The final check refuses to finish when an unexpected policy is left behind
+await db.exec(`create policy sneaky_open on inventory_items for select to authenticated using (true)`);
+try { await db.exec(mig); ok(false, 'migration should refuse an unexpected policy'); }
+catch (e) { ok(/Unexpected policies after lockdown/.test(e.message) && /sneaky_open/.test(e.message), 'migration refuses to finish with an unexpected extra policy'); await db.exec('ROLLBACK'); }
+ok((await db.query(`select count(*)::int n from pg_policy where polname = 'Enable delete for authenticated users' and polrelid = 'inventory_items'::regclass`)).rows[0].n === 1, 'the refused run changed nothing');
+await db.exec(`drop policy sneaky_open on inventory_items`);
 
 await db.exec(mig);
 await db.exec(mig); // re-run must be safe
@@ -119,6 +169,16 @@ const histDel = await as('admin', async () => (await db.query(`delete from inven
 ok(histEdit === 0 && histDel === 0, 'transaction history cannot be edited or deleted, even by an admin client');
 await resetData();
 
+for (const who of ['anon', 'member']) {
+  const side = await sideAccess(who);
+  ok(side.inventory_recipes === 0 && side.inventory_sales === 0 && side.inventory_sales_records === 0 && side.recipeWrite === 0 && !side.salesRecordsInsert && !side.ingredientInsert,
+    `${who}: no access to recipes, ingredients, inventory_sales or inventory_sales_records (${JSON.stringify(side)})`);
+  await resetSide();
+}
+const sideAdmin = await sideAccess('admin');
+ok(sideAdmin.inventory_recipes === 1 && sideAdmin.recipeWrite === 1 && sideAdmin.ingredientInsert, `admin: full access to recipes and ingredients (${JSON.stringify(sideAdmin)})`);
+await resetSide();
+
 await db.exec('set role service_role');
 const svc = (await db.query(`select count(*)::int n from inventory_items`)).rows[0].n;
 const svcRpc = (await db.query(`select process_inventory_receipt(gen_random_uuid(), gen_random_uuid()) r`)).rows[0].r;
@@ -129,8 +189,11 @@ const cfg = (await db.query(`select proname, proconfig::text c from pg_proc wher
 ok(cfg.every(r => (r.c || '').includes('search_path')), 'both functions have a pinned search_path');
 
 await db.exec(rb);
+await db.exec(rb); // re-run must be safe
 const after = await access('member');
-ok(after.read === 1 && after.insert && after.rpc, 'rollback restores the previous member access');
+const sideAfter = await sideAccess('anon');
+ok(after.read === 1 && after.insert && after.rpc && sideAfter.inventory_sales === 1 && sideAfter.salesRecordsInsert,
+  'rollback (run twice) restores the previous access');
 
 if (process.exitCode) console.error('\nInventory RLS migration test FAILED');
 else console.log('\nInventory RLS migration test passed');
