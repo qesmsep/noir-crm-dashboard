@@ -98,7 +98,8 @@
     "test:coverage": "jest --coverage",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
     "test:migration:toast": "node scripts/test-toast-migration.mjs",
-    "test:migration:inventory": "node scripts/test-inventory-functions-migration.mjs"
+    "test:migration:inventory": "node scripts/test-inventory-functions-migration.mjs",
+    "test:migration:inventory-rls": "node scripts/test-inventory-rls-migration.mjs"
   },
   "eslintConfig": {
     "extends": [
