@@ -296,6 +296,7 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
   const [recipes, setRecipes] = useState<Recipe[]>([]); // every location's recipes, for linking
   const [days, setDays] = useState<DaySummary[]>([]);
   const [emptyDays, setEmptyDays] = useState(0);
+  const [lastSuccessAt, setLastSuccessAt] = useState<string | null>(null);
   const [lastRun, setLastRun] = useState<SyncRun | null>(null);
   const [configured, setConfigured] = useState(true);
   const [allowance, setAllowance] = useState<Allowance | null>(null);
@@ -320,13 +321,14 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
     setError(null);
     try {
       const [d, l, r] = await Promise.all([
-        api<{ configured: boolean; allowance: Allowance; last_run: SyncRun | null; days: DaySummary[]; empty_days: number }>('/api/inventory/toast/days'),
+        api<{ configured: boolean; allowance: Allowance; last_run: SyncRun | null; days: DaySummary[]; empty_days: number; last_success_at: string | null }>('/api/inventory/toast/days'),
         api<{ data: ToastItemRow[] }>('/api/inventory/toast/links'),
         api<{ data: Recipe[] }>('/api/inventory/recipes'),
       ]);
       setRecipes(r.data || []);
       setDays(d.days);
       setEmptyDays(d.empty_days || 0);
+      setLastSuccessAt(d.last_success_at);
       setLastRun(d.last_run);
       setConfigured(d.configured);
       setAllowance(d.allowance);
@@ -530,6 +532,13 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
         </div>
       </div>
 
+      {configured && !loading && (!lastSuccessAt || Date.now() - new Date(lastSuccessAt).getTime() > 2 * 86400000) && (
+        <div className={`${t.notice} ${t.noticeError}`}>
+          {lastSuccessAt
+            ? `No successful Toast sync since ${fmtWhen(lastSuccessAt)}. Toast deletes export files after 7 days — check the morning job (CRON_SECRET) or tap Sync now.`
+            : 'No successful Toast sync yet. Tap Sync now; if the morning job doesn’t run, check CRON_SECRET in Vercel.'}
+        </div>
+      )}
       {!configured && <div className={t.notice}>Toast SFTP isn’t set up on this deployment yet (TOAST_SFTP_HOST / USER / PRIVATE_KEY).</div>}
       {lastRun?.status === 'error' && lastRun.error && <div className={`${t.notice} ${t.noticeError}`}>Last sync failed: {lastRun.error}</div>}
       {error && <div className={`${t.notice} ${t.noticeError}`}>{error}</div>}

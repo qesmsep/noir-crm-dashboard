@@ -46,6 +46,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       });
     }
 
+    // Toast keeps export files for 7 days: two days without a successful sync
+    // (cron not running, SFTP failing) is worth a warning before data is lost.
+    const { data: lastOk } = await supabaseAdmin
+      .from('toast_sync_runs')
+      .select('finished_at')
+      .eq('status', 'success')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
     const { count: emptyDays } = await supabaseAdmin
       .from('toast_sales_days')
       .select('business_date', { count: 'exact', head: true })
@@ -54,6 +64,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     return res.status(200).json({
       configured: toastSftpConfigured(),
       empty_days: emptyDays ?? 0,
+      last_success_at: lastOk?.finished_at || null,
       allowance: ctx.allowance,
       last_run: runRes.data || null,
       days: days.map(d => ({

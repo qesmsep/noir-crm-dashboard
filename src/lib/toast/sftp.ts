@@ -39,8 +39,11 @@ async function pinFingerprint(fingerprint: string): Promise<void> {
   const now = new Date().toISOString();
   const { data } = await supabaseAdmin.from('system_settings').select('id').eq('key', PINNED_KEY).maybeSingle();
   const value = { fingerprint, host: process.env.TOAST_SFTP_HOST, pinned_at: now };
-  if (data) await supabaseAdmin.from('system_settings').update({ value, updated_at: now }).eq('key', PINNED_KEY);
-  else await supabaseAdmin.from('system_settings').insert({ key: PINNED_KEY, value, created_at: now, updated_at: now });
+  const { error } = data
+    ? await supabaseAdmin.from('system_settings').update({ value, updated_at: now }).eq('key', PINNED_KEY)
+    : await supabaseAdmin.from('system_settings').insert({ key: PINNED_KEY, value, created_at: now, updated_at: now });
+  // Not fatal: this run already verified nothing (first use); the next run will try to pin again.
+  if (error) console.error(`Pinning Toast SFTP host key ${fingerprint} failed:`, error.message);
 }
 
 export function toastSftpConfigured(): boolean {
