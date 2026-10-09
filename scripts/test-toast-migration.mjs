@@ -79,6 +79,19 @@ await db.exec(`insert into toast_sales_lines(item_selection_id,business_date,toa
 try { await db.query(`select * from apply_toast_sales('2026-10-08', array['c'], $1::jsonb, 'tim')`, [JSON.stringify([{ item_id: gin, quantity_change: 2 }])]); ok(false, 'positive should fail'); }
 catch (e) { ok(/must be negative/.test(e.message), 'positive sales adjustment rejected'); }
 
+// Product Mix import: all or nothing, refuses overlaps
+const pmLines = JSON.stringify([
+  { item_selection_id: 'pmix:2026-10-03:a', toast_item_id: 'pmix:a', menu_item: 'A', menu_group: 'G', menu: 'Cocktails', qty: 3 },
+  { item_selection_id: 'pmix:2026-10-03:b', toast_item_id: 'pmix:b', menu_item: 'B', menu_group: 'G', menu: 'RooftopKC', qty: 2, net_price: 30 },
+]);
+ok((await db.query(`select import_product_mix('2026-10-01','2026-10-03','pm.csv',$1::jsonb) n`, [pmLines])).rows[0].n === 2, 'Product Mix imports day + lines');
+for (const [s0, e0, label] of [['2026-10-02', '2026-10-02', 'inside'], ['2026-09-30', '2026-10-01', 'touching start'], ['2026-10-07', '2026-10-09', 'over a nightly day']]) {
+  try { await db.query(`select import_product_mix($1,$2,'x',$3::jsonb)`, [s0, e0, JSON.stringify([{ item_selection_id: 'pmix:' + e0 + ':z', toast_item_id: 'z', qty: 1 }])]); ok(false, 'overlap ' + label); }
+  catch (e) { ok(/OVERLAP/.test(e.message), `overlap refused (${label})`); }
+}
+try { await db.query(`select import_product_mix('2026-09-20','2026-09-21','x',$1::jsonb)`, [JSON.stringify([{ item_selection_id: 'dup', toast_item_id: 'z', qty: 1 }, { item_selection_id: 'dup', toast_item_id: 'z', qty: 1 }])]); ok(false, 'bad lines'); }
+catch { ok((await db.query(`select count(*)::int n from toast_sales_days where business_date='2026-09-21'`)).rows[0].n === 0, 'a failed import leaves no day behind'); }
+
 // One sync at a time
 await db.exec(`insert into toast_sync_runs(trigger, status) values ('cron','running')`);
 try { await db.exec(`insert into toast_sync_runs(trigger, status) values ('manual','running')`); ok(false, 'second running sync'); }
@@ -102,6 +115,7 @@ try { await db.query(`select * from complete_inventory_count($1,'tim')`, [cnt]);
 
 await db.exec(rb);
 ok((await db.query(`select to_regclass('toast_sales_days') r`)).rows[0].r === null, 'rollback drops tables');
+ok((await db.query(`select count(*)::int n from pg_proc where proname in ('apply_toast_sales','import_product_mix','complete_inventory_count')`)).rows[0].n === 0, 'rollback drops functions');
 
 if (process.exitCode) console.error('\nToast migration test FAILED');
 else console.log('\nToast migration test passed');

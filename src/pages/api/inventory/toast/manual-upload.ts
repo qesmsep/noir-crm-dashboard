@@ -17,6 +17,7 @@ const Body = z.object({
 });
 
 const CHUNK = 500;
+const MAX_PMIX_ROWS = 5000;
 
 /** Toast item ids already known for each menu/group/item name, so a hand upload links like the nightly export does. */
 async function knownToastIds(): Promise<Map<string, string>> {
@@ -83,6 +84,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       }
       const { data: existing } = await supabaseAdmin.from('toast_sales_days').select('business_date, line_count').eq('business_date', end).maybeSingle();
       const { error: dayErr } = await supabaseAdmin.from('toast_sales_days').upsert(
+        // source is left out for a day the nightly sync already created (undefined
+        // keys aren't sent), so an existing day keeps 'sftp'.
         { business_date: end, export_folder: filename, source: existing ? undefined : 'manual_items', line_count: Math.max(existing?.line_count || 0, lines.length) },
         { onConflict: 'business_date' }
       );
@@ -101,22 +104,13 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         });
       }
       if (rows.length === 0) return res.status(400).json({ error: 'No items with a quantity in this report.' });
+      if (rows.length > MAX_PMIX_ROWS) return res.status(400).json({ error: `This report has ${rows.length} items — upload it in smaller date ranges.` });
 
       const ids = await knownToastIds();
-      const { error: dayErr } = await supabaseAdmin.from('toast_sales_days').insert({
-        business_date: end,
-        period_start: start,
-        export_folder: filename,
-        source: 'manual_pmix',
-        line_count: rows.length,
-      });
-      if (dayErr) throw new Error(dayErr.message);
-
       const lines = rows.map(r => {
         const key = productMixKey(r);
         return {
           item_selection_id: `pmix:${end}:${key}`,
-          business_date: end,
           toast_item_id: ids.get(key) || `pmix:${key}`,
           menu_item: r.menu_item,
           menu_group: r.menu_group,
@@ -125,17 +119,21 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           gross_price: r.gross,
           discount: r.discount,
           net_price: r.net,
-          voided: false,
           ordered_at: start === end ? start : `${start} to ${end}`,
         };
       });
-      for (let i = 0; i < lines.length; i += CHUNK) {
-        const { error } = await supabaseAdmin.from('toast_sales_lines').insert(lines.slice(i, i + CHUNK));
-        if (error) {
-          await supabaseAdmin.from('toast_sales_lines').delete().eq('business_date', end).like('item_selection_id', 'pmix:%');
-          await supabaseAdmin.from('toast_sales_days').delete().eq('business_date', end).eq('source', 'manual_pmix');
-          throw new Error(error.message);
+      // Day and lines in one transaction, with the overlap check inside it.
+      const { error } = await supabaseAdmin.rpc('import_product_mix', {
+        p_period_start: start,
+        p_business_date: end,
+        p_filename: filename,
+        p_lines: lines,
+      });
+      if (error) {
+        if (error.message?.includes('OVERLAP')) {
+          return res.status(409).json({ error: 'Sales for some of these dates are already imported — uploading would count them twice.', detail: error.message });
         }
+        throw new Error(error.message);
       }
     }
 

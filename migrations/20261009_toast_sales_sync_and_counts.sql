@@ -327,6 +327,72 @@ GRANT EXECUTE ON FUNCTION apply_toast_sales(DATE, TEXT[], JSONB, TEXT) TO servic
 COMMENT ON FUNCTION apply_toast_sales IS 'Applies an approved day of Toast sales: deducts stock (may go negative), logs sales transactions, marks lines applied. All or nothing.';
 
 -- ----------------------------------------
+-- 5b. import_product_mix — a hand-uploaded Product Mix report, all or nothing
+-- ----------------------------------------
+-- The day row and every line go in together, after an overlap check that
+-- can't race another upload or the nightly sync (the table lock makes them
+-- take turns). A half-imported report would block those dates for good.
+CREATE OR REPLACE FUNCTION import_product_mix(
+  p_period_start  DATE,
+  p_business_date DATE,
+  p_filename      TEXT,
+  p_lines         JSONB   -- [{ item_selection_id, toast_item_id, menu_item, menu_group, menu, qty, gross_price, discount, net_price, ordered_at }]
+)
+RETURNS INTEGER
+AS $$
+DECLARE
+  v_conflicts TEXT;
+  v_count     INTEGER;
+BEGIN
+  IF p_period_start > p_business_date THEN
+    RAISE EXCEPTION 'The start date is after the end date';
+  END IF;
+
+  LOCK TABLE toast_sales_days IN SHARE ROW EXCLUSIVE MODE;
+
+  SELECT string_agg(
+           CASE WHEN d.period_start IS NOT NULL AND d.period_start <> d.business_date
+                THEN d.period_start::TEXT || '–' || d.business_date::TEXT
+                ELSE d.business_date::TEXT END,
+           ', ' ORDER BY d.business_date)
+  INTO v_conflicts
+  FROM toast_sales_days d
+  WHERE d.business_date BETWEEN p_period_start AND p_business_date
+     OR (d.source = 'manual_pmix' AND d.period_start <= p_business_date AND d.business_date >= p_period_start);
+  IF v_conflicts IS NOT NULL THEN
+    RAISE EXCEPTION 'OVERLAP: already imported %', v_conflicts;
+  END IF;
+
+  v_count := jsonb_array_length(COALESCE(p_lines, '[]'::jsonb));
+  IF v_count = 0 THEN
+    RAISE EXCEPTION 'No items with a quantity in this report';
+  END IF;
+
+  INSERT INTO toast_sales_days (business_date, period_start, export_folder, source, line_count)
+  VALUES (p_business_date, p_period_start, p_filename, 'manual_pmix', v_count);
+
+  INSERT INTO toast_sales_lines (
+    item_selection_id, business_date, toast_item_id, menu_item, menu_group, menu,
+    qty, gross_price, discount, net_price, voided, ordered_at
+  )
+  SELECT r.item_selection_id, p_business_date, r.toast_item_id, COALESCE(r.menu_item, ''), COALESCE(r.menu_group, ''), COALESCE(r.menu, ''),
+         r.qty, COALESCE(r.gross_price, 0), COALESCE(r.discount, 0), COALESCE(r.net_price, 0), FALSE, r.ordered_at
+  FROM jsonb_to_recordset(p_lines) AS r(
+    item_selection_id TEXT, toast_item_id TEXT, menu_item TEXT, menu_group TEXT, menu TEXT,
+    qty NUMERIC, gross_price NUMERIC, discount NUMERIC, net_price NUMERIC, ordered_at TEXT
+  );
+
+  RETURN v_count;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp;
+
+REVOKE EXECUTE ON FUNCTION import_product_mix(DATE, DATE, TEXT, JSONB) FROM PUBLIC;
+REVOKE EXECUTE ON FUNCTION import_product_mix(DATE, DATE, TEXT, JSONB) FROM authenticated;
+GRANT EXECUTE ON FUNCTION import_product_mix(DATE, DATE, TEXT, JSONB) TO service_role;
+
+COMMENT ON FUNCTION import_product_mix IS 'Imports a hand-uploaded Toast Product Mix report (day + lines) in one transaction, refusing any date range already imported.';
+
+-- ----------------------------------------
 -- 6. complete_inventory_count
 -- ----------------------------------------
 CREATE OR REPLACE FUNCTION complete_inventory_count(

@@ -7,6 +7,7 @@
 
 DROP FUNCTION IF EXISTS complete_inventory_count(UUID, TEXT);
 DROP FUNCTION IF EXISTS apply_toast_sales(DATE, TEXT[], JSONB, TEXT);
+DROP FUNCTION IF EXISTS import_product_mix(DATE, DATE, TEXT, JSONB);
 
 DROP TABLE IF EXISTS inventory_count_lines;
 DROP TABLE IF EXISTS inventory_counts;
