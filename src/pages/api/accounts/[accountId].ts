@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { authorizeAccountAccessReq } from '@/lib/admin-auth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -15,6 +16,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (!accountId || typeof accountId !== 'string') {
     return res.status(400).json({ error: 'account_id is required' });
+  }
+
+  // Admin, or the member portal user reading their own account only.
+  const access = await authorizeAccountAccessReq(req, accountId);
+  if (!access.ok) {
+    return res.status(access.status).json({ error: access.error });
   }
 
   if (req.method === 'GET') {

@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '../../lib/supabase';
+import { isCronAuthorized } from '@/lib/admin-auth';
 
 const MAX_RETRIES = 3;
 
@@ -240,14 +241,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  // Verify: Vercel cron (multiple indicators) or CRON_SECRET
-  const isVercelCron = req.headers['x-vercel-cron'] === '1' ||
-                       req.headers['user-agent']?.includes('Vercel') ||
-                       req.headers['x-vercel-deployment-url'];
-
-  const hasCronSecret = req.headers.authorization === `Bearer ${process.env.CRON_SECRET}`;
-
-  if (!isVercelCron && !hasCronSecret) {
+  // Only Vercel cron (Authorization: Bearer ${CRON_SECRET}) or a caller holding
+  // that secret. User-agent and x-vercel-* headers can be sent by anyone.
+  if (!isCronAuthorized(req)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

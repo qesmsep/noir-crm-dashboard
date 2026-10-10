@@ -9,6 +9,11 @@ import { Analytics } from '@vercel/analytics/react';
 import type { AppProps } from 'next/app';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
+import { installAdminFetchAuth } from '../lib/admin-fetch-auth';
+
+// Before any page or provider mounts, so their first /api calls carry the
+// admin session (see src/lib/admin-fetch-auth.ts).
+installAdminFetchAuth();
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   const router = useRouter();

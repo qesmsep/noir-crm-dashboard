@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import Stripe from 'stripe';
+import { authorizeAccountAccessReq } from '@/lib/admin-auth';
 import { createClient } from '@supabase/supabase-js';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
@@ -30,6 +31,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { account_id, payment_method_type = 'card' } = req.body;
+
+  // Admin, or the member portal user acting on their own account only.
+  const access = await authorizeAccountAccessReq(req, typeof account_id === 'string' ? account_id : undefined);
+  if (!access.ok) {
+    return res.status(access.status).json({ error: access.error });
+  }
 
   if (!account_id) {
     return res.status(400).json({ error: 'account_id is required' });

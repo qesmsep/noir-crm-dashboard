@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabaseAdmin } from '../../../../lib/supabase';
+import { verifyAdminAccess } from '@/lib/admin-middleware';
 
 export async function GET() {
   try {
@@ -47,6 +48,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const auth = await verifyAdminAccess(request);
+  if (!auth.authorized) return auth.response;
+
   try {
     const body = await request.json();
     const { hold_fee_enabled, hold_fee_amount } = body;

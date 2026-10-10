@@ -117,7 +117,10 @@ export default function AdminsPage() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch('/api/admins');
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch('/api/admins', {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
       const result = await response.json();
 
       if (!response.ok) {

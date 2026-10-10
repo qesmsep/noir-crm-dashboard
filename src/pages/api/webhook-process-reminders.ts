@@ -1,5 +1,6 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase } from '../../lib/supabase';
+import { secretsMatch } from '@/lib/admin-auth';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -7,9 +8,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  // Verify webhook secret if needed
+  // Fails closed: WEBHOOK_SECRET must be set and match x-webhook-secret. It
+  // used to be skipped entirely when the env var was unset.
   const webhookSecret = req.headers['x-webhook-secret'];
-  if (process.env.WEBHOOK_SECRET && webhookSecret !== process.env.WEBHOOK_SECRET) {
+  if (!secretsMatch(Array.isArray(webhookSecret) ? webhookSecret[0] : webhookSecret, process.env.WEBHOOK_SECRET)) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 

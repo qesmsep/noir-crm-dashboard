@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 import { randomUUID } from 'crypto';
+import { authorizeAccountAccessReq } from '@/lib/admin-auth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -32,10 +33,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { account_id, member_data, new_price_id } = req.body;
+  const { account_id, new_price_id } = req.body;
+  let { member_data } = req.body;
 
   if (!account_id || !member_data) {
     return res.status(400).json({ error: 'account_id and member_data are required' });
+  }
+
+  // Admin, or the member portal user adding to their own account only.
+  const access = await authorizeAccountAccessReq(req, account_id);
+  if (!access.ok) {
+    return res.status(access.status).json({ error: access.error });
+  }
+  if (access.via === 'member') {
+    // A member supplies the person's details only, never account or auth fields.
+    const MEMBER_EDITABLE = ['first_name', 'last_name', 'email', 'phone', 'dob', 'photo', 'company'];
+    member_data = Object.fromEntries(
+      Object.entries(member_data as Record<string, unknown>).filter(([key]) => MEMBER_EDITABLE.includes(key))
+    );
   }
 
   try {

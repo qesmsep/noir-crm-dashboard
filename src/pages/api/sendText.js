@@ -1,12 +1,13 @@
 import { createClient } from '@supabase/supabase-js';
 import fetch from 'node-fetch';
+import { withAdminAuth } from '@/lib/api-auth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -153,3 +154,6 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Failed to send messages' });
   }
 } 
+
+// Admin only (server-side check; see src/lib/api-access-policy.ts).
+export default withAdminAuth(handler);
