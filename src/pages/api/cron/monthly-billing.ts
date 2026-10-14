@@ -9,6 +9,9 @@ import {
 } from '@/lib/billing';
 import { getTodayLocalDate } from '@/lib/utils';
 
+// Overdue accounts older than this are flagged, not auto-charged
+const MAX_CATCH_UP_DAYS = 30;
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -53,6 +56,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Derive from local `today` (not UTC now) so an evening run can't bill a day early
     const tomorrow = new Date(Date.parse(today + 'T00:00:00Z') + 86400000).toISOString().split('T')[0];
 
+    // Catch up overdue accounts, but only within MAX_CATCH_UP_DAYS — older dates
+    // are reported for manual review instead of auto-charged.
+    const catchUpFloor = new Date(Date.parse(today + 'T00:00:00Z') - MAX_CATCH_UP_DAYS * 86400000).toISOString().split('T')[0];
+
     // Find accounts due for billing today or overdue (a missed run or stale date
     // would otherwise strand the account forever).
     // Join with subscription_plans to get billing interval and beverage credit
@@ -61,6 +68,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const { data: accountsToBill, error: fetchError } = await supabase
       .from('accounts')
       .select('*, subscription_plans!membership_plan_id(interval, beverage_credit)')
+      .gte('next_billing_date', catchUpFloor + 'T00:00:00')
       .lt('next_billing_date', tomorrow + 'T00:00:00')
       .eq('subscription_status', 'active')
       .is('subscription_cancel_at', null)
@@ -69,6 +77,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (fetchError) {
       console.error('❌ Failed to fetch accounts:', fetchError);
       return res.status(500).json({ error: 'Failed to fetch accounts', details: fetchError });
+    }
+
+    // Report active accounts stranded beyond the catch-up window
+    const { data: staleAccounts } = await supabase
+      .from('accounts')
+      .select('account_id, next_billing_date')
+      .lt('next_billing_date', catchUpFloor + 'T00:00:00')
+      .eq('subscription_status', 'active')
+      .is('subscription_cancel_at', null)
+      .is('last_payment_failed_at', null);
+
+    for (const stale of staleAccounts || []) {
+      console.warn(`   ⚠️  Stale billing date ${stale.next_billing_date} for ${stale.account_id} — needs manual review`);
+      results.errors.push({
+        account_id: stale.account_id,
+        error: `next_billing_date ${stale.next_billing_date} is more than ${MAX_CATCH_UP_DAYS} days overdue; not auto-charged`,
+        type: 'stale_billing_date',
+      });
     }
 
     if (!accountsToBill || accountsToBill.length === 0) {
