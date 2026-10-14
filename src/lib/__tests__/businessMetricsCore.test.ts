@@ -235,3 +235,18 @@ describe('aggregateLedger', () => {
     expect(agg.purchasesWithEmptyNote).toBe(2);
   });
 });
+
+describe('computeCashflowWindows overdue list', () => {
+  it('lists overdue accounts oldest first with their ids', () => {
+    const cf = computeCashflowWindows(
+      [
+        { dues: 150, annual: false, nextBillingDate: '2026-08-20', accountId: 'b' },
+        { dues: 175, annual: false, nextBillingDate: '2026-08-01', accountId: 'a' },
+        { dues: 100, annual: false, nextBillingDate: '2026-08-25', accountId: 'c' },
+      ],
+      '2026-08-22'
+    );
+    expect(cf.overdueBilling.list.map(o => o.accountId)).toEqual(['a', 'b']);
+    expect(cf.overdueBilling.accounts).toBe(2);
+  });
+});

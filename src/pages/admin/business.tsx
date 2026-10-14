@@ -80,7 +80,11 @@ interface Metrics {
   cashflow: {
     asOf: string;
     windows: { days: number; amount: number; accounts: number }[];
-    overdueBilling: { accounts: number; amount: number };
+    overdueBilling: {
+      accounts: number;
+      amount: number;
+      list: { accountId: string | null; name: string; nextBillingDate: string; dues: number; paymentFailedAt: string | null; retryCount: number }[];
+    };
   };
   locations: {
     current: LocationSummary[];
@@ -355,6 +359,7 @@ export default function BusinessDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAtRisk, setShowAtRisk] = useState(false);
+  const [showOverdue, setShowOverdue] = useState(false);
 
   const fetchMetrics = useCallback(async () => {
     setLoading(true);
@@ -529,9 +534,58 @@ export default function BusinessDashboard() {
               ))}
             </div>
             {m.cashflow.overdueBilling.accounts > 0 && (
-              <div className={styles.error} style={{ marginTop: '0.5rem' }}>
+              <div
+                className={styles.error}
+                style={{ marginTop: '0.5rem', cursor: 'pointer' }}
+                role="button"
+                tabIndex={0}
+                aria-expanded={showOverdue}
+                onClick={() => setShowOverdue(v => !v)}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowOverdue(v => !v); } }}
+              >
                 ⚠ {m.cashflow.overdueBilling.accounts} active account{m.cashflow.overdueBilling.accounts > 1 ? 's have' : ' has'} a billing
-                date in the past ({fmtCurrency(m.cashflow.overdueBilling.amount)} of dues) — billing may be stalled. Check these in Stripe.
+                date in the past ({fmtCurrency(m.cashflow.overdueBilling.amount)} of dues) — billing may be stalled.{' '}
+                <span style={{ textDecoration: 'underline' }}>{showOverdue ? 'Hide accounts' : 'View accounts'}</span>
+              </div>
+            )}
+            {showOverdue && m.cashflow.overdueBilling.list.length > 0 && (
+              <div className={styles.tableCard} style={{ marginTop: '0.5rem' }}>
+                <div className={styles.chartContainer}>
+                  <table className={styles.dataTable}>
+                    <thead>
+                      <tr>
+                        <th>Account</th>
+                        <th>Billing Date</th>
+                        <th>Status</th>
+                        <th className={styles.textRight}>Dues</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {m.cashflow.overdueBilling.list.map((o, i) => (
+                        <tr key={o.accountId || i}>
+                          <td>
+                            {o.accountId ? (
+                              <a href={`/admin/members/${o.accountId}`} style={{ color: '#A59480', textDecoration: 'none' }}>
+                                {o.name}
+                              </a>
+                            ) : (
+                              o.name
+                            )}
+                          </td>
+                          <td>{o.nextBillingDate}</td>
+                          <td>
+                            {!o.paymentFailedAt
+                              ? 'Not billed'
+                              : o.retryCount >= 4
+                                ? `Payment failed ${o.paymentFailedAt} — retries exhausted`
+                                : `Payment failed ${o.paymentFailedAt} — retry ${o.retryCount}/4`}
+                          </td>
+                          <td className={styles.textRight}>{fmtCurrencyDec(o.dues)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             )}
 
