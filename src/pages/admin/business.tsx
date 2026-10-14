@@ -40,6 +40,7 @@ interface WeeklyPoint {
 }
 
 interface CelebrationRow {
+  account_id?: string;
   member_id: string | null;
   name: string;
   date: string; // YYYY-MM-DD
@@ -399,7 +400,7 @@ function CelebrationList({
       ) : (
         <ul className={styles.dateList}>
           {rows.map(r => (
-            <li key={`${r.member_id}-${r.date}-${r.name}`} className={styles.dateRow}>
+            <li key={r.account_id || r.member_id || r.name} className={styles.dateRow}>
               <span className={styles.dateRowName}>
                 {r.member_id ? <a href={`/admin/members/${r.member_id}`}>{r.name}</a> : r.name}
                 <span className={styles.dateRowDetail}> · {detail(r)}</span>
@@ -480,25 +481,28 @@ export default function BusinessDashboard() {
 
         {m && (
           <>
-            {m.celebrations && (
+            {m.celebrations && (() => {
+              const weeks = Math.round(m.celebrations.windowDays / 7);
+              return (
               <>
-                <h2 className={styles.sectionTitle}>Coming Up — Next {m.celebrations.windowDays / 7} Weeks</h2>
+                <h2 className={styles.sectionTitle}>Coming Up — Next {weeks} Weeks</h2>
                 <div className={styles.chartsGrid}>
                   <CelebrationList
                     title="🎂 Birthdays"
                     rows={m.celebrations.birthdays}
                     detail={r => `turning ${r.years}`}
-                    empty="No member birthdays in the next 4 weeks"
+                    empty={`No member birthdays in the next ${weeks} weeks`}
                   />
                   <CelebrationList
                     title="🥂 Membership Anniversaries"
                     rows={m.celebrations.anniversaries}
                     detail={r => `${ordinal(r.years)} year`}
-                    empty="No membership anniversaries in the next 4 weeks"
+                    empty={`No membership anniversaries in the next ${weeks} weeks`}
                   />
                 </div>
               </>
-            )}
+              );
+            })()}
 
             {/* ------------------------------------------------------- */}
             <h2 className={styles.sectionTitle}>Membership</h2>

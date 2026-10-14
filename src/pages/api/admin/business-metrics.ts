@@ -391,10 +391,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Celebrations — birthdays and membership anniversaries, next 4 weeks
     // ------------------------------------------------------------------
     const CELEBRATION_WINDOW_DAYS = 28;
+    // Ages above this are placeholder DOBs (e.g. 1900-01-01), not real birthdays
+    const MAX_PLAUSIBLE_AGE = 110;
     const upcomingBirthdays = (activeMembers as any[])
       .map(m => {
         const next = nextYearlyOccurrence(m.dob, today, CELEBRATION_WINDOW_DAYS);
-        return next && {
+        return next && next.years <= MAX_PLAUSIBLE_AGE && {
           member_id: m.member_id,
           name: `${m.first_name || ''} ${m.last_name || ''}`.trim() || 'Unknown',
           ...next,
@@ -403,14 +405,30 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .filter(Boolean)
       .sort((a: any, b: any) => a.daysAway - b.daysAway || a.name.localeCompare(b.name));
 
-    // Anniversary = the account's first member join date; active accounts only
+    // Anniversary = the account's first member join date; active accounts only.
+    // Name/link the earliest-joined *active* member so a departed founder
+    // doesn't label the row (falls back to the account's primary name).
+    const activeContact = new Map<string, { member_id: string; name: string; join: string }>();
+    for (const m of activeMembers as any[]) {
+      if (!m.account_id) continue;
+      const jd = (m.join_date || '9999-12-31').slice(0, 10);
+      const existing = activeContact.get(m.account_id);
+      if (!existing || jd < existing.join) {
+        activeContact.set(m.account_id, {
+          member_id: m.member_id,
+          name: `${m.first_name || ''} ${m.last_name || ''}`.trim(),
+          join: jd,
+        });
+      }
+    }
     const upcomingAnniversaries = activeAccounts
       .map(a => {
         const next = nextYearlyOccurrence(accountEarliestJoin.get(a.account_id), today, CELEBRATION_WINDOW_DAYS);
+        const contact = activeContact.get(a.account_id);
         return next && next.years >= 1 && {
           account_id: a.account_id,
-          member_id: accountPrimaryMemberId.get(a.account_id) || null,
-          name: accountName.get(a.account_id) || 'Unknown',
+          member_id: contact?.member_id || accountPrimaryMemberId.get(a.account_id) || null,
+          name: contact?.name || accountName.get(a.account_id) || 'Unknown',
           ...next,
         };
       })
