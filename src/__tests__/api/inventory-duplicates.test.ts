@@ -14,7 +14,7 @@ function mockBuilder(table: string) {
   const op: Op = { table, calls: [] };
   mockOps.push(op);
   const b: Record<string, unknown> = {};
-  for (const m of ['select', 'insert', 'update', 'eq', 'is', 'in', 'order', 'single', 'maybeSingle']) {
+  for (const m of ['select', 'insert', 'update', 'eq', 'is', 'in', 'order', 'range', 'single', 'maybeSingle']) {
     b[m] = (...args: unknown[]) => {
       op.calls.push([m, args]);
       return b;
@@ -98,6 +98,23 @@ describe('POST /api/inventory duplicate check', () => {
     const res = await call(inventoryHandler, 'POST', item('Bufalo Trace', 'Bufalo Trace', BAR1, { confirm_new: true }));
     expect(res.statusCode).toBe(201);
     expect(inserted()).toBe(true);
+  });
+});
+
+describe('POST /api/inventory past the row cap', () => {
+  it('pages through every row, so a duplicate on row 1001 is still caught', async () => {
+    const filler = Array.from({ length: 1000 }, (_, i) => ({ id: `f${i}`, name: `Filler ${i}`, brand: 'X', location_id: BAR2 }));
+    mockRespond = op => {
+      if (has(op, 'insert')) return { data: { id: 'new' }, error: null };
+      const range = op.calls.find(([m]) => m === 'range');
+      const from = range ? (range[1][0] as number) : 0;
+      return { data: from === 0 ? filler : [{ id: ITEM, name: 'Kahlua Coffee Liqueur', brand: 'Kahlua', location_id: BAR1 }], error: null };
+    };
+    const res = await call(inventoryHandler, 'POST', {
+      name: 'Kahlua Coffee Liqueur', brand: 'Kahlua', location_id: BAR1, category: 'spirits', unit: 'bottle', quantity: 1,
+    });
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe('ALREADY_EXISTS');
   });
 });
 

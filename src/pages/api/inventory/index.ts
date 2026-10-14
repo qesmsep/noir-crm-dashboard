@@ -14,6 +14,24 @@ import { findSimilarItems, matchKey } from '../../../lib/inventory/itemNames';
  *
  * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
  */
+type ItemLabelRow = { id: string; name: string; brand: string | null; location_id: string };
+
+/** Every item's label, paged past PostgREST's row cap so the duplicate check never misses rows. */
+async function allItemLabels(client: NonNullable<typeof supabaseAdmin>) {
+  const PAGE = 1000;
+  const rows: ItemLabelRow[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await client
+      .from('inventory_items')
+      .select('id, name, brand, location_id')
+      .order('id')
+      .range(from, from + PAGE - 1);
+    if (error) return { data: null, error };
+    rows.push(...((data || []) as ItemLabelRow[]));
+    if (!data || data.length < PAGE) return { data: rows, error: null };
+  }
+}
+
 async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse) {
   const client = supabaseAdmin || supabase;
 
@@ -96,9 +114,7 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       // Don't create a second row for something already in inventory. The same
       // product at another bar is how an item is linked across bars, so that's
       // fine; anything else that looks like a duplicate needs confirm_new.
-      const { data: existing, error: existingError } = await client
-        .from('inventory_items')
-        .select('id, name, brand, location_id');
+      const { data: existing, error: existingError } = await allItemLabels(client);
       if (existingError) {
         console.error('Error checking for duplicate inventory items:', existingError);
         return res.status(500).json({ error: 'Failed to create item' });

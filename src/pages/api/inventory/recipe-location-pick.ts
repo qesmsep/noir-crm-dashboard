@@ -61,8 +61,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const updated = ingredients.map((x, i) => (i === ingredient_index ? next : x));
 
     // Only write over the version read above, so a pick or a recipe save that
-    // lands between this read and write is not lost. (A recipe editor left open
-    // on an older copy can still save over a pick; recipes PUT doesn't check.)
+    // lands between this read and write is not lost. The recipe editor does the
+    // same on its side (recipes PUT, expected_updated_at).
     let save = supabaseAdmin
       .from('inventory_recipes')
       .update({ ingredients: JSON.stringify(updated), updated_at: new Date().toISOString() })

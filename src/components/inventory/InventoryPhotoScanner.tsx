@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import { Camera, Upload, X, Check, Loader2 } from 'lucide-react';
 import type { ScannedItem, InventoryItem, LocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
@@ -30,6 +30,19 @@ export default function InventoryPhotoScanner({
   const [matchSearchQuery, setMatchSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Look-alikes per new line, recomputed only when a line's name or brand changes
+  // (not on every quantity keystroke).
+  const alikeKey = (scanResults || []).map(i => (i.create_new ? `${i.name}\u0000${i.brand || ''}` : '')).join('\u0001');
+  const alikeByLine = useMemo(
+    () =>
+      alikeKey.split('\u0001').map(k => {
+        if (!k) return [];
+        const [name, brand] = k.split('\u0000');
+        return findSimilarItems({ name, brand }, existingItems, { limit: 3 });
+      }),
+    [alikeKey, existingItems]
+  );
 
   const handleFileSelect = useCallback((file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -538,7 +551,7 @@ export default function InventoryPhotoScanner({
                         </div>
 
                         {item.create_new && (() => {
-                          const alike = findSimilarItems({ name: item.name, brand: item.brand }, existingItems, { limit: 3 });
+                          const alike = alikeByLine[idx] || [];
                           if (alike.length === 0) return null;
                           const likely = alike.some(m => m.likely);
                           return (

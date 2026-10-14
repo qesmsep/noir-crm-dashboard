@@ -435,13 +435,15 @@ export default function InventoryItemModal({
         }
       }
 
+      // Report new rows first, so a failed refresh can't lose them.
+      if (created.length > 0) onCreated?.(created);
+
       // Refresh the inventory list
       if (onRefresh) {
         await onRefresh();
       } else {
         await onSave?.(form);
       }
-      if (created.length > 0) onCreated?.(created);
 
       // Show result to user
       if (failures.length > 0 && successes.length === 0) {
