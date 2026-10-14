@@ -3,6 +3,7 @@ import { ArrowRight, X, AlertCircle } from 'lucide-react';
 import type { InventoryItem, LocationSlug, UILocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
 import { getAuthHeaders } from '../../lib/client-auth';
+import { itemLabel } from '../../lib/inventory/itemNames';
 
 interface InventoryTransferModalProps {
   isOpen: boolean;
@@ -166,8 +167,7 @@ export default function InventoryTransferModal({
                     .filter(item => fromLocationId ? item.location_id === fromLocationId : true)
                     .map((item) => (
                       <option key={item.id} value={item.id}>
-                        {item.brand ? `${item.brand} ` : ''}
-                        {item.name} ({item.quantity} {item.unit}
+                        {itemLabel(item)} ({item.quantity} {item.unit}
                         {item.quantity !== 1 && item.unit !== 'oz' ? 's' : ''} available)
                       </option>
                     ))}

@@ -89,6 +89,12 @@ export interface RecipeIngredient {
   name: string;
   quantity: number;
   unit: RecipeIngredientUnit;
+  /**
+   * Per bar (location id): the bottle this ingredient comes out of there, or
+   * null when it isn't tracked there. Bars not listed find the same product
+   * automatically. Quantities are shared; only the bottle differs.
+   */
+  location_items?: Record<string, string | null>;
 }
 
 export interface Recipe {
@@ -189,6 +195,7 @@ export interface ScannedItem {
   ai_extracted_brand?: string; // Original AI extraction
   location_quantities?: Partial<Record<LocationSlug, number>>; // qty per location
   create_new?: boolean; // true = create new, false = match to existing
+  confirmed_new?: boolean; // looked like something already in inventory; the person said it's new
 }
 
 // ========================================

@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { withRateLimitAndAuth, type AuthenticatedRequest } from '../../../lib/api-auth';
-import { safeJSONParse, calculateIngredientCost, sanitizeInput, validateIngredients } from '../../../lib/inventory-utils';
+import { safeJSONParse, calculateIngredientCost, sanitizeInput, validateIngredients, ingredientItemIds, validateLocationPicks } from '../../../lib/inventory-utils';
 import { MAX_RECIPE_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../../../constants/inventory';
 import type { DBRecipe, DBInventoryItem, RecipeIngredient } from '../../../types/inventory';
 
@@ -153,20 +153,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const sanitizedDescription = sanitizeInput(body.description, MAX_DESCRIPTION_LENGTH);
 
       // Validate ingredients exist
-      const ingredientIds = body.ingredients.map((ing: RecipeIngredient) => ing.inventory_item_id);
       const { data: itemCheck } = await client
         .from('inventory_items')
-        .select('id')
-        .in('id', ingredientIds);
+        .select('id, location_id')
+        .in('id', ingredientItemIds(body.ingredients));
 
-      const validItemIds = new Set((itemCheck || []).map((item: { id: string }) => item.id));
-      if (!validateIngredients(body.ingredients, validItemIds)) {
+      const itemLocation = new Map((itemCheck || []).map((item: { id: string; location_id: string }) => [item.id, item.location_id]));
+      if (!validateIngredients(body.ingredients, new Set(itemLocation.keys()))) {
         return errorResponse(
           res,
           400,
           'One or more ingredients reference invalid inventory items',
           'INVALID_INGREDIENTS'
         );
+      }
+      if (!validateLocationPicks(body.ingredients, itemLocation)) {
+        return errorResponse(res, 400, 'A bottle picked for a location is not stocked at that location', 'INVALID_INGREDIENTS');
       }
 
       // Calculate cost and margin
@@ -234,20 +236,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           return errorResponse(res, 400, 'Recipe must have at least one ingredient', 'VALIDATION_ERROR');
         }
 
-        const ingredientIds = body.ingredients.map((ing: RecipeIngredient) => ing.inventory_item_id);
         const { data: itemCheck } = await client
           .from('inventory_items')
-          .select('id')
-          .in('id', ingredientIds);
+          .select('id, location_id')
+          .in('id', ingredientItemIds(body.ingredients));
 
-        const validItemIds = new Set((itemCheck || []).map((item: { id: string }) => item.id));
-        if (!validateIngredients(body.ingredients, validItemIds)) {
+        const itemLocation = new Map((itemCheck || []).map((item: { id: string; location_id: string }) => [item.id, item.location_id]));
+        if (!validateIngredients(body.ingredients, new Set(itemLocation.keys()))) {
           return errorResponse(
             res,
             400,
             'One or more ingredients reference invalid inventory items',
             'INVALID_INGREDIENTS'
           );
+        }
+        if (!validateLocationPicks(body.ingredients, itemLocation)) {
+          return errorResponse(res, 400, 'A bottle picked for a location is not stocked at that location', 'INVALID_INGREDIENTS');
         }
       }
 
@@ -287,19 +291,27 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (body.batch_instructions !== undefined) updateData.batch_instructions = sanitizeInput(body.batch_instructions, 5000);
       if (body.is_active !== undefined) updateData.is_active = body.is_active;
 
-      const { data, error } = await client
-        .from('inventory_recipes')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
+      // The editor sends the version it loaded, so saving an old copy can't
+      // silently undo a bottle picked for a bar from the Sales review since.
+      let update = client.from('inventory_recipes').update(updateData).eq('id', id);
+      if (body.expected_updated_at !== undefined) {
+        update = body.expected_updated_at === null
+          ? update.is('updated_at', null)
+          : update.eq('updated_at', body.expected_updated_at);
+      }
+      const { data: rows, error } = await update.select();
 
       if (error) {
         console.error('Error updating recipe:', error);
         return errorResponse(res, 500, 'Failed to update recipe', 'RECIPE_UPDATE_ERROR', error);
       }
+      if (!rows || rows.length === 0) {
+        return body.expected_updated_at !== undefined
+          ? errorResponse(res, 409, 'This recipe changed since it was opened. Close it, reopen it and save again.', 'STALE_RECIPE')
+          : errorResponse(res, 404, 'Recipe not found', 'NOT_FOUND');
+      }
 
-      return res.status(200).json({ data: parseRecipe(data as DBRecipe) });
+      return res.status(200).json({ data: parseRecipe(rows[0] as DBRecipe) });
     } catch (err) {
       console.error('Unhandled error updating recipe:', err);
       return errorResponse(res, 500, 'Internal server error', 'INTERNAL_ERROR', err);

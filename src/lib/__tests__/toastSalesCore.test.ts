@@ -186,7 +186,99 @@ describe('buildDeductionPlan', () => {
     const plan = buildDeductionPlan([line('a', 'T-ESP', 'RooftopKC')], links, [ESPRESSO], ITEMS, LOCS, NO_ALLOWANCE);
     // Vodka is stocked on the roof; coffee liqueur isn't, so the whole drink is held back.
     expect(plan.resolved).toHaveLength(0);
-    expect(plan.unresolved[0].reasons).toEqual(["Coffee Liqueur isn't stocked at RooftopKC"]);
+    expect(plan.unresolved[0].reasons).toEqual(["Kahlua Coffee Liqueur isn't stocked at RooftopKC"]);
+    expect(plan.unresolved[0].gaps).toEqual([
+      {
+        recipe_id: 'r-esp',
+        recipe_name: 'Espresso Martini',
+        ingredient_index: 1,
+        ingredient_name: 'Kahlua',
+        inventory_item_id: 'kah-n',
+        location_id: 'loc-roof',
+        location_name: 'RooftopKC',
+        kind: 'missing',
+        candidate_ids: [],
+      },
+    ]);
+  });
+
+  it('skips an ingredient marked not tracked at the bar, and deducts the rest', () => {
+    const recipe: RecipeRef = {
+      ...ESPRESSO,
+      ingredients: [ESPRESSO.ingredients[0], { ...ESPRESSO.ingredients[1], location_items: { 'loc-roof': null } }],
+    };
+    const plan = buildDeductionPlan([line('a', 'T-ESP', 'RooftopKC')], links, [recipe], ITEMS, LOCS, NO_ALLOWANCE);
+    expect(plan.unresolved).toHaveLength(0);
+    expect(Array.from(plan.totals.keys())).toEqual(['vod-r']);
+    // Still deducted where it is tracked.
+    const noir = buildDeductionPlan([line('b', 'T-ESP', 'Cocktails')], links, [recipe], ITEMS, LOCS, NO_ALLOWANCE);
+    expect(noir.totals.has('kah-n')).toBe(true);
+  });
+
+  it('uses the bottle picked for the bar over the automatic match', () => {
+    const otherVodka = item({ id: 'abs-r', name: 'Vodka', brand: 'Absolut', location_id: 'loc-roof' });
+    const kahluaRoof = item({ id: 'kah-r', name: 'Coffee Liqueur', brand: 'Kahlua', location_id: 'loc-roof' });
+    const recipe: RecipeRef = {
+      ...ESPRESSO,
+      ingredients: [{ ...ESPRESSO.ingredients[0], location_items: { 'loc-roof': 'abs-r' } }, ESPRESSO.ingredients[1]],
+    };
+    const plan = buildDeductionPlan([line('a', 'T-ESP', 'RooftopKC')], links, [recipe], [...ITEMS, otherVodka, kahluaRoof], LOCS, NO_ALLOWANCE);
+    expect(plan.unresolved).toHaveLength(0);
+    expect(Array.from(plan.totals.keys()).sort()).toEqual(['abs-r', 'kah-r']);
+  });
+
+  it('reports a picked bottle that was deleted or belongs to another bar', () => {
+    const recipe: RecipeRef = {
+      ...ESPRESSO,
+      ingredients: [{ ...ESPRESSO.ingredients[0], location_items: { 'loc-roof': 'vod-n' } }, { ...ESPRESSO.ingredients[1], location_items: { 'loc-roof': 'gone' } }],
+    };
+    const plan = buildDeductionPlan([line('a', 'T-ESP', 'RooftopKC')], links, [recipe], ITEMS, LOCS, NO_ALLOWANCE);
+    expect(plan.unresolved[0].reasons).toEqual([
+      'Recipe "Espresso Martini" — Vodka: the bottle picked for RooftopKC no longer exists',
+      'Recipe "Espresso Martini" — Kahlua: the bottle picked for RooftopKC no longer exists',
+    ]);
+    // Each one gets a Fix button.
+    expect(plan.unresolved[0].gaps.map(g => [g.ingredient_index, g.location_id, g.kind, g.stale_pick])).toEqual([
+      [0, 'loc-roof', 'missing', true],
+      [1, 'loc-roof', 'missing', true],
+    ]);
+  });
+
+  it('finds the bottle at another bar when only one side has the brand filled in', () => {
+    // The Trinidad Baddie case: Noir's Buffalo Trace has no brand, the roof's does.
+    const btNoir = item({ id: 'bt-n', name: 'Buffalo Trace', brand: '', volume_ml: 1000 });
+    const btRoof = item({ id: 'bt-r', name: 'Buffalo Trace', brand: 'Buffalo Trace', volume_ml: 750, location_id: 'loc-roof' });
+    const recipe: RecipeRef = { id: 'r-of', name: 'Old Fashioned', ingredients: [{ inventory_item_id: 'bt-r', name: 'Buffalo Trace', quantity: 2, unit: 'oz' }] };
+    const l: ToastLink = { toast_item_id: 'T-OF', link_type: 'recipe', recipe_id: 'r-of', inventory_item_id: null, amount: null, amount_unit: null };
+    const plan = buildDeductionPlan([line('a', 'T-OF', 'Cocktails')], [l], [recipe], [btNoir, btRoof], LOCS, NO_ALLOWANCE);
+    expect(plan.unresolved).toHaveLength(0);
+    expect(plan.totals.get('bt-n')).toBeCloseTo((2 * 29.5735) / 1000, 6);
+  });
+
+  it('settles two matching bottles by size, and asks when that does not settle it', () => {
+    const btNoir = item({ id: 'bt-n', name: 'Buffalo Trace', brand: '', volume_ml: 1000 });
+    const roof1l = item({ id: 'bt-r1', name: 'Buffalo Trace', brand: '', volume_ml: 1000, location_id: 'loc-roof' });
+    const roof750 = item({ id: 'bt-r7', name: 'Buffalo Trace', brand: 'Buffalo Trace', volume_ml: 750, location_id: 'loc-roof' });
+    const recipe: RecipeRef = { id: 'r-of', name: 'Old Fashioned', ingredients: [{ inventory_item_id: 'bt-n', name: 'Buffalo Trace', quantity: 2, unit: 'oz' }] };
+    const l: ToastLink = { toast_item_id: 'T-OF', link_type: 'recipe', recipe_id: 'r-of', inventory_item_id: null, amount: null, amount_unit: null };
+
+    // bt-r1 is an exact name+brand match, so it wins outright.
+    let plan = buildDeductionPlan([line('a', 'T-OF', 'RooftopKC')], [l], [recipe], [btNoir, roof1l, roof750], LOCS, NO_ALLOWANCE);
+    expect(Array.from(plan.totals.keys())).toEqual(['bt-r1']);
+
+    // No exact match, but two roof bottles carry the same label; size picks the 1L.
+    const base = { ...btNoir, name: 'Buffalo Trace Bourbon', brand: '' };
+    const roofA = { ...roof1l, name: 'Bourbon', brand: 'Buffalo Trace' };
+    const roofB = { ...roof750, name: 'Buffalo Trace Bourbon', brand: 'Buffalo Trace' };
+    const r2: RecipeRef = { ...recipe, ingredients: [{ ...recipe.ingredients[0], inventory_item_id: 'bt-n' }] };
+    plan = buildDeductionPlan([line('a', 'T-OF', 'RooftopKC')], [l], [r2], [base, roofB, roofA], LOCS, NO_ALLOWANCE);
+    expect(Array.from(plan.totals.keys())).toEqual(['bt-r1']);
+
+    // Two of the same size: never guess.
+    const twin = { ...roofA, id: 'bt-r1b', name: 'Buffalo Trace Bourbon' };
+    plan = buildDeductionPlan([line('a', 'T-OF', 'RooftopKC')], [l], [r2], [base, roofA, twin], LOCS, NO_ALLOWANCE);
+    expect(plan.unresolved[0].reasons).toEqual(['Buffalo Trace Bourbon matches more than one bottle at RooftopKC — pick one']);
+    expect(plan.unresolved[0].gaps[0]).toEqual(expect.objectContaining({ kind: 'ambiguous', candidate_ids: ['bt-r1', 'bt-r1b'] }));
   });
 
   it('skips voids, applies ignored items with no deduction, and reports unlinked items', () => {
