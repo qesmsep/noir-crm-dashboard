@@ -636,7 +636,7 @@ export function nextBillingDateAfterPayment(
   today: string
 ): string {
   const add = (d: string) => (interval === 'year' ? addYears(d, 1) : addMonths(d, 1));
-  const base = currentBillingDate ? currentBillingDate.split('T')[0] : today;
+  const base = currentBillingDate ? currentBillingDate.slice(0, 10) : today;
   const next = add(base);
   return next > today ? next : add(today);
 }

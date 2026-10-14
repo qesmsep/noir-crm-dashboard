@@ -5,8 +5,7 @@ import {
   logPaymentToLedger,
   handlePaymentFailure,
   handleMissingPaymentMethod,
-  addMonths,
-  addYears,
+  nextBillingDateAfterPayment,
 } from '@/lib/billing';
 import { getTodayLocalDate } from '@/lib/utils';
 
@@ -19,7 +18,7 @@ const supabase = createClient(
  * Monthly Billing Cron Job
  *
  * Runs daily to:
- * 1. Find accounts where next_billing_date = today
+ * 1. Find accounts where next_billing_date is today or earlier
  * 2. Charge their monthly_dues amount
  * 3. Update next_billing_date to +1 month if successful
  * 4. Handle failures and set to past_due
@@ -51,7 +50,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const today = getTodayLocalDate();
-    const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
+    // Derive from local `today` (not UTC now) so an evening run can't bill a day early
+    const tomorrow = new Date(Date.parse(today + 'T00:00:00Z') + 86400000).toISOString().split('T')[0];
 
     // Find accounts due for billing today or overdue (a missed run or stale date
     // would otherwise strand the account forever).
@@ -100,7 +100,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           await supabase
             .from('accounts')
             .update({
-              next_billing_date: billingInterval === 'year' ? addYears(today, 1) : addMonths(today, 1),
+              next_billing_date: nextBillingDateAfterPayment(account.next_billing_date, billingInterval, today),
               last_billing_attempt: new Date().toISOString(),
             })
             .eq('account_id', account.account_id);
@@ -122,7 +122,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           const { error: updateError } = await supabase
             .from('accounts')
             .update({
-              next_billing_date: billingInterval === 'year' ? addYears(today, 1) : addMonths(today, 1),
+              next_billing_date: nextBillingDateAfterPayment(account.next_billing_date, billingInterval, today),
               last_billing_attempt: new Date().toISOString(),
               billing_retry_count: 0,
               last_payment_failed_at: null,

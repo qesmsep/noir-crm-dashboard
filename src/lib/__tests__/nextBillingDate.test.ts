@@ -22,3 +22,9 @@ describe('nextBillingDateAfterPayment', () => {
     expect(nextBillingDateAfterPayment(null, 'month', '2026-10-14')).toBe('2026-11-14');
   });
 });
+
+describe('nextBillingDateAfterPayment boundary', () => {
+  it('advances from today when the anchored date lands exactly on today', () => {
+    expect(nextBillingDateAfterPayment('2026-09-14', 'month', '2026-10-14')).toBe('2026-11-14');
+  });
+});
