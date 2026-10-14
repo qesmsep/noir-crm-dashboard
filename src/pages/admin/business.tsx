@@ -48,6 +48,15 @@ interface CelebrationRow {
   years: number;
 }
 
+interface EventRow {
+  id: string;
+  title: string;
+  start: string; // ISO timestamp
+  end: string | null;
+  fullDay: boolean;
+  location: string | null;
+}
+
 interface Metrics {
   generatedAt: string;
   today: string;
@@ -112,6 +121,10 @@ interface Metrics {
     visitRateMTD: number;
     atRiskCount: number;
     atRisk: AtRiskRow[];
+  };
+  events?: {
+    windowDays: number;
+    upcoming: EventRow[];
   };
   celebrations?: {
     windowDays: number;
@@ -415,6 +428,63 @@ function CelebrationList({
 }
 
 // ---------------------------------------------------------------------------
+// Upcoming private events list
+// ---------------------------------------------------------------------------
+
+const VENUE_TZ = 'America/Chicago';
+
+function chicagoDateKey(d: Date): string {
+  return d.toLocaleDateString('en-CA', { timeZone: VENUE_TZ });
+}
+
+function fmtEventWhen(e: EventRow, today: string): { day: string; time: string } {
+  const start = new Date(e.start);
+  const key = chicagoDateKey(start);
+  const tomorrow = chicagoDateKey(new Date(Date.parse(today + 'T12:00:00Z') + 86_400_000));
+  const day = key === today
+    ? 'Today'
+    : key === tomorrow
+      ? 'Tomorrow'
+      : start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: VENUE_TZ });
+  const time = e.fullDay
+    ? 'All day'
+    : start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: VENUE_TZ }).replace(':00', '');
+  return { day, time };
+}
+
+function EventsList({ rows, today, windowDays }: { rows: EventRow[]; today: string; windowDays: number }) {
+  const soonCutoff = Date.parse(today + 'T12:00:00Z') + 7 * 86_400_000;
+  return (
+    <div className={styles.chartCard}>
+      <div className={styles.chartTitle}>
+        📅 Private Events ({rows.length})
+        <a href="/admin/event-calendar" className={styles.chartTitleLink}>Calendar →</a>
+      </div>
+      {rows.length === 0 ? (
+        <div className={styles.emptyState}>No private events in the next {Math.round(windowDays / 7)} weeks</div>
+      ) : (
+        <ul className={styles.dateList}>
+          {rows.map(e => {
+            const { day, time } = fmtEventWhen(e, today);
+            return (
+              <li key={e.id} className={styles.dateRow}>
+                <span className={styles.dateRowName}>
+                  <strong>{e.title}</strong>
+                  {e.location && <span className={styles.dateRowDetail}> · {e.location}</span>}
+                </span>
+                <span className={Date.parse(e.start) < soonCutoff ? styles.dateRowWhenSoon : styles.dateRowWhen}>
+                  {day} · {time}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
@@ -424,6 +494,20 @@ export default function BusinessDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [showAtRisk, setShowAtRisk] = useState(false);
   const [showOverdue, setShowOverdue] = useState(false);
+  // Tile explanations are hidden by default to keep the dashboard compact;
+  // the choice is remembered per browser.
+  const [showDetails, setShowDetails] = useState(false);
+  useEffect(() => {
+    try {
+      setShowDetails(localStorage.getItem('businessDashboard.showDetails') === '1');
+    } catch {}
+  }, []);
+  const toggleDetails = () => {
+    setShowDetails(v => {
+      try { localStorage.setItem('businessDashboard.showDetails', v ? '0' : '1'); } catch {}
+      return !v;
+    });
+  };
 
   const fetchMetrics = useCallback(async () => {
     setLoading(true);
@@ -460,12 +544,15 @@ export default function BusinessDashboard() {
 
   return (
     <AdminLayout>
-      <div className={styles.root}>
+      <div className={`${styles.root} ${showDetails ? '' : styles.compact}`}>
         <div className={styles.header}>
           <h1 className={styles.title}>Business Dashboard</h1>
           {m && (
-            <div style={{ fontSize: '0.8125rem', color: '#86868b' }}>
-              {fmtMonth(m.month)} · data through {m.today}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.8125rem', color: '#86868b' }}>
+              <span>{fmtMonth(m.month)} · data through {m.today}</span>
+              <button type="button" className={styles.detailsToggle} onClick={toggleDetails} aria-pressed={showDetails}>
+                {showDetails ? 'Hide details' : 'Show details'}
+              </button>
             </div>
           )}
         </div>
@@ -481,28 +568,32 @@ export default function BusinessDashboard() {
 
         {m && (
           <>
-            {m.celebrations && (() => {
-              const weeks = Math.round(m.celebrations.windowDays / 7);
-              return (
+            {(m.celebrations || m.events) && (
               <>
-                <h2 className={styles.sectionTitle}>Coming Up — Next {weeks} Weeks</h2>
-                <div className={styles.chartsGrid}>
-                  <CelebrationList
-                    title="🎂 Birthdays"
-                    rows={m.celebrations.birthdays}
-                    detail={r => `turning ${r.years}`}
-                    empty={`No member birthdays in the next ${weeks} weeks`}
-                  />
-                  <CelebrationList
-                    title="🥂 Membership Anniversaries"
-                    rows={m.celebrations.anniversaries}
-                    detail={r => `${ordinal(r.years)} year`}
-                    empty={`No membership anniversaries in the next ${weeks} weeks`}
-                  />
+                <h2 className={styles.sectionTitle}>Coming Up</h2>
+                <div className={styles.comingUpGrid}>
+                  {m.events && (
+                    <EventsList rows={m.events.upcoming} today={m.today} windowDays={m.events.windowDays} />
+                  )}
+                  {m.celebrations && (
+                    <CelebrationList
+                      title="🎂 Birthdays"
+                      rows={m.celebrations.birthdays}
+                      detail={r => `turning ${r.years}`}
+                      empty={`No member birthdays in the next ${Math.round(m.celebrations.windowDays / 7)} weeks`}
+                    />
+                  )}
+                  {m.celebrations && (
+                    <CelebrationList
+                      title="🥂 Anniversaries"
+                      rows={m.celebrations.anniversaries}
+                      detail={r => `${ordinal(r.years)} year`}
+                      empty={`No membership anniversaries in the next ${Math.round(m.celebrations.windowDays / 7)} weeks`}
+                    />
+                  )}
                 </div>
               </>
-              );
-            })()}
+            )}
 
             {/* ------------------------------------------------------- */}
             <h2 className={styles.sectionTitle}>Membership</h2>

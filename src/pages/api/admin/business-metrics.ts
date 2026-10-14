@@ -435,6 +435,48 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .filter(Boolean)
       .sort((a: any, b: any) => a.daysAway - b.daysAway || a.name.localeCompare(b.name));
 
+    // ------------------------------------------------------------------
+    // Upcoming private events — next 14 days. Non-fatal: an events failure
+    // must not take down the whole dashboard.
+    // ------------------------------------------------------------------
+    const EVENTS_WINDOW_DAYS = 14;
+    let upcomingEvents: {
+      id: string;
+      title: string;
+      start: string;
+      end: string | null;
+      fullDay: boolean;
+      location: string | null;
+    }[] = [];
+    {
+      const nowMs = Date.now();
+      // private_events has two FKs to locations, so a PostgREST embed is
+      // ambiguous — look location names up separately.
+      const [{ data: eventRows, error: eventsErr }, { data: locRows }] = await Promise.all([
+        supabaseAdmin
+          .from('private_events')
+          .select('id, title, start_time, end_time, full_day, location_id')
+          .gte('start_time', new Date(nowMs).toISOString())
+          .lt('start_time', new Date(nowMs + EVENTS_WINDOW_DAYS * 86_400_000).toISOString())
+          .eq('status', 'active')
+          .order('start_time', { ascending: true }),
+        supabaseAdmin.from('locations').select('id, name'),
+      ]);
+      const locName = new Map<string, string>((locRows || []).map((l: any) => [l.id, l.name]));
+      if (eventsErr) {
+        console.warn('[business-metrics] private_events fetch failed:', eventsErr.message);
+      } else {
+        upcomingEvents = (eventRows || []).map((e: any) => ({
+          id: e.id,
+          title: e.title || 'Untitled event',
+          start: e.start_time,
+          end: e.end_time,
+          fullDay: !!e.full_day,
+          location: (e.location_id && locName.get(e.location_id)) || null,
+        }));
+      }
+    }
+
     const celebrations = {
       windowDays: CELEBRATION_WINDOW_DAYS,
       birthdays: upcomingBirthdays,
@@ -459,6 +501,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       balances,
       engagement,
       celebrations,
+      events: { windowDays: EVENTS_WINDOW_DAYS, upcoming: upcomingEvents },
       // Data-quality signals: nonzero values mean a figure above is degraded
       // (stale plan id => annual dues counted as monthly; empty purchase
       // notes => spend silently bucketed under "Events & Other").
