@@ -391,12 +391,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // Celebrations — birthdays and membership anniversaries, next 4 weeks
     // ------------------------------------------------------------------
     const CELEBRATION_WINDOW_DAYS = 28;
-    // Ages above this are placeholder DOBs (e.g. 1900-01-01), not real birthdays
+    // Ages outside 1..MAX are placeholder or future DOBs, not real birthdays
     const MAX_PLAUSIBLE_AGE = 110;
     const upcomingBirthdays = (activeMembers as any[])
       .map(m => {
         const next = nextYearlyOccurrence(m.dob, today, CELEBRATION_WINDOW_DAYS);
-        return next && next.years <= MAX_PLAUSIBLE_AGE && {
+        return next && next.years >= 1 && next.years <= MAX_PLAUSIBLE_AGE && {
           member_id: m.member_id,
           name: `${m.first_name || ''} ${m.last_name || ''}`.trim() || 'Unknown',
           ...next,
