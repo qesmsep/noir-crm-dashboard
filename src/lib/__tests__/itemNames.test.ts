@@ -56,6 +56,16 @@ describe('similarity', () => {
     expect(s).toBeLessThan(LIKELY_DUPLICATE);
   });
 
+  // Same brand, different expression: worth showing, never blocked.
+  const sameBrand: Array<[string, string, string]> = [
+    ["Maker's Mark", "Maker's 46", "Maker's Mark"],
+    ['Don Julio 1942', 'Don Julio Blanco', 'Don Julio'],
+    ['Blanco Tequila', 'Reposado Tequila', 'Don Julio'],
+  ];
+  it.each(sameBrand)('%s / %s from one brand is not a likely duplicate', (a, b, brand) => {
+    expect(similarity({ name: a, brand }, { name: b, brand })).toBeLessThan(LIKELY_DUPLICATE);
+  });
+
   const different: Array<[string, string, string, string]> = [
     ['Lime Juice', '', 'Lemon Juice', ''],
     ['Lime Juice', '', 'Limes', ''],

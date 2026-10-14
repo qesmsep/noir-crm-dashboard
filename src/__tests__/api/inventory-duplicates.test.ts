@@ -14,7 +14,7 @@ function mockBuilder(table: string) {
   const op: Op = { table, calls: [] };
   mockOps.push(op);
   const b: Record<string, unknown> = {};
-  for (const m of ['select', 'insert', 'update', 'eq', 'is', 'order', 'single', 'maybeSingle']) {
+  for (const m of ['select', 'insert', 'update', 'eq', 'is', 'in', 'order', 'single', 'maybeSingle']) {
     b[m] = (...args: unknown[]) => {
       op.calls.push([m, args]);
       return b;
@@ -32,6 +32,7 @@ jest.mock('../../lib/toast/settle', () => ({ settleDaysWithNothingToApprove: () 
 
 import inventoryHandler from '../../pages/api/inventory/index';
 import pickHandler from '../../pages/api/inventory/recipe-location-pick';
+import recipesHandler from '../../pages/api/inventory/recipes';
 
 function call(handler: unknown, method: string, body: unknown) {
   const res: { statusCode?: number; body?: any; status: (c: number) => typeof res; json: (b: unknown) => typeof res } = {
@@ -187,5 +188,34 @@ describe('PUT /api/inventory/recipe-location-pick', () => {
     const res = await call(pickHandler, 'PUT', body(null));
     spy.mockRestore();
     expect(res.statusCode).toBe(200);
+  });
+});
+
+describe('PUT /api/inventory/recipes version check', () => {
+  const STAMP = '2026-10-14T16:00:00.000000+00:00';
+  let rows: unknown[];
+  beforeEach(() => {
+    rows = [{ id: RECIPE, name: 'Espresso Martini', ingredients: '[]', updated_at: STAMP }];
+    mockRespond = op => (has(op, 'update') ? { data: rows, error: null } : { data: [], error: null });
+  });
+  const update = () => mockOps.find(o => o.table === 'inventory_recipes' && has(o, 'update'));
+
+  it('saves only over the version the editor opened', async () => {
+    const res = await call(recipesHandler, 'PUT', { id: RECIPE, name: 'Espresso Martini', expected_updated_at: STAMP });
+    expect(res.statusCode).toBe(200);
+    expect(update()!.calls).toContainEqual(['eq', ['updated_at', STAMP]]);
+  });
+
+  it('409s when the recipe changed since it was opened', async () => {
+    rows = [];
+    const res = await call(recipesHandler, 'PUT', { id: RECIPE, name: 'Espresso Martini', expected_updated_at: STAMP });
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe('STALE_RECIPE');
+  });
+
+  it('saves without a version check when none is sent (archive)', async () => {
+    const res = await call(recipesHandler, 'PUT', { id: RECIPE, is_active: false });
+    expect(res.statusCode).toBe(200);
+    expect(update()!.calls.some(([m, a]) => m === 'eq' && (a as unknown[])[0] === 'updated_at')).toBe(false);
   });
 });

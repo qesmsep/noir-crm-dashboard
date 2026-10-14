@@ -291,19 +291,27 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       if (body.batch_instructions !== undefined) updateData.batch_instructions = sanitizeInput(body.batch_instructions, 5000);
       if (body.is_active !== undefined) updateData.is_active = body.is_active;
 
-      const { data, error } = await client
-        .from('inventory_recipes')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
+      // The editor sends the version it loaded, so saving an old copy can't
+      // silently undo a bottle picked for a bar from the Sales review since.
+      let update = client.from('inventory_recipes').update(updateData).eq('id', id);
+      if (body.expected_updated_at !== undefined) {
+        update = body.expected_updated_at === null
+          ? update.is('updated_at', null)
+          : update.eq('updated_at', body.expected_updated_at);
+      }
+      const { data: rows, error } = await update.select();
 
       if (error) {
         console.error('Error updating recipe:', error);
         return errorResponse(res, 500, 'Failed to update recipe', 'RECIPE_UPDATE_ERROR', error);
       }
+      if (!rows || rows.length === 0) {
+        return body.expected_updated_at !== undefined
+          ? errorResponse(res, 409, 'This recipe changed since it was opened. Close it, reopen it and save again.', 'STALE_RECIPE')
+          : errorResponse(res, 404, 'Recipe not found', 'NOT_FOUND');
+      }
 
-      return res.status(200).json({ data: parseRecipe(data as DBRecipe) });
+      return res.status(200).json({ data: parseRecipe(rows[0] as DBRecipe) });
     } catch (err) {
       console.error('Unhandled error updating recipe:', err);
       return errorResponse(res, 500, 'Internal server error', 'INTERNAL_ERROR', err);

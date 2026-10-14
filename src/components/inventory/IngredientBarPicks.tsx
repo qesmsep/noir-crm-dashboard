@@ -39,7 +39,7 @@ export default function IngredientBarPicks({
           : 'ambiguous' in auto
           ? 'more than one match — choose'
           : 'not stocked here — choose';
-        const problem = !hasPick && (!auto || !('item' in auto));
+        const problem = hasPick ? picked != null && !here.some(i => i.id === picked) : !auto || !('item' in auto);
         const alike = base ? new Set(findSimilarItems(base, here, { limit: 5 }).map(m => m.item.id)) : new Set<string>();
         const options = [...here].sort(
           (a, b) => Number(alike.has(b.id)) - Number(alike.has(a.id)) || itemLabel(a).localeCompare(itemLabel(b))

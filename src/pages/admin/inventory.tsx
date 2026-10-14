@@ -409,7 +409,7 @@ export default function InventoryPage() {
     setSavingRecipe(true);
     try {
       const method = editingRecipe ? 'PUT' : 'POST';
-      const body = editingRecipe ? { ...data, id: editingRecipe.id } : data;
+      const body = editingRecipe ? { ...data, id: editingRecipe.id, expected_updated_at: editingRecipe.updated_at ?? null } : data;
       const headers = await getAuthHeaders();
       const res = await fetch('/api/inventory/recipes', {
         method,
