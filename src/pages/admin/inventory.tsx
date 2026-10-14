@@ -340,27 +340,30 @@ export default function InventoryPage() {
         }
         const headers = await getAuthHeaders();
         const steps = planMatchedAllocation(matched, allocatedLocations, allInventory, locationsData);
+        const addTo = (itemId: string, quantity: number) =>
+          fetch('/api/inventory/transactions', {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              item_id: itemId,
+              transaction_type: 'add',
+              quantity_change: quantity,
+              cost_per_unit: costPerUnit > 0 ? costPerUnit : undefined, // Track price in transaction history
+              notes: costPerUnit > 0
+                ? `Added from receipt scan ($${costPerUnit.toFixed(2)}/unit)`
+                : 'Added from receipt scan'
+            }),
+          });
         for (const step of steps) {
           const where = locationsData.find(l => l.slug === step.location_slug)?.name || step.location_slug;
+          if (step.kind === 'error') {
+            failures.push(`Failed to add ${scanned.name} at ${where}: ${step.reason}`);
+            continue;
+          }
           try {
             let res: Response;
-            if (step.kind === 'error') {
-              failures.push(`Failed to add ${scanned.name} at ${where}: ${step.reason}`);
-              continue;
-            } else if (step.kind === 'add') {
-              res = await fetch('/api/inventory/transactions', {
-                method: 'POST',
-                headers,
-                body: JSON.stringify({
-                  item_id: step.item.id,
-                  transaction_type: 'add',
-                  quantity_change: step.quantity,
-                  cost_per_unit: costPerUnit > 0 ? costPerUnit : undefined, // Track price in transaction history
-                  notes: costPerUnit > 0
-                    ? `Added from receipt scan ($${costPerUnit.toFixed(2)}/unit)`
-                    : 'Added from receipt scan'
-                }),
-              });
+            if (step.kind === 'add') {
+              res = await addTo(step.item.id, step.quantity);
             } else {
               const from = step.from;
               res = await fetch('/api/inventory', {
@@ -379,9 +382,15 @@ export default function InventoryPage() {
                   par_level: 0,
                   notes: 'Added from receipt scan',
                   location_id: step.location_id,
-                  confirm_new: true, // the same product as the matched row, at a new bar
+                  // The plan found no row with this label at the bar; the server still refuses an exact duplicate.
+                  confirm_new: true,
                 }),
               });
+              if (res.status === 409) {
+                // The bar has it after all (the list here was out of date): add the share to that row.
+                const body = await res.clone().json().catch(() => ({}));
+                if (body.code === 'ALREADY_EXISTS' && body.existing?.id) res = await addTo(body.existing.id, step.quantity);
+              }
             }
 
             if (!res.ok) {
