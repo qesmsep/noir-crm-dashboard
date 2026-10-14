@@ -449,8 +449,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       fullDay: boolean;
       location: string | null;
     }[] = [];
-    // Window is whole Chicago calendar days: today (including events that
-    // already started) through the end of day 14.
+    // Window is whole Chicago calendar days: anything starting today (even
+    // if already started/ended) through the end of day 14. Events don't span
+    // days, so filtering on start_time is enough.
     try {
       const [{ data: eventRows, error: eventsErr }, { data: locRows, error: locErr }] = await Promise.all([
         supabaseAdmin

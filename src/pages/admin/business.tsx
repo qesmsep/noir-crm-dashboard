@@ -448,7 +448,7 @@ function fmtEventWhen(e: EventRow, today: string): { day: string; time: string }
       : start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', timeZone: VENUE_TZ });
   const time = e.fullDay
     ? 'All day'
-    : start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: VENUE_TZ }).replace(':00', '');
+    : start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: VENUE_TZ }).replace(/:00(?=\s)/, '');
   return { day, time };
 }
 
