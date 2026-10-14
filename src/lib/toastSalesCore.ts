@@ -314,6 +314,8 @@ export interface IngredientGap {
   /** missing: nothing like it at that bar; ambiguous: more than one bottle could be it. */
   kind: 'missing' | 'ambiguous';
   candidate_ids: string[];
+  /** The bottle picked for this bar is gone or moved; fixing it replaces or clears the pick. */
+  stale_pick?: boolean;
 }
 
 export interface UnresolvedGroup {
@@ -465,8 +467,22 @@ function servingDeductions(
           const picked = picks[locationId];
           if (picked === null) return; // not tracked at this bar
           const item = ctx.stock.items.get(picked);
-          if (!item || item.location_id !== locationId) reasons.push(`${label}: the bottle picked for ${locationName} no longer exists`);
-          else deduct(item, ing.quantity, ing.unit, label);
+          if (!item || item.location_id !== locationId) {
+            reasons.push(`${label}: the bottle picked for ${locationName} no longer exists`);
+            const linked = ctx.stock.items.get(ing.inventory_item_id);
+            gaps.push({
+              recipe_id: recipe.id,
+              recipe_name: recipe.name,
+              ingredient_index: index,
+              ingredient_name: ing.name || (linked ? itemLabel(linked) : 'ingredient'),
+              inventory_item_id: ing.inventory_item_id,
+              location_id: locationId,
+              location_name: locationName,
+              kind: 'missing',
+              candidate_ids: [],
+              stale_pick: true,
+            });
+          } else deduct(item, ing.quantity, ing.unit, label);
           return;
         }
         const linked = ctx.stock.items.get(ing.inventory_item_id);

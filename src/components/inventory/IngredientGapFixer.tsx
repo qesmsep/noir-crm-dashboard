@@ -17,6 +17,7 @@ export interface IngredientGapView {
   location_name: string;
   kind: 'missing' | 'ambiguous';
   candidate_ids: string[];
+  stale_pick?: boolean;
 }
 
 type Choice = 'pick' | 'add' | 'untracked';
@@ -71,7 +72,7 @@ export default function IngredientGapFixer({
 
   const label = base ? itemLabel(base) : gap.ingredient_name;
 
-  const pick = (value: string | null) =>
+  const pick = (value: string | null | 'auto') =>
     send('/api/inventory/recipe-location-pick', 'PUT', {
       recipe_id: gap.recipe_id,
       ingredient_index: gap.ingredient_index,
@@ -110,6 +111,8 @@ export default function IngredientGapFixer({
           location_id: gap.location_id,
           confirm_new: true,
         });
+        // A stale pick would still win over the new bottle; go back to finding it automatically.
+        if (gap.stale_pick) await pick('auto');
         onSaved(`Added ${label} to ${gap.location_name} with 0 on hand. Count it in or scan the next receipt to set the quantity.`);
       }
     } catch (e) {

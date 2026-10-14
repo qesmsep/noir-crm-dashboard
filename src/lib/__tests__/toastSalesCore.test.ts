@@ -237,6 +237,11 @@ describe('buildDeductionPlan', () => {
       'Recipe "Espresso Martini" — Vodka: the bottle picked for RooftopKC no longer exists',
       'Recipe "Espresso Martini" — Kahlua: the bottle picked for RooftopKC no longer exists',
     ]);
+    // Each one gets a Fix button.
+    expect(plan.unresolved[0].gaps.map(g => [g.ingredient_index, g.location_id, g.kind, g.stale_pick])).toEqual([
+      [0, 'loc-roof', 'missing', true],
+      [1, 'loc-roof', 'missing', true],
+    ]);
   });
 
   it('finds the bottle at another bar when only one side has the brand filled in', () => {
