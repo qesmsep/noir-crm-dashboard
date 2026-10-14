@@ -294,6 +294,8 @@ export default function RecipeDrawer({
   /** The add-item form saved one row per bar; fill the ingredient with the one for where this recipe is served. */
   const handleNewItemsCreated = (created: InventoryItem[]) => {
     if (created.length === 0) return;
+    // The ingredient points at one row; the recipe's other bars find their own
+    // copy of the same product automatically (findAtLocation), so no picks needed.
     const preferred = servedAt.map(l => l.id);
     const item = created.find(i => preferred.includes(i.location_id)) || created[0];
     if (pendingBatchIngredientIndex !== null) {
@@ -1110,7 +1112,6 @@ export default function RecipeDrawer({
           setPendingIngredientIndex(null);
           setPendingBatchIngredientIndex(null);
         }}
-        onSave={async () => undefined}
         onCreated={handleNewItemsCreated}
         existingAction={{
           label: 'Use it',
@@ -1121,7 +1122,6 @@ export default function RecipeDrawer({
         }}
         onRefresh={onInventoryChanged}
         editItem={null}
-        saving={false}
         currentLocation={currentLocation}
         locations={availableLocations}
       />

@@ -22,11 +22,12 @@ export default function IngredientBarPicks({
   onChange: (locationId: string, value: string | null | 'auto') => void;
 }) {
   const base = stock.items.get(ingredient.inventory_item_id);
-  const picks = ingredient.location_items || {};
+  const locationItems = ingredient.location_items;
 
   const rows = useMemo(
     () =>
       locations.map(loc => {
+        const picks = locationItems || {};
         const here = inventory.filter(i => i.location_id === loc.id);
         const hasPick = Object.prototype.hasOwnProperty.call(picks, loc.id);
         const picked = hasPick ? picks[loc.id] : undefined;
@@ -45,7 +46,7 @@ export default function IngredientBarPicks({
         );
         return { loc, hasPick, picked, autoText, problem, options, alike };
       }),
-    [locations, inventory, picks, base, stock]
+    [locations, inventory, locationItems, base, stock]
   );
 
   if (!base) return null;

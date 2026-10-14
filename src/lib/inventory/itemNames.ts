@@ -19,7 +19,7 @@ const UNLABELLED_BRANDS = new Set(['house-made', 'housemade', 'house made']);
 export function looseText(s: string): string {
   return s
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
     .replace(/&/g, ' and ')
     .replace(/['’`]/g, '')

@@ -16,10 +16,11 @@ import { findSimilarItems, itemLabel, matchKey } from '../../lib/inventory/itemN
 interface InventoryItemModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: InventoryItemFormData) => void | Promise<void> | Promise<InventoryItem | null>;
+  /** Optional when onRefresh is given — the modal saves its own rows. */
+  onSave?: (data: InventoryItemFormData) => void | Promise<void> | Promise<InventoryItem | null>;
   onDelete?: (id: string) => void;
   editItem: InventoryItem | null;
-  saving: boolean;
+  saving?: boolean;
   currentLocation: UILocationSlug;
   locations?: Array<{ id: string; slug: string; name: string }>;
   onRefresh?: () => Promise<void>;
@@ -63,7 +64,7 @@ export default function InventoryItemModal({
   onSave,
   onDelete,
   editItem,
-  saving,
+  saving = false,
   currentLocation,
   locations = [],
   onRefresh,
@@ -85,6 +86,7 @@ export default function InventoryItemModal({
   const [loadingLocations, setLoadingLocations] = useState(false);
   const [allItems, setAllItems] = useState<InventoryItem[]>([]);
   const [confirmedNew, setConfirmedNew] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // Every item at every bar, to catch a duplicate before it's created.
   useEffect(() => {
@@ -316,10 +318,8 @@ export default function InventoryItemModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (likelyDuplicate) {
-      alert(`“${itemLabel(similar[0].item)}” is already in inventory. Use that one, or tap “It’s a different item” to add this anyway.`);
-      return;
-    }
+    // The warning panel explains it and the button is disabled; this only guards a stray submit.
+    if (likelyDuplicate || submitting) return;
 
     // Save items only to locations where availability is checked
     const locationsToSave = Object.entries(locationAvailability)
@@ -335,6 +335,7 @@ export default function InventoryItemModal({
     const successes: string[] = [];
     const created: InventoryItem[] = [];
 
+    setSubmitting(true);
     try {
       const headers = await getAuthHeaders();
 
@@ -380,12 +381,19 @@ export default function InventoryItemModal({
                 quantity,
                 par_level: parLevel,
                 location_id: locationId,
-                confirm_new: true, // checked above, before anything was created
+                // A new bar for an existing product, or a look-alike waved through
+                // on purpose. Otherwise the server checks too, in case the list
+                // above never loaded.
+                confirm_new: editItem ? true : confirmedNew,
               }),
             });
 
             if (!response.ok) {
               const body = await response.json().catch(() => ({}));
+              if (body.code === 'SIMILAR_ITEMS' && Array.isArray(body.similar)) {
+                // Show what the server found, with the "different item" checkbox.
+                setAllItems(prev => [...prev, ...(body.similar as InventoryItem[]).filter(x => !prev.some(p => p.id === x.id))]);
+              }
               throw new Error(body.error || 'Create failed');
             }
             const body = await response.json().catch(() => ({}));
@@ -431,7 +439,7 @@ export default function InventoryItemModal({
       if (onRefresh) {
         await onRefresh();
       } else {
-        await onSave(form);
+        await onSave?.(form);
       }
       if (created.length > 0) onCreated?.(created);
 
@@ -447,6 +455,8 @@ export default function InventoryItemModal({
     } catch (err) {
       console.error('Failed to save inventory items:', err);
       alert('Failed to save inventory items. Please try again.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -968,10 +978,10 @@ export default function InventoryItemModal({
                 </button>
                 <button
                   className={styles.btnPrimary}
-                  disabled={saving || !form.name.trim() || Object.values(locationAvailability).every(v => !v)}
+                  disabled={saving || submitting || likelyDuplicate || !form.name.trim() || Object.values(locationAvailability).every(v => !v)}
                   type="submit"
                 >
-                  {saving
+                  {saving || submitting
                     ? 'Saving...'
                     : editItem
                       ? 'Update Item'

@@ -31,7 +31,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   try {
     const { data: recipe, error: recipeErr } = await supabaseAdmin
       .from('inventory_recipes')
-      .select('id, name, ingredients')
+      .select('id, name, ingredients, updated_at')
       .eq('id', recipe_id)
       .maybeSingle();
     if (recipeErr) throw new Error(recipeErr.message);
@@ -60,14 +60,26 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const next: RecipeIngredient = Object.keys(picks).length > 0 ? { ...rest, location_items: picks } : rest;
     const updated = ingredients.map((x, i) => (i === ingredient_index ? next : x));
 
-    const { error: saveErr } = await supabaseAdmin
+    // Only write over the version read above, so a pick or a recipe save
+    // landing in between is never silently lost.
+    let save = supabaseAdmin
       .from('inventory_recipes')
       .update({ ingredients: JSON.stringify(updated), updated_at: new Date().toISOString() })
       .eq('id', recipe_id);
+    save = recipe.updated_at == null ? save.is('updated_at', null) : save.eq('updated_at', recipe.updated_at);
+    const { data: saved, error: saveErr } = await save.select('id');
     if (saveErr) throw new Error(saveErr.message);
+    if (!saved || saved.length === 0) {
+      return res.status(409).json({ error: `"${recipe.name}" changed since this was loaded — reload and try again` });
+    }
 
     // A drink whose only gap was this ingredient may now have nothing left to approve.
-    await settleDaysWithNothingToApprove();
+    // The pick is saved either way, so a failure here is logged, not returned.
+    try {
+      await settleDaysWithNothingToApprove();
+    } catch (err) {
+      console.error('recipe-location-pick: settling days failed:', err);
+    }
 
     return res.status(200).json({ data: { recipe_id, ingredient_index, location_items: next.location_items || {} } });
   } catch (err) {
