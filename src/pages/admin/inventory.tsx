@@ -388,9 +388,16 @@ export default function InventoryPage() {
                 }),
               });
               if (res.status === 409) {
-                // The bar has it after all (the list here was out of date): add the share to that row.
+                // The bar has it after all (the list here was out of date): add the share to
+                // that row, unless it's another bottle size (never fold sizes together).
                 const body = await res.clone().json().catch(() => ({}));
-                if (body.code === 'ALREADY_EXISTS' && body.existing?.id) res = await addTo(body.existing.id, step.quantity);
+                const existing = body.code === 'ALREADY_EXISTS' ? body.existing : null;
+                if (existing?.id && (existing.volume_ml || null) === (from.volume_ml || null)) {
+                  res = await addTo(existing.id, step.quantity);
+                } else if (existing?.id) {
+                  failures.push(`Failed to add ${scanned.name} (${step.quantity}) at ${where}: that bar stocks it in a different bottle size — add it there by hand`);
+                  continue;
+                }
               }
             }
 

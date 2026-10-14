@@ -14,7 +14,7 @@ import { findSimilarItems, matchKey } from '../../../lib/inventory/itemNames';
  *
  * Rate limiting is applied by withRateLimitAndAuth wrapper BEFORE authentication.
  */
-type ItemLabelRow = { id: string; name: string; brand: string | null; location_id: string };
+type ItemLabelRow = { id: string; name: string; brand: string | null; location_id: string; volume_ml: number | null };
 
 /** Every item's label, paged past PostgREST's row cap so the duplicate check never misses rows. */
 async function allItemLabels(client: NonNullable<typeof supabaseAdmin>) {
@@ -23,7 +23,7 @@ async function allItemLabels(client: NonNullable<typeof supabaseAdmin>) {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await client
       .from('inventory_items')
-      .select('id, name, brand, location_id')
+      .select('id, name, brand, location_id, volume_ml')
       .order('id')
       .range(from, from + PAGE - 1);
     if (error) return { data: null, error };
