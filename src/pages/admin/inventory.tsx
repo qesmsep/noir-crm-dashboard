@@ -40,6 +40,7 @@ import type {
 } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
 import { getAuthHeaders as getBaseAuthHeaders } from '../../lib/client-auth';
+import { planMatchedAllocation } from '../../lib/inventory/scanAllocation';
 
 // Helper to get auth headers with Content-Type for API requests
 async function getAuthHeaders(): Promise<HeadersInit> {
@@ -309,6 +310,7 @@ export default function InventoryPage() {
   // AI Scan handler - supports multi-location assignment with per-location quantities
   const handleScanConfirm = async (scannedItems: ScannedItem[]) => {
     const failures: string[] = [];
+    const saved: string[] = [];
 
     for (const scanned of scannedItems) {
       const locationQuantities = scanned.location_quantities || {};
@@ -328,31 +330,86 @@ export default function InventoryPage() {
       }
 
       if (!scanned.create_new && scanned.matched_inventory_id) {
-        // Match to existing: add quantity and update price to the existing item
-        const totalQuantity = allocatedLocations.reduce((sum, [_, qty]) => sum + qty, 0);
-
-        try {
-          const headers = await getAuthHeaders();
-          const res = await fetch('/api/inventory/transactions', {
+        // Matched to an existing product: each bar's share goes on that bar's own
+        // row, created there if the bar doesn't stock it yet.
+        const matched =
+          allInventory.find(i => i.id === scanned.matched_inventory_id) ||
+          inventory.find(i => i.id === scanned.matched_inventory_id);
+        if (!matched) {
+          failures.push(`Failed to update ${scanned.name}: the matched item no longer exists`);
+          continue;
+        }
+        const headers = await getAuthHeaders();
+        const steps = planMatchedAllocation(matched, allocatedLocations, allInventory, locationsData);
+        const addTo = (itemId: string, quantity: number) =>
+          fetch('/api/inventory/transactions', {
             method: 'POST',
             headers,
             body: JSON.stringify({
-              item_id: scanned.matched_inventory_id,
+              item_id: itemId,
               transaction_type: 'add',
-              quantity_change: totalQuantity,
+              quantity_change: quantity,
               cost_per_unit: costPerUnit > 0 ? costPerUnit : undefined, // Track price in transaction history
               notes: costPerUnit > 0
                 ? `Added from receipt scan ($${costPerUnit.toFixed(2)}/unit)`
                 : 'Added from receipt scan'
             }),
           });
-
-          if (!res.ok) {
-            const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
-            failures.push(`Failed to update ${scanned.name}: ${errorData.error || res.statusText}`);
+        for (const step of steps) {
+          const where = locationsData.find(l => l.slug === step.location_slug)?.name || step.location_slug;
+          if (step.kind === 'error') {
+            failures.push(`Failed to add ${scanned.name} at ${where}: ${step.reason}`);
+            continue;
           }
-        } catch (err) {
-          failures.push(`Failed to update ${scanned.name}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          try {
+            let res: Response;
+            if (step.kind === 'add') {
+              res = await addTo(step.item.id, step.quantity);
+            } else {
+              const from = step.from;
+              res = await fetch('/api/inventory', {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({
+                  name: from.name,
+                  brand: from.brand || '',
+                  category: from.category,
+                  subcategory: from.subcategory || '',
+                  unit: from.unit,
+                  volume_ml: from.volume_ml,
+                  cost_per_unit: costPerUnit > 0 ? costPerUnit : from.cost_per_unit || 0,
+                  price_per_serving: from.price_per_serving || 0,
+                  quantity: step.quantity,
+                  par_level: 0,
+                  notes: 'Added from receipt scan',
+                  location_id: step.location_id,
+                  // No confirm_new: the plan found no row with this label at the bar, and the
+                  // server's look-alike check reports a near-duplicate there instead of creating it.
+                }),
+              });
+              if (res.status === 409) {
+                // The bar has it after all (the list here was out of date): add the share to
+                // that row, unless it's another bottle size (never fold sizes together).
+                const body = await res.clone().json().catch(() => ({}));
+                const existing = body.code === 'ALREADY_EXISTS' ? body.existing : null;
+                if (existing?.id && (existing.volume_ml || null) === (from.volume_ml || null)) {
+                  res = await addTo(existing.id, step.quantity);
+                } else if (existing?.id) {
+                  failures.push(`Failed to add ${scanned.name} (${step.quantity}) at ${where}: that bar stocks it in a different bottle size — add it there by hand`);
+                  continue;
+                }
+              }
+            }
+
+            if (!res.ok) {
+              const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+              failures.push(`Failed to add ${scanned.name} (${step.quantity}) at ${where}: ${errorData.error || res.statusText}`);
+            } else {
+              saved.push(`${scanned.name} (${step.quantity}) at ${where}`);
+            }
+          } catch (err) {
+            failures.push(`Failed to add ${scanned.name} at ${where}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          }
         }
       } else {
         // Create new: create inventory item at each allocated location with specific quantity
@@ -386,6 +443,8 @@ export default function InventoryPage() {
                 : (errorData.error || res.statusText);
               failures.push(`Failed to create ${scanned.name} (${quantity} units) at ${locationSlug}: ${errorMsg}`);
               console.error('Inventory creation error:', errorData);
+            } else {
+              saved.push(`${scanned.name} (${quantity}) at ${locationSlug}`);
             }
           } catch (err) {
             failures.push(`Failed to create ${scanned.name} at ${locationSlug}: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -400,7 +459,9 @@ export default function InventoryPage() {
 
     // Show failures to user if any occurred
     if (failures.length > 0) {
-      alert(`Scan completed with errors:\n\n${failures.join('\n')}`);
+      // Name what was saved too, so a retry covers only what failed.
+      const done = saved.length > 0 ? `\n\nSaved (don't re-add):\n${saved.join('\n')}` : '';
+      alert(`Scan completed with errors:\n\n${failures.join('\n')}${done}`);
     }
   };
 
