@@ -13,6 +13,7 @@ import {
   weekStartOf,
   round2,
   nextYearlyOccurrence,
+  zonedMidnightIso,
 } from '../businessMetricsCore';
 
 describe('classifyPlan', () => {
@@ -283,5 +284,17 @@ describe('computeCashflowWindows overdue list', () => {
     );
     expect(cf.overdueBilling.list.map(o => o.accountId)).toEqual(['a', 'b']);
     expect(cf.overdueBilling.accounts).toBe(2);
+  });
+});
+
+describe('zonedMidnightIso', () => {
+  it('returns Chicago midnight in CDT and CST', () => {
+    expect(zonedMidnightIso('2026-10-14')).toBe('2026-10-14T05:00:00.000Z');
+    expect(zonedMidnightIso('2026-12-01')).toBe('2026-12-01T06:00:00.000Z');
+  });
+
+  it('handles DST-change days', () => {
+    expect(zonedMidnightIso('2026-03-08')).toBe('2026-03-08T06:00:00.000Z');
+    expect(zonedMidnightIso('2026-11-01')).toBe('2026-11-01T05:00:00.000Z');
   });
 });

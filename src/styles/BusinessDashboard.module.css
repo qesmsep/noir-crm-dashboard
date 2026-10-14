@@ -271,6 +271,12 @@
 /* ============================================
    UPCOMING BIRTHDAYS / ANNIVERSARIES
    ============================================ */
+.comingUpGrid .chartTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
 .comingUpGrid {
   width: 100%;
   max-width: 100%;
@@ -281,7 +287,7 @@
 }
 
 .chartTitleLink {
-  float: right;
+  margin-left: auto;
   font-size: 0.75rem;
   font-weight: 500;
   color: #A59480;

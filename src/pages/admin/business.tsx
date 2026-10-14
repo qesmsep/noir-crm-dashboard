@@ -503,10 +503,9 @@ export default function BusinessDashboard() {
     } catch {}
   }, []);
   const toggleDetails = () => {
-    setShowDetails(v => {
-      try { localStorage.setItem('businessDashboard.showDetails', v ? '0' : '1'); } catch {}
-      return !v;
-    });
+    const next = !showDetails;
+    try { localStorage.setItem('businessDashboard.showDetails', next ? '1' : '0'); } catch {}
+    setShowDetails(next);
   };
 
   const fetchMetrics = useCallback(async () => {
@@ -550,7 +549,7 @@ export default function BusinessDashboard() {
           {m && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.8125rem', color: '#86868b' }}>
               <span>{fmtMonth(m.month)} · data through {m.today}</span>
-              <button type="button" className={styles.detailsToggle} onClick={toggleDetails} aria-pressed={showDetails}>
+              <button type="button" className={styles.detailsToggle} onClick={toggleDetails}>
                 {showDetails ? 'Hide details' : 'Show details'}
               </button>
             </div>

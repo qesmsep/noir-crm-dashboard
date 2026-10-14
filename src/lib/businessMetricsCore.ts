@@ -344,3 +344,22 @@ export function nextYearlyOccurrence(
   if (daysAway > windowDays) return null;
   return { date, daysAway, years: year - oy };
 }
+
+function tzOffsetMinutes(at: Date, tz: string): number {
+  const name = new Intl.DateTimeFormat('en-US', { timeZone: tz, timeZoneName: 'shortOffset' })
+    .formatToParts(at)
+    .find(p => p.type === 'timeZoneName')?.value || 'GMT';
+  const m = /GMT([+-])(\d{1,2})(?::(\d{2}))?/.exec(name);
+  return m ? (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] || 0)) : 0;
+}
+
+/**
+ * UTC instant (ISO) of local midnight starting `dateStr` (YYYY-MM-DD) in
+ * `tz`. Re-checks the offset at the first guess so DST-change days land
+ * on the offset actually in effect at midnight.
+ */
+export function zonedMidnightIso(dateStr: string, tz: string = CHICAGO_TZ): string {
+  const utcMidnight = Date.parse(dateStr + 'T00:00:00Z');
+  const guess = utcMidnight - tzOffsetMinutes(new Date(dateStr + 'T12:00:00Z'), tz) * 60_000;
+  return new Date(utcMidnight - tzOffsetMinutes(new Date(guess), tz) * 60_000).toISOString();
+}

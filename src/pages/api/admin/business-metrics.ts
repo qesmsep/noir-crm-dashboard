@@ -19,6 +19,7 @@ import {
   weekStartOf,
   round2,
   nextYearlyOccurrence,
+  zonedMidnightIso,
 } from '../../../lib/businessMetricsCore';
 
 /**
@@ -448,20 +449,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       fullDay: boolean;
       location: string | null;
     }[] = [];
-    {
-      const nowMs = Date.now();
-      // private_events has two FKs to locations, so a PostgREST embed is
-      // ambiguous — look location names up separately.
-      const [{ data: eventRows, error: eventsErr }, { data: locRows }] = await Promise.all([
+    // Window is whole Chicago calendar days: today (including events that
+    // already started) through the end of day 14.
+    try {
+      const [{ data: eventRows, error: eventsErr }, { data: locRows, error: locErr }] = await Promise.all([
         supabaseAdmin
           .from('private_events')
           .select('id, title, start_time, end_time, full_day, location_id')
-          .gte('start_time', new Date(nowMs).toISOString())
-          .lt('start_time', new Date(nowMs + EVENTS_WINDOW_DAYS * 86_400_000).toISOString())
+          .gte('start_time', zonedMidnightIso(today))
+          .lt('start_time', zonedMidnightIso(addDays(today, EVENTS_WINDOW_DAYS + 1)))
           .eq('status', 'active')
           .order('start_time', { ascending: true }),
+        // private_events has two FKs to locations, so a PostgREST embed is
+        // ambiguous — look location names up separately.
         supabaseAdmin.from('locations').select('id, name'),
       ]);
+      if (locErr) console.warn('[business-metrics] locations fetch failed:', locErr.message);
       const locName = new Map<string, string>((locRows || []).map((l: any) => [l.id, l.name]));
       if (eventsErr) {
         console.warn('[business-metrics] private_events fetch failed:', eventsErr.message);
@@ -475,6 +478,8 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           location: (e.location_id && locName.get(e.location_id)) || null,
         }));
       }
+    } catch (err: any) {
+      console.warn('[business-metrics] upcoming events failed:', err?.message || err);
     }
 
     const celebrations = {
