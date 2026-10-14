@@ -83,7 +83,7 @@ interface Metrics {
     overdueBilling: {
       accounts: number;
       amount: number;
-      list: { accountId: string | null; name: string; nextBillingDate: string; dues: number; paymentFailed: boolean }[];
+      list: { accountId: string | null; name: string; nextBillingDate: string; dues: number; paymentFailedAt: string | null; retryCount: number }[];
     };
   };
   locations: {
@@ -539,6 +539,7 @@ export default function BusinessDashboard() {
                 style={{ marginTop: '0.5rem', cursor: 'pointer' }}
                 role="button"
                 tabIndex={0}
+                aria-expanded={showOverdue}
                 onClick={() => setShowOverdue(v => !v)}
                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowOverdue(v => !v); } }}
               >
@@ -572,7 +573,13 @@ export default function BusinessDashboard() {
                             )}
                           </td>
                           <td>{o.nextBillingDate}</td>
-                          <td>{o.paymentFailed ? 'Payment failed — retrying' : 'Not billed'}</td>
+                          <td>
+                            {!o.paymentFailedAt
+                              ? 'Not billed'
+                              : o.retryCount >= 4
+                                ? `Payment failed ${o.paymentFailedAt} — retries exhausted`
+                                : `Payment failed ${o.paymentFailedAt} — retry ${o.retryCount}/4`}
+                          </td>
                           <td className={styles.textRight}>{fmtCurrencyDec(o.dues)}</td>
                         </tr>
                       ))}

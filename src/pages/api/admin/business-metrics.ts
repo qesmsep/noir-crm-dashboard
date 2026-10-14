@@ -59,6 +59,7 @@ interface AccountRow {
   subscription_cancel_at: string | null;
   membership_plan_id: string | null;
   last_payment_failed_at: string | null;
+  billing_retry_count: number | null;
 }
 
 async function fetchAllLedger(): Promise<LedgerRow[]> {
@@ -108,7 +109,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       fetchAllLedger(),
       supabaseAdmin
         .from('accounts')
-        .select('account_id, monthly_dues, subscription_status, next_billing_date, subscription_cancel_at, membership_plan_id, last_payment_failed_at'),
+        .select('account_id, monthly_dues, subscription_status, next_billing_date, subscription_cancel_at, membership_plan_id, last_payment_failed_at, billing_retry_count'),
       supabaseAdmin
         .from('members')
         .select('member_id, account_id, first_name, last_name, status, join_date'),
@@ -328,7 +329,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // — pure math in core
     // ------------------------------------------------------------------
     const cashflowCore = computeCashflowWindows(payingInputs, today);
-    const failedAt = new Map(payingAccounts.map(a => [a.account_id, a.last_payment_failed_at]));
+    const byId = new Map(payingAccounts.map(a => [a.account_id, a]));
     const cashflow = {
       ...cashflowCore,
       overdueBilling: {
@@ -336,8 +337,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         list: cashflowCore.overdueBilling.list.map(o => ({
           ...o,
           name: (o.accountId && accountName.get(o.accountId)) || 'Unknown',
-          // In the failed-payment retry flow (retry cron owns these) vs. not being billed at all
-          paymentFailed: !!(o.accountId && failedAt.get(o.accountId)),
+          // Failure date + retries let the UI tell "retrying" from a stale flag / exhausted retries
+          paymentFailedAt: (o.accountId && byId.get(o.accountId)?.last_payment_failed_at?.slice(0, 10)) || null,
+          retryCount: (o.accountId && byId.get(o.accountId)?.billing_retry_count) || 0,
         })),
       },
     };
