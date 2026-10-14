@@ -5,10 +5,12 @@ import {
   logPaymentToLedger,
   handlePaymentFailure,
   handleMissingPaymentMethod,
-  addMonths,
-  addYears,
+  nextBillingDateAfterPayment,
 } from '@/lib/billing';
 import { getTodayLocalDate } from '@/lib/utils';
+
+// Overdue accounts older than this are flagged, not auto-charged
+const MAX_CATCH_UP_DAYS = 30;
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +21,7 @@ const supabase = createClient(
  * Monthly Billing Cron Job
  *
  * Runs daily to:
- * 1. Find accounts where next_billing_date = today
+ * 1. Find accounts where next_billing_date is today or earlier
  * 2. Charge their monthly_dues amount
  * 3. Update next_billing_date to +1 month if successful
  * 4. Handle failures and set to past_due
@@ -51,22 +53,48 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const today = getTodayLocalDate();
-    const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
+    // Derive from local `today` (not UTC now) so an evening run can't bill a day early
+    const tomorrow = new Date(Date.parse(today + 'T00:00:00Z') + 86400000).toISOString().split('T')[0];
 
-    // Find accounts due for billing today (using date range to match timestamps)
+    // Catch up overdue accounts, but only within MAX_CATCH_UP_DAYS — older dates
+    // are reported for manual review instead of auto-charged.
+    const catchUpFloor = new Date(Date.parse(today + 'T00:00:00Z') - MAX_CATCH_UP_DAYS * 86400000).toISOString().split('T')[0];
+
+    // Find accounts due for billing today or overdue (a missed run or stale date
+    // would otherwise strand the account forever).
     // Join with subscription_plans to get billing interval and beverage credit
     // Skip accounts with subscription_cancel_at set (defensive - should be canceled already)
+    // Skip accounts in the failed-payment retry flow — retry-failed-payments owns those
     const { data: accountsToBill, error: fetchError } = await supabase
       .from('accounts')
       .select('*, subscription_plans!membership_plan_id(interval, beverage_credit)')
-      .gte('next_billing_date', today + 'T00:00:00')
+      .gte('next_billing_date', catchUpFloor + 'T00:00:00')
       .lt('next_billing_date', tomorrow + 'T00:00:00')
       .eq('subscription_status', 'active')
-      .is('subscription_cancel_at', null);
+      .is('subscription_cancel_at', null)
+      .is('last_payment_failed_at', null);
 
     if (fetchError) {
       console.error('❌ Failed to fetch accounts:', fetchError);
       return res.status(500).json({ error: 'Failed to fetch accounts', details: fetchError });
+    }
+
+    // Report active accounts stranded beyond the catch-up window
+    const { data: staleAccounts } = await supabase
+      .from('accounts')
+      .select('account_id, next_billing_date')
+      .lt('next_billing_date', catchUpFloor + 'T00:00:00')
+      .eq('subscription_status', 'active')
+      .is('subscription_cancel_at', null)
+      .is('last_payment_failed_at', null);
+
+    for (const stale of staleAccounts || []) {
+      console.warn(`   ⚠️  Stale billing date ${stale.next_billing_date} for ${stale.account_id} — needs manual review`);
+      results.errors.push({
+        account_id: stale.account_id,
+        error: `next_billing_date ${stale.next_billing_date} is more than ${MAX_CATCH_UP_DAYS} days overdue; not auto-charged`,
+        type: 'stale_billing_date',
+      });
     }
 
     if (!accountsToBill || accountsToBill.length === 0) {
@@ -98,7 +126,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           await supabase
             .from('accounts')
             .update({
-              next_billing_date: billingInterval === 'year' ? addYears(today, 1) : addMonths(today, 1),
+              next_billing_date: nextBillingDateAfterPayment(account.next_billing_date, billingInterval, today),
               last_billing_attempt: new Date().toISOString(),
             })
             .eq('account_id', account.account_id);
@@ -116,19 +144,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // @ts-ignore - subscription_plans is a joined object, not an array
           const billingInterval = account.subscription_plans?.interval || 'month';
 
-          // Update next_billing_date based on interval and reset retry counter
-          const { error: updateError } = await supabase
+          // Update next_billing_date based on interval and reset retry counter.
+          // Overdue dates are re-selected every run, so a failed write here would
+          // re-charge the member tomorrow — retry once, then flag as critical.
+          const billingUpdate = {
+            next_billing_date: nextBillingDateAfterPayment(account.next_billing_date, billingInterval, today),
+            last_billing_attempt: new Date().toISOString(),
+            billing_retry_count: 0,
+            last_payment_failed_at: null,
+          };
+          let { error: updateError } = await supabase
             .from('accounts')
-            .update({
-              next_billing_date: billingInterval === 'year' ? addYears(today, 1) : addMonths(today, 1),
-              last_billing_attempt: new Date().toISOString(),
-              billing_retry_count: 0,
-              last_payment_failed_at: null,
-            })
+            .update(billingUpdate)
             .eq('account_id', account.account_id);
 
           if (updateError) {
-            console.error('   ⚠️  Failed to update billing date:', updateError);
+            ({ error: updateError } = await supabase
+              .from('accounts')
+              .update(billingUpdate)
+              .eq('account_id', account.account_id));
+          }
+
+          if (updateError) {
+            console.error('\n🚨 CRITICAL: BILLING DATE NOT ADVANCED AFTER CHARGE 🚨');
+            console.error(`   Account: ${account.account_id}`);
+            console.error(`   Error: ${updateError.message}`);
+            console.error('   ACTION REQUIRED: set next_billing_date manually or the account is re-charged next run\n');
+            results.errors.push({
+              account_id: account.account_id,
+              error: `CRITICAL: next_billing_date not advanced after successful charge: ${updateError.message}`,
+              type: 'billing_date_update_failure',
+              payment_intent_id: result.paymentIntent?.id,
+            });
           }
 
           // Log to ledger — catch separately so a ledger failure doesn't

@@ -270,3 +270,18 @@ describe('nextYearlyOccurrence', () => {
     expect(nextYearlyOccurrence('2025-10-15T05:00:00+00:00', '2026-10-09', 28)?.years).toBe(1);
   });
 });
+
+describe('computeCashflowWindows overdue list', () => {
+  it('lists overdue accounts oldest first with their ids', () => {
+    const cf = computeCashflowWindows(
+      [
+        { dues: 150, annual: false, nextBillingDate: '2026-08-20', accountId: 'b' },
+        { dues: 175, annual: false, nextBillingDate: '2026-08-01', accountId: 'a' },
+        { dues: 100, annual: false, nextBillingDate: '2026-08-25', accountId: 'c' },
+      ],
+      '2026-08-22'
+    );
+    expect(cf.overdueBilling.list.map(o => o.accountId)).toEqual(['a', 'b']);
+    expect(cf.overdueBilling.accounts).toBe(2);
+  });
+});

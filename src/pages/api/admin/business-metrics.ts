@@ -59,6 +59,8 @@ interface AccountRow {
   next_billing_date: string | null;
   subscription_cancel_at: string | null;
   membership_plan_id: string | null;
+  last_payment_failed_at: string | null;
+  billing_retry_count: number | null;
 }
 
 async function fetchAllLedger(): Promise<LedgerRow[]> {
@@ -108,7 +110,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       fetchAllLedger(),
       supabaseAdmin
         .from('accounts')
-        .select('account_id, monthly_dues, subscription_status, next_billing_date, subscription_cancel_at, membership_plan_id'),
+        .select('account_id, monthly_dues, subscription_status, next_billing_date, subscription_cancel_at, membership_plan_id, last_payment_failed_at, billing_retry_count'),
       supabaseAdmin
         .from('members')
         .select('member_id, account_id, first_name, last_name, status, join_date, dob'),
@@ -263,6 +265,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       dues: a.monthly_dues,
       annual: isAnnual(a),
       nextBillingDate: a.next_billing_date?.slice(0, 10) || null,
+      accountId: a.account_id,
     }));
     const mrr = computeMrr(payingInputs);
 
@@ -326,7 +329,21 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // 4 — Cash-flow projection (dues billing in the next 7/14/21/30 days)
     // — pure math in core
     // ------------------------------------------------------------------
-    const cashflow = computeCashflowWindows(payingInputs, today);
+    const cashflowCore = computeCashflowWindows(payingInputs, today);
+    const byId = new Map(payingAccounts.map(a => [a.account_id, a]));
+    const cashflow = {
+      ...cashflowCore,
+      overdueBilling: {
+        ...cashflowCore.overdueBilling,
+        list: cashflowCore.overdueBilling.list.map(o => ({
+          ...o,
+          name: (o.accountId && accountName.get(o.accountId)) || 'Unknown',
+          // Failure date + retries let the UI tell "retrying" from a stale flag / exhausted retries
+          paymentFailedAt: (o.accountId && byId.get(o.accountId)?.last_payment_failed_at?.slice(0, 10)) || null,
+          retryCount: (o.accountId && byId.get(o.accountId)?.billing_retry_count) || 0,
+        })),
+      },
+    };
 
     // ------------------------------------------------------------------
     // Balances — money owed to us, and the house-credit liability
