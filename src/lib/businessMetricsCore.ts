@@ -104,6 +104,7 @@ export interface PayingAccountInput {
   dues: number;
   annual: boolean;
   nextBillingDate: string | null; // YYYY-MM-DD
+  accountId?: string;
 }
 
 export interface MrrSummary {
@@ -142,7 +143,11 @@ export function computeMrr(accounts: PayingAccountInput[]): MrrSummary {
 export interface CashflowSummary {
   asOf: string;
   windows: { days: number; amount: number; accounts: number }[];
-  overdueBilling: { accounts: number; amount: number };
+  overdueBilling: {
+    accounts: number;
+    amount: number;
+    list: { accountId: string | null; nextBillingDate: string; dues: number }[];
+  };
 }
 
 /**
@@ -170,15 +175,20 @@ export function computeCashflowWindows(
   });
 
   let overdueAmount = 0;
-  let overdueCount = 0;
+  const overdueList: CashflowSummary['overdueBilling']['list'] = [];
   for (const a of accounts) {
     if (a.nextBillingDate && a.nextBillingDate < today) {
       overdueAmount += a.dues;
-      overdueCount++;
+      overdueList.push({ accountId: a.accountId ?? null, nextBillingDate: a.nextBillingDate, dues: a.dues });
     }
   }
+  overdueList.sort((x, y) => x.nextBillingDate.localeCompare(y.nextBillingDate));
 
-  return { asOf: today, windows, overdueBilling: { accounts: overdueCount, amount: round2(overdueAmount) } };
+  return {
+    asOf: today,
+    windows,
+    overdueBilling: { accounts: overdueList.length, amount: round2(overdueAmount), list: overdueList },
+  };
 }
 
 // ---------------------------------------------------------------------------

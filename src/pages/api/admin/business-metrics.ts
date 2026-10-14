@@ -58,6 +58,7 @@ interface AccountRow {
   next_billing_date: string | null;
   subscription_cancel_at: string | null;
   membership_plan_id: string | null;
+  last_payment_failed_at: string | null;
 }
 
 async function fetchAllLedger(): Promise<LedgerRow[]> {
@@ -107,7 +108,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       fetchAllLedger(),
       supabaseAdmin
         .from('accounts')
-        .select('account_id, monthly_dues, subscription_status, next_billing_date, subscription_cancel_at, membership_plan_id'),
+        .select('account_id, monthly_dues, subscription_status, next_billing_date, subscription_cancel_at, membership_plan_id, last_payment_failed_at'),
       supabaseAdmin
         .from('members')
         .select('member_id, account_id, first_name, last_name, status, join_date'),
@@ -262,6 +263,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       dues: a.monthly_dues,
       annual: isAnnual(a),
       nextBillingDate: a.next_billing_date?.slice(0, 10) || null,
+      accountId: a.account_id,
     }));
     const mrr = computeMrr(payingInputs);
 
@@ -325,7 +327,20 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     // 4 — Cash-flow projection (dues billing in the next 7/14/21/30 days)
     // — pure math in core
     // ------------------------------------------------------------------
-    const cashflow = computeCashflowWindows(payingInputs, today);
+    const cashflowCore = computeCashflowWindows(payingInputs, today);
+    const failedAt = new Map(payingAccounts.map(a => [a.account_id, a.last_payment_failed_at]));
+    const cashflow = {
+      ...cashflowCore,
+      overdueBilling: {
+        ...cashflowCore.overdueBilling,
+        list: cashflowCore.overdueBilling.list.map(o => ({
+          ...o,
+          name: (o.accountId && accountName.get(o.accountId)) || 'Unknown',
+          // In the failed-payment retry flow (retry cron owns these) vs. not being billed at all
+          paymentFailed: !!(o.accountId && failedAt.get(o.accountId)),
+        })),
+      },
+    };
 
     // ------------------------------------------------------------------
     // Balances — money owed to us, and the house-credit liability
