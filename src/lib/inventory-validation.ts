@@ -26,9 +26,11 @@ export const InventoryItemSchema = z.object({
   image_url: z.string().url().optional().or(z.literal('')),
   location_id: z.string().uuid().optional(),
   location_slug: LocationSlugSchema.optional(),
+  /** Create even though a look-alike exists (never overrides the same item at the same bar). */
+  confirm_new: z.boolean().optional(),
 });
 
-export const UpdateInventoryItemSchema = InventoryItemSchema.partial().extend({
+export const UpdateInventoryItemSchema = InventoryItemSchema.omit({ confirm_new: true }).partial().extend({
   id: z.string().uuid()
 });
 

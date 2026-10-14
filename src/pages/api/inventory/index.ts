@@ -109,7 +109,9 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       if (sameHere) {
         return res.status(409).json({ error: 'This item already exists at this location', code: 'ALREADY_EXISTS', existing: sameHere });
       }
-      if (req.body?.confirm_new !== true) {
+      // confirm_new comes from the "it's a different item" checkbox, or from the
+      // Sales review copying a recipe's bottle to another bar by its own name.
+      if (body.confirm_new !== true) {
         const others = (existing || []).filter(i => matchKey(i) !== key);
         const likely = findSimilarItems(candidate, others).filter(m => m.likely);
         if (likely.length > 0) {
@@ -181,6 +183,37 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
       const { id, ...updates } = validation.data;
       if (!id) {
         return res.status(400).json({ error: 'Item ID is required' });
+      }
+
+      // A rename or move must not land on another row for the same item at that bar.
+      if (updates.name !== undefined || updates.brand !== undefined || updates.location_id !== undefined) {
+        const { data: current, error: currentError } = await client
+          .from('inventory_items')
+          .select('id, name, brand, location_id')
+          .eq('id', id)
+          .maybeSingle();
+        if (currentError) {
+          console.error('Error loading inventory item:', currentError);
+          return res.status(500).json({ error: 'Failed to update item' });
+        }
+        if (!current) return res.status(404).json({ error: 'Item not found' });
+        const next = { name: updates.name ?? current.name, brand: updates.brand ?? current.brand ?? '' };
+        const nextLocation = updates.location_id ?? current.location_id;
+        const key = matchKey(next);
+        if (key !== matchKey(current) || nextLocation !== current.location_id) {
+          const { data: here, error: hereError } = await client
+            .from('inventory_items')
+            .select('id, name, brand, location_id')
+            .eq('location_id', nextLocation);
+          if (hereError) {
+            console.error('Error checking for duplicate inventory items:', hereError);
+            return res.status(500).json({ error: 'Failed to update item' });
+          }
+          const clash = (here || []).find(i => i.id !== id && matchKey(i) === key);
+          if (clash) {
+            return res.status(409).json({ error: 'This item already exists at this location', code: 'ALREADY_EXISTS', existing: clash });
+          }
+        }
       }
 
       const { data, error} = await client

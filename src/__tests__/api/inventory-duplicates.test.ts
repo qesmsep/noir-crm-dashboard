@@ -100,6 +100,33 @@ describe('POST /api/inventory duplicate check', () => {
   });
 });
 
+describe('PUT /api/inventory rename check', () => {
+  const rows = [
+    { id: ITEM, name: 'Buffalo Trace', brand: 'Buffalo Trace', location_id: BAR1 },
+    { id: OTHER, name: 'Bourbon', brand: 'Old Forester', location_id: BAR1 },
+  ];
+  beforeEach(() => {
+    mockRespond = op => {
+      if (has(op, 'update')) return { data: { id: OTHER }, error: null };
+      if (has(op, 'maybeSingle')) return { data: rows[1], error: null };
+      return { data: rows, error: null };
+    };
+  });
+  const updated = () => mockOps.some(o => has(o, 'update'));
+
+  it('refuses a rename onto an item already at that bar', async () => {
+    const res = await call(inventoryHandler, 'PUT', { id: OTHER, name: 'Buffalo Trace', brand: 'Buffalo Trace' });
+    expect(res.statusCode).toBe(409);
+    expect(res.body.code).toBe('ALREADY_EXISTS');
+    expect(updated()).toBe(false);
+  });
+
+  it('saves a rename that clashes with nothing, and edits that keep the name', async () => {
+    expect((await call(inventoryHandler, 'PUT', { id: OTHER, name: 'Old Forester 86', brand: 'Old Forester' })).statusCode).toBe(200);
+    expect((await call(inventoryHandler, 'PUT', { id: OTHER, name: 'Bourbon', brand: 'Old Forester', quantity: 3 })).statusCode).toBe(200);
+  });
+});
+
 describe('PUT /api/inventory/recipe-location-pick', () => {
   const STAMP = '2026-10-14T16:00:00.000000+00:00';
   const recipe = {
