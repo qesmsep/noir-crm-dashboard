@@ -3,6 +3,7 @@ import { Camera, Upload, X, Check, Loader2 } from 'lucide-react';
 import type { ScannedItem, InventoryItem, LocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
 import { getAuthHeaders } from '../../lib/client-auth';
+import { findSimilarItems, itemLabel } from '../../lib/inventory/itemNames';
 
 interface InventoryPhotoScannerProps {
   isOpen: boolean;
@@ -243,7 +244,7 @@ export default function InventoryPhotoScanner({
   const removeScannedItem = (index: number) => {
     if (!scanResults) return;
     const item = scanResults[index];
-    const itemName = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+    const itemName = itemLabel(item);
 
     if (confirm(`Remove ${itemName} from the scan?`)) {
       setScanResults(scanResults.filter((_, i) => i !== index));
@@ -254,6 +255,29 @@ export default function InventoryPhotoScanner({
     setMatchingItemIndex(index);
     setMatchSearchQuery('');
     setShowMatchModal(true);
+  };
+
+  const setConfirmedNew = (index: number, confirmed: boolean) => {
+    if (!scanResults) return;
+    const updated = [...scanResults];
+    updated[index] = { ...updated[index], confirmed_new: confirmed };
+    setScanResults(updated);
+  };
+
+  const matchScannedTo = (index: number, inventoryItem: InventoryItem) => {
+    if (!scanResults) return;
+    const updated = [...scanResults];
+    updated[index] = {
+      ...updated[index],
+      matched_inventory_id: inventoryItem.id,
+      matched_inventory_name: inventoryItem.name,
+      matched_inventory_brand: inventoryItem.brand || '',
+      matched_inventory_stock: inventoryItem.quantity,
+      name: inventoryItem.name,
+      brand: inventoryItem.brand || '',
+      create_new: false,
+    };
+    setScanResults(updated);
   };
 
   const selectMatchedItem = (inventoryItem: InventoryItem) => {
@@ -512,6 +536,52 @@ export default function InventoryPhotoScanner({
                             />
                           </div>
                         </div>
+
+                        {item.create_new && (() => {
+                          const alike = findSimilarItems({ name: item.name, brand: item.brand }, existingItems, { limit: 3 });
+                          if (alike.length === 0) return null;
+                          const likely = alike.some(m => m.likely);
+                          return (
+                            <div
+                              role="status"
+                              style={{
+                                marginBottom: '1rem',
+                                border: `1px solid ${likely && !item.confirmed_new ? '#F59E0B' : '#E5E7EB'}`,
+                                background: likely && !item.confirmed_new ? '#FFFBEB' : '#F9FAFB',
+                                borderRadius: 8,
+                                padding: '0.625rem 0.75rem',
+                                fontSize: '0.8125rem',
+                              }}
+                            >
+                              <div style={{ fontWeight: 600, marginBottom: '0.375rem' }}>
+                                {likely ? 'Already in inventory?' : 'Similar items in inventory'}
+                              </div>
+                              {alike.map(m => (
+                                <div key={m.item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.125rem 0' }}>
+                                  <span style={{ flex: 1, minWidth: 0 }}>{itemLabel(m.item)}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => matchScannedTo(idx, m.item)}
+                                    style={{ minHeight: 36, padding: '0 0.75rem', borderRadius: 6, border: '1px solid #D1D5DB', background: 'white', fontWeight: 500 }}
+                                  >
+                                    Use this
+                                  </button>
+                                </div>
+                              ))}
+                              {likely && (
+                                <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.375rem', minHeight: 36 }}>
+                                  <input
+                                    type="checkbox"
+                                    checked={!!item.confirmed_new}
+                                    onChange={e => setConfirmedNew(idx, e.target.checked)}
+                                    style={{ width: 18, height: 18 }}
+                                  />
+                                  It’s a different item — add it as new
+                                </label>
+                              )}
+                            </div>
+                          );
+                        })()}
 
                         {/* Row: Qty | Unit Price | Total */}
                         <div style={{
@@ -886,7 +956,7 @@ export default function InventoryPhotoScanner({
                       }}
                     >
                       <div style={{ fontWeight: 600, fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
-                        {item.brand ? `${item.brand} ` : ''}{item.name}
+                        {itemLabel(item)}
                       </div>
                       <div style={{ fontSize: '0.8125rem', color: '#6B7280' }}>
                         Stock: {item.quantity} {item.unit} · {item.category}

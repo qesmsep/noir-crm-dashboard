@@ -1,18 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Plus, Trash2, Upload, Image as ImageIcon, Archive } from 'lucide-react';
 import InventoryItemModal from './InventoryItemModal';
+import IngredientBarPicks from './IngredientBarPicks';
 import type {
   Recipe,
   RecipeFormData,
   RecipeIngredient,
   InventoryItem,
-  InventoryItemFormData,
   LocationSlug,
   UILocationSlug,
 } from '../../types/inventory';
 import { Z_INDEX } from '../../constants/inventory';
 import { convertToMilliliters } from '../../lib/inventory-utils';
+import { itemLabel } from '../../lib/inventory/itemNames';
+import { indexStock } from '../../lib/toastSalesCore';
 import styles from '../../styles/Inventory.module.css';
 
 interface RecipeDrawerProps {
@@ -24,7 +26,8 @@ interface RecipeDrawerProps {
   editRecipe: Recipe | null;
   inventory: InventoryItem[];
   saving: boolean;
-  onSaveNewItem?: (data: InventoryItemFormData) => Promise<InventoryItem | null>;
+  /** Re-fetch inventory after an item is added from inside the recipe. */
+  onInventoryChanged?: () => Promise<void>;
   currentLocation?: UILocationSlug;
   locations?: Array<{ id: string; slug: LocationSlug; name: string }>;
 }
@@ -63,7 +66,7 @@ export default function RecipeDrawer({
   editRecipe,
   inventory,
   saving,
-  onSaveNewItem,
+  onInventoryChanged,
   currentLocation = 'noirkc',
   locations = [],
 }: RecipeDrawerProps) {
@@ -71,7 +74,6 @@ export default function RecipeDrawer({
   const [isAddItemModalOpen, setIsAddItemModalOpen] = useState(false);
   const [pendingIngredientIndex, setPendingIngredientIndex] = useState<number | null>(null);
   const [pendingBatchIngredientIndex, setPendingBatchIngredientIndex] = useState<number | null>(null);
-  const [savingNewItem, setSavingNewItem] = useState(false);
   const [isBatchModalOpen, setIsBatchModalOpen] = useState(false);
   const [batchIngredients, setBatchIngredients] = useState<RecipeIngredient[]>([]);
   const [batchYield, setBatchYield] = useState<number>(1);
@@ -97,6 +99,8 @@ export default function RecipeDrawer({
 
   // Locations are already real (no synthetic 'all').
   const availableLocations = locations;
+  const stock = useMemo(() => indexStock(inventory.map(i => ({ ...i, brand: i.brand || '' }))), [inventory]);
+  const servedAt = availableLocations.filter(l => (form.location_ids || []).includes(l.id));
 
   // Portal cleanup effect
   useEffect(() => {
@@ -141,7 +145,7 @@ export default function RecipeDrawer({
     editRecipe.ingredients.forEach((ing, idx) => {
       const item = inventory.find(i => i.id === ing.inventory_item_id);
       if (item) {
-        terms[idx] = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+        terms[idx] = itemLabel(item);
       }
     });
     setSearchTerms(terms);
@@ -195,6 +199,18 @@ export default function RecipeDrawer({
     });
   };
 
+  const setIngredientPick = (index: number, locationId: string, value: string | null | 'auto') => {
+    setForm((prev) => {
+      const updated = [...prev.ingredients];
+      const picks = { ...(updated[index].location_items || {}) };
+      if (value === 'auto') delete picks[locationId];
+      else picks[locationId] = value;
+      const { location_items: _old, ...rest } = updated[index];
+      updated[index] = Object.keys(picks).length > 0 ? { ...rest, location_items: picks } : rest;
+      return { ...prev, ingredients: updated };
+    });
+  };
+
   const removeIngredient = (index: number) => {
     setForm((prev) => ({
       ...prev,
@@ -217,7 +233,7 @@ export default function RecipeDrawer({
     if (!searchTerm) return inventory;
     const term = searchTerm.toLowerCase();
     return inventory.filter(item => {
-      const fullName = `${item.brand ? item.brand + ' ' : ''}${item.name}`.toLowerCase();
+      const fullName = itemLabel(item).toLowerCase();
       return fullName.includes(term);
     });
   };
@@ -228,12 +244,14 @@ export default function RecipeDrawer({
   };
 
   const handleSelectInventoryItem = (index: number, item: InventoryItem) => {
-    const displayName = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+    const displayName = itemLabel(item);
 
     setForm((prev) => {
       const updated = [...prev.ingredients];
+      // A different bottle means the per-bar picks were for something else.
+      const { location_items: _picks, ...rest } = updated[index];
       updated[index] = {
-        ...updated[index],
+        ...rest,
         inventory_item_id: item.id,
         name: displayName
       };
@@ -273,33 +291,17 @@ export default function RecipeDrawer({
     setIsAddItemModalOpen(true);
   };
 
-  const handleSaveNewItemComplete = async (data: InventoryItemFormData) => {
-    if (!onSaveNewItem) return;
-
-    setSavingNewItem(true);
-    try {
-      // Save the new item via parent callback
-      const newItem = await onSaveNewItem(data);
-
-      // Auto-populate the ingredient row with the new item
-      if (newItem) {
-        // Check if we're adding from batch mode
-        if (pendingBatchIngredientIndex !== null) {
-          updateBatchIngredient(pendingBatchIngredientIndex, 'inventory_item_id', newItem.id);
-          setPendingBatchIngredientIndex(null);
-        }
-        // Check if we're adding from regular mode
-        else if (pendingIngredientIndex !== null) {
-          updateIngredient(pendingIngredientIndex, 'inventory_item_id', newItem.id);
-          setPendingIngredientIndex(null);
-        }
-      }
-
-      setIsAddItemModalOpen(false);
-    } catch (err) {
-      console.error('Failed to save new item:', err);
-    } finally {
-      setSavingNewItem(false);
+  /** The add-item form saved one row per bar; fill the ingredient with the one for where this recipe is served. */
+  const handleNewItemsCreated = (created: InventoryItem[]) => {
+    if (created.length === 0) return;
+    const preferred = servedAt.map(l => l.id);
+    const item = created.find(i => preferred.includes(i.location_id)) || created[0];
+    if (pendingBatchIngredientIndex !== null) {
+      handleSelectBatchInventoryItem(pendingBatchIngredientIndex, item);
+      setPendingBatchIngredientIndex(null);
+    } else if (pendingIngredientIndex !== null) {
+      handleSelectInventoryItem(pendingIngredientIndex, item);
+      setPendingIngredientIndex(null);
     }
   };
 
@@ -315,7 +317,7 @@ export default function RecipeDrawer({
       form.batch_ingredients.forEach((ing, idx) => {
         const item = inventory.find(i => i.id === ing.inventory_item_id);
         if (item) {
-          terms[idx] = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+          terms[idx] = itemLabel(item);
         }
       });
       setBatchSearchTerms(terms);
@@ -329,7 +331,7 @@ export default function RecipeDrawer({
       form.ingredients.forEach((ing, idx) => {
         const item = inventory.find(i => i.id === ing.inventory_item_id);
         if (item) {
-          terms[idx] = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+          terms[idx] = itemLabel(item);
         }
       });
       setBatchSearchTerms(terms);
@@ -386,7 +388,7 @@ export default function RecipeDrawer({
     perCocktailIngredients.forEach((ing, idx) => {
       const item = inventory.find(i => i.id === ing.inventory_item_id);
       if (item) {
-        terms[idx] = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+        terms[idx] = itemLabel(item);
       }
     });
     setSearchTerms(terms);
@@ -435,7 +437,7 @@ export default function RecipeDrawer({
   };
 
   const handleSelectBatchInventoryItem = (index: number, item: InventoryItem) => {
-    const displayName = `${item.brand ? item.brand + ' ' : ''}${item.name}`;
+    const displayName = itemLabel(item);
 
     setBatchIngredients(prev => {
       const updated = [...prev];
@@ -570,7 +572,7 @@ export default function RecipeDrawer({
             <label className={styles.formLabel}>Ingredients</label>
             <ul className={styles.ingredientsList}>
               {form.ingredients.map((ing, idx) => (
-                <li key={idx} className={styles.ingredientRow}>
+                <li key={idx} className={styles.ingredientRow} style={{ flexWrap: 'wrap' }}>
                   <div className={styles.ingredientSelectWrapper} style={{ position: 'relative' }}>
                     <input
                       type="text"
@@ -608,7 +610,7 @@ export default function RecipeDrawer({
                             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
                             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                           >
-                            {item.brand ? `${item.brand} ` : ''}{item.name}
+                            {itemLabel(item)}
                           </div>
                         ))}
                         {getFilteredInventory(searchTerms[idx] || '').length === 0 && (
@@ -662,6 +664,15 @@ export default function RecipeDrawer({
                   >
                     <Trash2 size={15} />
                   </button>
+                  {ing.inventory_item_id && servedAt.length > 0 && (
+                    <IngredientBarPicks
+                      ingredient={ing}
+                      locations={servedAt}
+                      inventory={inventory}
+                      stock={stock}
+                      onChange={(locationId, value) => setIngredientPick(idx, locationId, value)}
+                    />
+                  )}
                 </li>
               ))}
             </ul>
@@ -1003,7 +1014,7 @@ export default function RecipeDrawer({
                                 onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#F3F4F6'}
                                 onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                               >
-                                {item.brand ? `${item.brand} ` : ''}{item.name}
+                                {itemLabel(item)}
                               </div>
                             ))}
                             {getFilteredInventory(batchSearchTerms[idx] || '').length === 0 && (
@@ -1099,10 +1110,20 @@ export default function RecipeDrawer({
           setPendingIngredientIndex(null);
           setPendingBatchIngredientIndex(null);
         }}
-        onSave={handleSaveNewItemComplete}
+        onSave={async () => undefined}
+        onCreated={handleNewItemsCreated}
+        existingAction={{
+          label: 'Use it',
+          run: item => {
+            handleNewItemsCreated([item]);
+            setIsAddItemModalOpen(false);
+          },
+        }}
+        onRefresh={onInventoryChanged}
         editItem={null}
-        saving={savingNewItem}
+        saving={false}
         currentLocation={currentLocation}
+        locations={availableLocations}
       />
     </>
   );

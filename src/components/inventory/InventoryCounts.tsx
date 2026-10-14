@@ -4,6 +4,7 @@ import type { UILocationSlug } from '../../types/inventory';
 import styles from '../../styles/Inventory.module.css';
 import t from '../../styles/ToastInventory.module.css';
 import { getAuthHeaders } from '../../lib/client-auth';
+import { itemLabel } from '../../lib/inventory/itemNames';
 
 // ---------------------------------------------------------------------------
 // Types (mirror /api/inventory/counts)
@@ -329,8 +330,7 @@ function CountDetail({ countId, onBack, onCompleted }: { countId: string; onBack
                 <div key={l.item_id} className={t.row}>
                   <div className={t.rowMain}>
                     <div className={t.rowTitle}>
-                      {l.inventory_items?.brand ? `${l.inventory_items.brand} ` : ''}
-                      {l.inventory_items?.name || 'Deleted item'}
+                      {l.inventory_items ? itemLabel(l.inventory_items) : 'Deleted item'}
                     </div>
                     <div className={t.rowSub}>
                       App {fmtQty(l.system_qty_at_close)} · shelf {fmtQty(l.counted_qty)} {l.inventory_items?.unit}
@@ -370,8 +370,7 @@ function CountDetail({ countId, onBack, onCompleted }: { countId: string; onBack
                     <div key={l.item_id} className={t.row}>
                       <div className={t.rowMain}>
                         <div className={t.rowTitle}>
-                          {l.inventory_items?.brand ? `${l.inventory_items.brand} ` : ''}
-                          {l.inventory_items?.name}
+                          {l.inventory_items ? itemLabel(l.inventory_items) : ''}
                         </div>
                         <div className={t.rowSub}>
                           App shows {fmtQty(l.system_qty_at_start)} {l.inventory_items?.unit}

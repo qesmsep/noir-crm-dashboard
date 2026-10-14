@@ -5,6 +5,8 @@ import styles from '../../styles/Inventory.module.css';
 import t from '../../styles/ToastInventory.module.css';
 import { getAuthHeaders } from '../../lib/client-auth';
 import ManualSalesUpload from './ManualSalesUpload';
+import IngredientGapFixer, { IngredientGapView } from './IngredientGapFixer';
+import { itemLabel } from '../../lib/inventory/itemNames';
 
 // ---------------------------------------------------------------------------
 // Types (mirror /api/inventory/toast/*)
@@ -58,6 +60,7 @@ interface NeedsAttention {
   menu: string;
   qty: number;
   reasons: string[];
+  gaps?: IngredientGapView[];
 }
 
 interface DayDetail {
@@ -246,8 +249,7 @@ function LinkEditor({
                   <option value="">Select an item…</option>
                   {itemChoices.map(i => (
                     <option key={i.id} value={i.id}>
-                      {i.brand ? `${i.brand} ` : ''}
-                      {i.name} — {locName(i.location_id)}
+                      {itemLabel(i)} — {locName(i.location_id)}
                     </option>
                   ))}
                 </select>
@@ -311,6 +313,7 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
   const [applying, setApplying] = useState(false);
 
   const [linking, setLinking] = useState<ToastItemRow | null>(null);
+  const [fixingGap, setFixingGap] = useState<IngredientGapView | null>(null);
   const [showAllItems, setShowAllItems] = useState(false);
   const [editingAllowance, setEditingAllowance] = useState(false);
   const [pouredDraft, setPouredDraft] = useState('');
@@ -456,7 +459,7 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
   const recipeName = (id: string | null) => recipes.find(r => r.id === id)?.name || 'missing recipe';
   const itemName = (id: string | null) => {
     const i = inventory.find(x => x.id === id);
-    return i ? `${i.brand ? `${i.brand} ` : ''}${i.name}` : 'missing item';
+    return i ? itemLabel(i) : 'missing item';
   };
   const linkLabel = (l: ToastLink) =>
     l.link_type === 'ignore'
@@ -667,9 +670,20 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
                               {r}
                             </div>
                           ))}
+                          {(n.gaps || []).map(g => (
+                            <button
+                              key={`${g.recipe_id}|${g.ingredient_index}|${g.location_id}`}
+                              type="button"
+                              className={`${styles.btnSecondary} ${styles.btnSmall}`}
+                              style={{ minHeight: 40, marginTop: '0.5rem', marginRight: '0.5rem' }}
+                              onClick={() => setFixingGap(g)}
+                            >
+                              Fix {g.ingredient_name} at {g.location_name}
+                            </button>
+                          ))}
                         </div>
                         <button className={`${styles.btnSecondary} ${styles.btnSmall}`} onClick={() => openLinkFor(n)} style={{ minHeight: 40 }}>
-                          Fix
+                          {n.gaps?.length ? 'Link' : 'Fix'}
                         </button>
                       </div>
                     ))}
@@ -690,10 +704,7 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
                       {rows.map(r => (
                         <div key={r.item_id} className={t.row}>
                           <div className={t.rowMain}>
-                            <div className={t.rowTitle}>
-                              {r.brand ? `${r.brand} ` : ''}
-                              {r.name}
-                            </div>
+                            <div className={t.rowTitle}>{itemLabel(r)}</div>
                             <div className={t.rowSub}>
                               {fmtQty(r.before)} → <span className={r.after < 0 ? t.negative : undefined}>{fmtQty(r.after)}</span> {r.unit}
                             </div>
@@ -719,6 +730,21 @@ export default function ToastSalesPanel({ inventory, locations, onApplied }: Pro
           </div>
         )}
       </div>
+
+      {fixingGap && (
+        <IngredientGapFixer
+          gap={fixingGap}
+          inventory={inventory}
+          onClose={() => setFixingGap(null)}
+          onSaved={async message => {
+            setFixingGap(null);
+            setNotice(message);
+            onApplied(); // inventory may have a new row
+            await load();
+            if (openDate) await loadDay(openDate);
+          }}
+        />
+      )}
 
       {linking && (
         <LinkEditor target={linking} recipes={recipes} inventory={inventory} locations={locations} onClose={() => setLinking(null)} onSaved={onLinkSaved} />

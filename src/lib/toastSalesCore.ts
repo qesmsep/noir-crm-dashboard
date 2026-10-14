@@ -6,6 +6,7 @@
  * The SFTP pull and database writes live in src/lib/toast/.
  */
 import Papa from 'papaparse';
+import { itemLabel, looseText, matchKey } from './inventory/itemNames';
 
 // ---------------------------------------------------------------------------
 // Toast export parsing
@@ -253,6 +254,13 @@ export interface RecipeIngredientRef {
   name?: string;
   quantity: number;
   unit: string;
+  /**
+   * The bottle this ingredient comes out of at each bar, by location id, when
+   * it isn't simply the same product as `inventory_item_id`. `null` means the
+   * ingredient isn't tracked at that bar: the drink deducts everything else.
+   * A bar not listed here finds its bottle automatically.
+   */
+  location_items?: Record<string, string | null>;
 }
 
 export interface RecipeRef {
@@ -294,6 +302,20 @@ export interface ResolvedLine {
   deductions: Deduction[]; // empty for ignored items
 }
 
+/** A recipe ingredient with no bottle at the bar a drink was sold at — fixable from the review screen. */
+export interface IngredientGap {
+  recipe_id: string;
+  recipe_name: string;
+  ingredient_index: number;
+  ingredient_name: string;
+  inventory_item_id: string;
+  location_id: string;
+  location_name: string;
+  /** missing: nothing like it at that bar; ambiguous: more than one bottle could be it. */
+  kind: 'missing' | 'ambiguous';
+  candidate_ids: string[];
+}
+
 export interface UnresolvedGroup {
   toast_item_id: string;
   menu_item: string;
@@ -301,6 +323,7 @@ export interface UnresolvedGroup {
   menu: string;
   qty: number;
   reasons: string[];
+  gaps: IngredientGap[];
 }
 
 export interface DeductionPlan {
@@ -314,14 +337,53 @@ function normKey(s: string): string {
   return s.trim().toLowerCase();
 }
 
-/** The same product stocked at the sale's location (inventory is per location; name+brand is unique there). */
-function atLocation(
-  item: StockItem,
-  locationId: string,
-  byNameBrandLoc: Map<string, StockItem>
-): StockItem | null {
-  if (item.location_id === locationId) return item;
-  return byNameBrandLoc.get(`${normKey(item.name)}|${normKey(item.brand)}|${locationId}`) || null;
+export interface StockIndex {
+  items: Map<string, StockItem>;
+  byNameBrandLoc: Map<string, StockItem>;
+  byLabelLoc: Map<string, StockItem[]>;
+  byNameLoc: Map<string, StockItem[]>;
+}
+
+function push<K, V>(m: Map<K, V[]>, k: K, v: V) {
+  const list = m.get(k);
+  if (list) list.push(v);
+  else m.set(k, [v]);
+}
+
+export function indexStock(items: StockItem[]): StockIndex {
+  const idx: StockIndex = {
+    items: new Map(items.map(i => [i.id, i])),
+    byNameBrandLoc: new Map(items.map(i => [`${normKey(i.name)}|${normKey(i.brand)}|${i.location_id}`, i])),
+    byLabelLoc: new Map(),
+    byNameLoc: new Map(),
+  };
+  for (const i of items) {
+    push(idx.byLabelLoc, `${matchKey(i)}|${i.location_id}`, i);
+    push(idx.byNameLoc, `${looseText(i.name)}|${i.location_id}`, i);
+  }
+  return idx;
+}
+
+export type LocalMatch = { item: StockItem } | { missing: true } | { ambiguous: StockItem[] };
+
+/**
+ * The same product stocked at another bar. Tried in order: the exact name and
+ * brand; the same label (so "Buffalo Trace" with no brand finds "Buffalo
+ * Trace" / "Buffalo Trace"); the same name with either brand. Two candidates
+ * are settled by bottle size; any more doubt is "ambiguous", never a guess.
+ */
+export function findAtLocation(item: StockItem, locationId: string, idx: StockIndex): LocalMatch {
+  if (item.location_id === locationId) return { item };
+  const exact = idx.byNameBrandLoc.get(`${normKey(item.name)}|${normKey(item.brand)}|${locationId}`);
+  if (exact) return { item: exact };
+  for (const list of [idx.byLabelLoc.get(`${matchKey(item)}|${locationId}`), idx.byNameLoc.get(`${looseText(item.name)}|${locationId}`)]) {
+    if (!list || list.length === 0) continue;
+    if (list.length === 1) return { item: list[0] };
+    const sameSize = list.filter(i => i.volume_ml === item.volume_ml);
+    if (sameSize.length === 1) return { item: sameSize[0] };
+    return { ambiguous: list };
+  }
+  return { missing: true };
 }
 
 /** Per-serving deductions for one Toast item at one location, or the reasons it can't be worked out. */
@@ -332,39 +394,51 @@ function servingDeductions(
   menuGroup: string,
   ctx: {
     recipes: Map<string, RecipeRef>;
-    items: Map<string, StockItem>;
-    byNameBrandLoc: Map<string, StockItem>;
+    stock: StockIndex;
     allowance: LossAllowance;
   }
-): { deductions: Deduction[] } | { reasons: string[] } {
-  if (!link) return { reasons: ['Not linked to a recipe or bottle yet'] };
+): { deductions: Deduction[] } | { reasons: string[]; gaps: IngredientGap[] } {
+  if (!link) return { reasons: ['Not linked to a recipe or bottle yet'], gaps: [] };
   if (link.link_type === 'ignore') return { deductions: [] };
 
   const withAllowance = (units: number, poured: boolean) =>
     units * (1 + (poured ? ctx.allowance.poured_pct : ctx.allowance.packaged_pct) / 100);
 
-  const resolveOne = (
-    itemId: string | null | undefined,
-    amount: number | null | undefined,
-    unit: string | null | undefined,
-    label: string
-  ): Deduction | string => {
-    const linked = itemId ? ctx.items.get(itemId) : undefined;
-    if (!linked) return `${label}: the linked bottle no longer exists`;
-    const local = atLocation(linked, locationId, ctx.byNameBrandLoc);
-    if (!local) return `${linked.name} isn't stocked at ${locationName}`;
-    const conv = toStockUnits(Number(amount), String(unit || ''), local);
-    if ('error' in conv) return `${label}: ${conv.error}`;
-    return { item_id: local.id, units: withAllowance(conv.units, conv.poured) };
-  };
-
   const reasons: string[] = [];
+  const gaps: IngredientGap[] = [];
   const deductions: Deduction[] = [];
 
+  const deduct = (local: StockItem, amount: number | null | undefined, unit: string | null | undefined, label: string) => {
+    const conv = toStockUnits(Number(amount), String(unit || ''), local);
+    if ('error' in conv) reasons.push(`${label}: ${conv.error}`);
+    else deductions.push({ item_id: local.id, units: withAllowance(conv.units, conv.poured) });
+  };
+
+  /** The bottle at this bar, or why there isn't one (and, for a recipe ingredient, the gap to fix). */
+  const localFor = (
+    linked: StockItem,
+    gap?: Omit<IngredientGap, 'kind' | 'candidate_ids' | 'location_id' | 'location_name'>
+  ): StockItem | null => {
+    const found = findAtLocation(linked, locationId, ctx.stock);
+    if ('item' in found) return found.item;
+    const name = itemLabel(linked);
+    if ('ambiguous' in found) {
+      reasons.push(`${name} matches more than one bottle at ${locationName} — pick one`);
+      if (gap) gaps.push({ ...gap, kind: 'ambiguous', candidate_ids: found.ambiguous.map(i => i.id), location_id: locationId, location_name: locationName });
+    } else {
+      reasons.push(`${name} isn't stocked at ${locationName}`);
+      if (gap) gaps.push({ ...gap, kind: 'missing', candidate_ids: [], location_id: locationId, location_name: locationName });
+    }
+    return null;
+  };
+
   if (link.link_type === 'item') {
-    const d = resolveOne(link.inventory_item_id, link.amount, link.amount_unit, 'Pour');
-    if (typeof d === 'string') reasons.push(d);
-    else deductions.push(d);
+    const linked = link.inventory_item_id ? ctx.stock.items.get(link.inventory_item_id) : undefined;
+    if (!linked) reasons.push('Pour: the linked bottle no longer exists');
+    else {
+      const local = localFor(linked);
+      if (local) deduct(local, link.amount, link.amount_unit, 'Pour');
+    }
   } else {
     const recipe = link.recipe_id ? ctx.recipes.get(link.recipe_id) : undefined;
     if (!recipe) {
@@ -376,24 +450,43 @@ function servingDeductions(
     } else {
       if (
         needsSpirit(recipe.category, menuGroup) &&
-        !recipe.ingredients.some(i => ctx.items.get(i.inventory_item_id)?.category === 'spirits')
+        !recipe.ingredients.some(i => ctx.stock.items.get(i.inventory_item_id)?.category === 'spirits')
       ) {
         reasons.push(`Recipe "${recipe.name}" lists no spirit`);
       }
-      for (const ing of recipe.ingredients) {
+      recipe.ingredients.forEach((ing, index) => {
         const label = `Recipe "${recipe.name}" — ${ing.name || 'ingredient'}`;
         if (!ing.inventory_item_id) {
           reasons.push(`${label} isn't linked to a bottle`);
-          continue;
+          return;
         }
-        const d = resolveOne(ing.inventory_item_id, ing.quantity, ing.unit, label);
-        if (typeof d === 'string') reasons.push(d);
-        else deductions.push(d);
-      }
+        const picks = ing.location_items || {};
+        if (Object.prototype.hasOwnProperty.call(picks, locationId)) {
+          const picked = picks[locationId];
+          if (picked === null) return; // not tracked at this bar
+          const item = ctx.stock.items.get(picked);
+          if (!item || item.location_id !== locationId) reasons.push(`${label}: the bottle picked for ${locationName} no longer exists`);
+          else deduct(item, ing.quantity, ing.unit, label);
+          return;
+        }
+        const linked = ctx.stock.items.get(ing.inventory_item_id);
+        if (!linked) {
+          reasons.push(`${label}: the linked bottle no longer exists`);
+          return;
+        }
+        const local = localFor(linked, {
+          recipe_id: recipe.id,
+          recipe_name: recipe.name,
+          ingredient_index: index,
+          ingredient_name: ing.name || itemLabel(linked),
+          inventory_item_id: ing.inventory_item_id,
+        });
+        if (local) deduct(local, ing.quantity, ing.unit, label);
+      });
     }
   }
 
-  return reasons.length > 0 ? { reasons } : { deductions };
+  return reasons.length > 0 ? { reasons, gaps } : { deductions };
 }
 
 /**
@@ -411,14 +504,13 @@ export function buildDeductionPlan(
 ): DeductionPlan {
   const ctx = {
     recipes: new Map(recipes.map(r => [r.id, r])),
-    items: new Map(items.map(i => [i.id, i])),
-    byNameBrandLoc: new Map(items.map(i => [`${normKey(i.name)}|${normKey(i.brand)}|${i.location_id}`, i])),
+    stock: indexStock(items),
     allowance,
   };
   const linkMap = new Map(links.map(l => [l.toast_item_id, l]));
   const locBySlug = new Map(locations.map(l => [l.slug, l]));
 
-  const perServing = new Map<string, { deductions: Deduction[] } | { reasons: string[] }>();
+  const perServing = new Map<string, { deductions: Deduction[] } | { reasons: string[]; gaps: IngredientGap[] }>();
   const resolved: ResolvedLine[] = [];
   const unresolvedMap = new Map<string, UnresolvedGroup>();
   const totals = new Map<string, number>();
@@ -433,7 +525,7 @@ export function buildDeductionPlan(
     if (!result) {
       result = loc
         ? servingDeductions(linkMap.get(line.toast_item_id), loc.id, loc.name, line.menu_group, ctx)
-        : { reasons: [`No "${slug}" location set up in the app`] };
+        : { reasons: [`No "${slug}" location set up in the app`], gaps: [] };
       perServing.set(key, result);
     }
 
@@ -445,6 +537,7 @@ export function buildDeductionPlan(
         menu: line.menu,
         qty: 0,
         reasons: result.reasons,
+        gaps: result.gaps,
       };
       g.qty += line.qty;
       unresolvedMap.set(key, g);

@@ -84,6 +84,25 @@ export function validateIngredients(
   );
 }
 
+/** Every inventory item an ingredient list refers to: each ingredient's bottle plus any bottle picked for a bar. */
+export function ingredientItemIds(ingredients: RecipeIngredient[]): string[] {
+  const ids = new Set<string>();
+  for (const ing of ingredients) {
+    if (ing.inventory_item_id) ids.add(ing.inventory_item_id);
+    for (const picked of Object.values(ing.location_items || {})) if (picked) ids.add(picked);
+  }
+  return Array.from(ids);
+}
+
+/** A bottle picked for a bar must exist and be stocked at that bar. `null` (not tracked there) is always fine. */
+export function validateLocationPicks(ingredients: RecipeIngredient[], itemLocation: Map<string, string>): boolean {
+  return ingredients.every(ing =>
+    Object.entries(ing.location_items || {}).every(
+      ([locationId, picked]) => picked === null || itemLocation.get(picked) === locationId
+    )
+  );
+}
+
 /**
  * Sanitizes user input by trimming and limiting length
  * @param input - User input string

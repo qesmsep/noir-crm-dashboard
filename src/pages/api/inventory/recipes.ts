@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { withRateLimitAndAuth, type AuthenticatedRequest } from '../../../lib/api-auth';
-import { safeJSONParse, calculateIngredientCost, sanitizeInput, validateIngredients } from '../../../lib/inventory-utils';
+import { safeJSONParse, calculateIngredientCost, sanitizeInput, validateIngredients, ingredientItemIds, validateLocationPicks } from '../../../lib/inventory-utils';
 import { MAX_RECIPE_NAME_LENGTH, MAX_DESCRIPTION_LENGTH } from '../../../constants/inventory';
 import type { DBRecipe, DBInventoryItem, RecipeIngredient } from '../../../types/inventory';
 
@@ -153,20 +153,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const sanitizedDescription = sanitizeInput(body.description, MAX_DESCRIPTION_LENGTH);
 
       // Validate ingredients exist
-      const ingredientIds = body.ingredients.map((ing: RecipeIngredient) => ing.inventory_item_id);
       const { data: itemCheck } = await client
         .from('inventory_items')
-        .select('id')
-        .in('id', ingredientIds);
+        .select('id, location_id')
+        .in('id', ingredientItemIds(body.ingredients));
 
-      const validItemIds = new Set((itemCheck || []).map((item: { id: string }) => item.id));
-      if (!validateIngredients(body.ingredients, validItemIds)) {
+      const itemLocation = new Map((itemCheck || []).map((item: { id: string; location_id: string }) => [item.id, item.location_id]));
+      if (!validateIngredients(body.ingredients, new Set(itemLocation.keys()))) {
         return errorResponse(
           res,
           400,
           'One or more ingredients reference invalid inventory items',
           'INVALID_INGREDIENTS'
         );
+      }
+      if (!validateLocationPicks(body.ingredients, itemLocation)) {
+        return errorResponse(res, 400, 'A bottle picked for a location is not stocked at that location', 'INVALID_INGREDIENTS');
       }
 
       // Calculate cost and margin
@@ -234,20 +236,22 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           return errorResponse(res, 400, 'Recipe must have at least one ingredient', 'VALIDATION_ERROR');
         }
 
-        const ingredientIds = body.ingredients.map((ing: RecipeIngredient) => ing.inventory_item_id);
         const { data: itemCheck } = await client
           .from('inventory_items')
-          .select('id')
-          .in('id', ingredientIds);
+          .select('id, location_id')
+          .in('id', ingredientItemIds(body.ingredients));
 
-        const validItemIds = new Set((itemCheck || []).map((item: { id: string }) => item.id));
-        if (!validateIngredients(body.ingredients, validItemIds)) {
+        const itemLocation = new Map((itemCheck || []).map((item: { id: string; location_id: string }) => [item.id, item.location_id]));
+        if (!validateIngredients(body.ingredients, new Set(itemLocation.keys()))) {
           return errorResponse(
             res,
             400,
             'One or more ingredients reference invalid inventory items',
             'INVALID_INGREDIENTS'
           );
+        }
+        if (!validateLocationPicks(body.ingredients, itemLocation)) {
+          return errorResponse(res, 400, 'A bottle picked for a location is not stocked at that location', 'INVALID_INGREDIENTS');
         }
       }
 

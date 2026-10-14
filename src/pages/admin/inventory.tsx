@@ -375,6 +375,7 @@ export default function InventoryPage() {
                 par_level: 0,
                 notes: 'Added from receipt scan',
                 location_slug: locationSlug,
+                confirm_new: !!scanned.confirmed_new,
               }),
             });
 
@@ -690,6 +691,7 @@ export default function InventoryPage() {
           await fetchAllInventory();
         }}
         locations={locationsData}
+        existingAction={{ label: 'Open it', run: item => setEditingItem(item) }}
       />
 
       <InventoryPhotoScanner
@@ -729,7 +731,10 @@ export default function InventoryPage() {
         editRecipe={editingRecipe}
         inventory={allInventory}  // Use all inventory for recipe creation
         saving={savingRecipe}
-        onSaveNewItem={handleSaveItem}
+        onInventoryChanged={async () => {
+          await fetchInventory();
+          await fetchAllInventory();
+        }}
         currentLocation={currentLocation}
         locations={locationsData.map(loc => ({
           id: loc.id,

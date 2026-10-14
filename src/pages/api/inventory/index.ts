@@ -3,6 +3,7 @@ import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import { InventoryItemSchema, UpdateInventoryItemSchema, validateRequest, formatZodErrors } from '../../../lib/inventory-validation';
 import { monitoring } from '../../../lib/monitoring';
+import { findSimilarItems, matchKey } from '../../../lib/inventory/itemNames';
 
 /**
  * Inventory Items API with Multi-Location Support
@@ -90,6 +91,34 @@ async function inventoryHandler(req: AuthenticatedRequest, res: NextApiResponse)
 
       if (!locationId) {
         return res.status(400).json({ error: 'Location is required' });
+      }
+
+      // Don't create a second row for something already in inventory. The same
+      // product at another bar is how an item is linked across bars, so that's
+      // fine; anything else that looks like a duplicate needs confirm_new.
+      const { data: existing, error: existingError } = await client
+        .from('inventory_items')
+        .select('id, name, brand, location_id');
+      if (existingError) {
+        console.error('Error checking for duplicate inventory items:', existingError);
+        return res.status(500).json({ error: 'Failed to create item' });
+      }
+      const candidate = { name: body.name, brand: body.brand || '' };
+      const key = matchKey(candidate);
+      const sameHere = (existing || []).find(i => i.location_id === locationId && matchKey(i) === key);
+      if (sameHere) {
+        return res.status(409).json({ error: 'This item already exists at this location', code: 'ALREADY_EXISTS', existing: sameHere });
+      }
+      if (req.body?.confirm_new !== true) {
+        const others = (existing || []).filter(i => matchKey(i) !== key);
+        const likely = findSimilarItems(candidate, others).filter(m => m.likely);
+        if (likely.length > 0) {
+          return res.status(409).json({
+            error: 'Looks like this is already in inventory',
+            code: 'SIMILAR_ITEMS',
+            similar: likely.map(m => ({ ...m.item, score: m.score })),
+          });
+        }
       }
 
       const { data, error } = await client

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Trash2, X, MapPin } from 'lucide-react';
 import type {
@@ -11,6 +11,7 @@ import type {
 import { Z_INDEX, OZ_TO_ML, DEFAULT_SUBCATEGORY_OPTIONS as DEFAULTS } from '../../constants/inventory';
 import styles from '../../styles/Inventory.module.css';
 import { getAuthHeaders } from '../../lib/client-auth';
+import { findSimilarItems, itemLabel, matchKey } from '../../lib/inventory/itemNames';
 
 interface InventoryItemModalProps {
   isOpen: boolean;
@@ -22,6 +23,10 @@ interface InventoryItemModalProps {
   currentLocation: UILocationSlug;
   locations?: Array<{ id: string; slug: string; name: string }>;
   onRefresh?: () => Promise<void>;
+  /** Called with the rows created when adding (one per location), before the modal closes. */
+  onCreated?: (items: InventoryItem[]) => void;
+  /** What to offer next to a look-alike that's already in inventory ("Open it", "Use it"). */
+  existingAction?: { label: string; run: (item: InventoryItem) => void };
 }
 
 // Location data interfaces
@@ -62,6 +67,8 @@ export default function InventoryItemModal({
   currentLocation,
   locations = [],
   onRefresh,
+  onCreated,
+  existingAction,
 }: InventoryItemModalProps) {
   const [form, setForm] = useState<InventoryItemFormData>(EMPTY_FORM);
   const [locationQuantities, setLocationQuantities] = useState<LocationQuantities>({});
@@ -76,6 +83,43 @@ export default function InventoryItemModal({
   const [volumeOzInput, setVolumeOzInput] = useState<string>('');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadingLocations, setLoadingLocations] = useState(false);
+  const [allItems, setAllItems] = useState<InventoryItem[]>([]);
+  const [confirmedNew, setConfirmedNew] = useState(false);
+
+  // Every item at every bar, to catch a duplicate before it's created.
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/inventory', { headers: await getAuthHeaders() });
+        if (res.ok && !cancelled) setAllItems(((await res.json()).data || []) as InventoryItem[]);
+      } catch {
+        // The check is a convenience; the server refuses likely duplicates anyway.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
+    setConfirmedNew(false);
+  }, [form.name, form.brand, isOpen]);
+
+  // Look-alikes, leaving out this product's own rows (the same item at each bar).
+  const similar = useMemo(() => {
+    if ((form.name || '').trim().length < 3) return [];
+    const own = editItem ? matchKey(editItem) : null;
+    const others = allItems.filter(i => (own ? matchKey(i) !== own : true) && i.id !== editItem?.id);
+    return findSimilarItems({ name: form.name, brand: form.brand }, others);
+  }, [form.name, form.brand, allItems, editItem]);
+  const likelyDuplicate = !editItem && similar.some(m => m.likely) && !confirmedNew;
+  const barsWith = (item: InventoryItem) => {
+    const key = matchKey(item);
+    const ids = new Set(allItems.filter(i => matchKey(i) === key).map(i => i.location_id));
+    return locations.filter(l => ids.has(l.id)).map(l => l.name).join(', ');
+  };
 
   // Initialize location data
   useEffect(() => {
@@ -272,6 +316,11 @@ export default function InventoryItemModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (likelyDuplicate) {
+      alert(`“${itemLabel(similar[0].item)}” is already in inventory. Use that one, or tap “It’s a different item” to add this anyway.`);
+      return;
+    }
+
     // Save items only to locations where availability is checked
     const locationsToSave = Object.entries(locationAvailability)
       .filter(([_, isAvailable]) => isAvailable)
@@ -284,6 +333,7 @@ export default function InventoryItemModal({
 
     const failures: string[] = [];
     const successes: string[] = [];
+    const created: InventoryItem[] = [];
 
     try {
       const headers = await getAuthHeaders();
@@ -330,13 +380,16 @@ export default function InventoryItemModal({
                 quantity,
                 par_level: parLevel,
                 location_id: locationId,
+                confirm_new: true, // checked above, before anything was created
               }),
             });
 
             if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(errorText || 'Create failed');
+              const body = await response.json().catch(() => ({}));
+              throw new Error(body.error || 'Create failed');
             }
+            const body = await response.json().catch(() => ({}));
+            if (body.data) created.push(body.data as InventoryItem);
             successes.push(locationName);
           }
         } catch (err) {
@@ -380,6 +433,7 @@ export default function InventoryItemModal({
       } else {
         await onSave(form);
       }
+      if (created.length > 0) onCreated?.(created);
 
       // Show result to user
       if (failures.length > 0 && successes.length === 0) {
@@ -525,6 +579,49 @@ export default function InventoryItemModal({
                     />
                   </div>
                 </div>
+
+                {similar.length > 0 && (
+                  <div
+                    role="status"
+                    style={{
+                      border: `1px solid ${likelyDuplicate ? '#F59E0B' : '#E5E2DC'}`,
+                      background: likelyDuplicate ? '#FFFBEB' : '#F7F6F2',
+                      borderRadius: 10,
+                      padding: '0.75rem',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, marginBottom: '0.5rem', color: '#1F1F1F' }}>
+                      {editItem ? 'Similar items already in inventory' : likelyDuplicate ? 'This looks like it’s already in inventory' : 'Similar items already in inventory'}
+                    </div>
+                    {similar.map(m => (
+                      <div key={m.item.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.25rem 0' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ color: '#1F1F1F' }}>{itemLabel(m.item)}</div>
+                          <div style={{ color: '#6B6760', fontSize: '0.75rem' }}>
+                            {barsWith(m.item) || 'No bar'} · {m.item.category}
+                            {m.item.volume_ml ? ` · ${m.item.volume_ml} ml` : ''}
+                          </div>
+                        </div>
+                        {existingAction && (
+                          <button
+                            type="button"
+                            onClick={() => existingAction.run(m.item)}
+                            style={{ minHeight: 40, padding: '0 0.875rem', borderRadius: 8, border: '1px solid #D1D5DB', background: 'white', fontWeight: 500 }}
+                          >
+                            {existingAction.label}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {!editItem && similar.some(m => m.likely) && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.5rem', minHeight: 40, color: '#1F1F1F' }}>
+                        <input type="checkbox" checked={confirmedNew} onChange={e => setConfirmedNew(e.target.checked)} style={{ width: 18, height: 18 }} />
+                        It’s a different item — add it anyway
+                      </label>
+                    )}
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
