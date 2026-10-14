@@ -269,6 +269,61 @@
 }
 
 /* ============================================
+   UPCOMING BIRTHDAYS / ANNIVERSARIES
+   ============================================ */
+.dateList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.dateRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  font-size: 0.8125rem;
+}
+
+.dateRow:last-child {
+  border-bottom: none;
+}
+
+.dateRowName {
+  color: #1d1d1f;
+  min-width: 0;
+}
+
+.dateRowName a {
+  color: #1d1d1f;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.dateRowName a:hover {
+  color: #A59480;
+}
+
+.dateRowDetail {
+  color: #86868b;
+}
+
+.dateRowWhen,
+.dateRowWhenSoon {
+  white-space: nowrap;
+  color: #6e6e73;
+}
+
+.dateRowWhenSoon {
+  color: #A59480;
+  font-weight: 600;
+}
+
+/* ============================================
    DRILL-DOWN TABLES
    ============================================ */
 .tablesGrid {

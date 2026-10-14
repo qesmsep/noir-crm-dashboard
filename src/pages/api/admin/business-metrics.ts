@@ -18,6 +18,7 @@ import {
   shiftMonth,
   weekStartOf,
   round2,
+  nextYearlyOccurrence,
 } from '../../../lib/businessMetricsCore';
 
 /**
@@ -112,7 +113,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .select('account_id, monthly_dues, subscription_status, next_billing_date, subscription_cancel_at, membership_plan_id, last_payment_failed_at, billing_retry_count'),
       supabaseAdmin
         .from('members')
-        .select('member_id, account_id, first_name, last_name, status, join_date'),
+        .select('member_id, account_id, first_name, last_name, status, join_date, dob'),
       supabaseAdmin.from('subscription_plans').select('id, plan_name, interval'),
     ]);
 
@@ -386,6 +387,60 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       atRisk: atRisk.slice(0, 20),
     };
 
+    // ------------------------------------------------------------------
+    // Celebrations — birthdays and membership anniversaries, next 4 weeks
+    // ------------------------------------------------------------------
+    const CELEBRATION_WINDOW_DAYS = 28;
+    // Ages outside 1..MAX are placeholder or future DOBs, not real birthdays
+    const MAX_PLAUSIBLE_AGE = 110;
+    const upcomingBirthdays = (activeMembers as any[])
+      .map(m => {
+        const next = nextYearlyOccurrence(m.dob, today, CELEBRATION_WINDOW_DAYS);
+        return next && next.years >= 1 && next.years <= MAX_PLAUSIBLE_AGE && {
+          member_id: m.member_id,
+          name: `${m.first_name || ''} ${m.last_name || ''}`.trim() || 'Unknown',
+          ...next,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.daysAway - b.daysAway || a.name.localeCompare(b.name));
+
+    // Anniversary = the account's first member join date; active accounts only.
+    // Name/link the earliest-joined *active* member so a departed founder
+    // doesn't label the row (falls back to the account's primary name).
+    const activeContact = new Map<string, { member_id: string; name: string; join: string }>();
+    for (const m of activeMembers as any[]) {
+      if (!m.account_id) continue;
+      const jd = (m.join_date || '9999-12-31').slice(0, 10);
+      const existing = activeContact.get(m.account_id);
+      if (!existing || jd < existing.join) {
+        activeContact.set(m.account_id, {
+          member_id: m.member_id,
+          name: `${m.first_name || ''} ${m.last_name || ''}`.trim(),
+          join: jd,
+        });
+      }
+    }
+    const upcomingAnniversaries = activeAccounts
+      .map(a => {
+        const next = nextYearlyOccurrence(accountEarliestJoin.get(a.account_id), today, CELEBRATION_WINDOW_DAYS);
+        const contact = activeContact.get(a.account_id);
+        return next && next.years >= 1 && {
+          account_id: a.account_id,
+          member_id: contact?.member_id || accountPrimaryMemberId.get(a.account_id) || null,
+          name: contact?.name || accountName.get(a.account_id) || 'Unknown',
+          ...next,
+        };
+      })
+      .filter(Boolean)
+      .sort((a: any, b: any) => a.daysAway - b.daysAway || a.name.localeCompare(b.name));
+
+    const celebrations = {
+      windowDays: CELEBRATION_WINDOW_DAYS,
+      birthdays: upcomingBirthdays,
+      anniversaries: upcomingAnniversaries,
+    };
+
     const payload = {
       generatedAt: new Date().toISOString(),
       today,
@@ -403,6 +458,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       },
       balances,
       engagement,
+      celebrations,
       // Data-quality signals: nonzero values mean a figure above is degraded
       // (stale plan id => annual dues counted as monthly; empty purchase
       // notes => spend silently bucketed under "Events & Other").
