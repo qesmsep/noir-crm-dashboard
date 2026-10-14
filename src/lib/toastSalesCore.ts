@@ -157,6 +157,9 @@ export function productMixKey(r: { menu: string; menu_group: string; menu_item: 
 // Sale location
 // ---------------------------------------------------------------------------
 
+/** Noir KC makes the batches and holds whatever a bar doesn't stock itself. */
+export const HOME_LOCATION_SLUG = 'noirkc';
+
 /**
  * Noir and RooftopKC are one Toast location; the Toast menu says which bar
  * sold the drink. Anything not on the RooftopKC menu is Noir.
@@ -398,6 +401,8 @@ function servingDeductions(
     recipes: Map<string, RecipeRef>;
     stock: StockIndex;
     allowance: LossAllowance;
+    /** Where batches and anything a bar doesn't stock come from (Noir KC). */
+    home?: { id: string; name: string };
   }
 ): { deductions: Deduction[] } | { reasons: string[]; gaps: IngredientGap[] } {
   if (!link) return { reasons: ['Not linked to a recipe or bottle yet'], gaps: [] };
@@ -416,19 +421,62 @@ function servingDeductions(
     else deductions.push({ item_id: local.id, units: withAllowance(conv.units, conv.poured) });
   };
 
-  /** The bottle at this bar, or why there isn't one (and, for a recipe ingredient, the gap to fix). */
+  type GapBase = Omit<IngredientGap, 'kind' | 'candidate_ids' | 'location_id' | 'location_name'>;
+
+  /**
+   * The bottle picked for this ingredient at one location: 'none' when nothing
+   * is picked there, 'skip' when it's not tracked there, 'stale' (reported)
+   * when the picked bottle is gone or moved.
+   */
+  const pickedAt = (
+    picks: Record<string, string | null>,
+    at: { id: string; name: string },
+    label: string,
+    gap: GapBase
+  ): StockItem | 'none' | 'skip' | 'stale' => {
+    if (!Object.prototype.hasOwnProperty.call(picks, at.id)) return 'none';
+    const picked = picks[at.id];
+    if (picked === null) return 'skip';
+    const item = ctx.stock.items.get(picked);
+    if (item && item.location_id === at.id) return item;
+    reasons.push(`${label}: the bottle picked for ${at.name} no longer exists`);
+    gaps.push({ ...gap, kind: 'missing', candidate_ids: [], location_id: at.id, location_name: at.name, stale_pick: true });
+    return 'stale';
+  };
+
+  /**
+   * The bottle this sale comes out of: the selling bar's own, or Noir KC's when
+   * the bar doesn't stock it (honouring a bottle picked for Noir KC). Null when
+   * there isn't one, with the reason (and, for a recipe ingredient, the gap to fix).
+   */
   const localFor = (
     linked: StockItem,
-    gap?: Omit<IngredientGap, 'kind' | 'candidate_ids' | 'location_id' | 'location_name'>
-  ): StockItem | null => {
-    const found = findAtLocation(linked, locationId, ctx.stock);
+    gap?: GapBase,
+    picks: Record<string, string | null> = {},
+    label = ''
+  ): StockItem | 'skip' | null => {
+    let found = findAtLocation(linked, locationId, ctx.stock);
+    let at = { id: locationId, name: locationName };
+    // A bar only stocks some things; the rest is made and kept at Noir KC.
+    if ('missing' in found && ctx.home && ctx.home.id !== locationId) {
+      at = ctx.home;
+      if (gap) {
+        const picked = pickedAt(picks, at, label, gap);
+        if (picked === 'skip') return 'skip';
+        if (picked === 'stale') return null;
+        if (picked !== 'none') return picked;
+      }
+      found = findAtLocation(linked, at.id, ctx.stock);
+    }
     if ('item' in found) return found.item;
     const name = itemLabel(linked);
     if ('ambiguous' in found) {
-      reasons.push(`${name} matches more than one bottle at ${locationName} — pick one`);
-      if (gap) gaps.push({ ...gap, kind: 'ambiguous', candidate_ids: found.ambiguous.map(i => i.id), location_id: locationId, location_name: locationName });
+      // A bottle picked for this location settles it, here and for any bar that falls back to it.
+      reasons.push(`${name} matches more than one bottle at ${at.name} — pick one`);
+      if (gap) gaps.push({ ...gap, kind: 'ambiguous', candidate_ids: found.ambiguous.map(i => i.id), location_id: at.id, location_name: at.name });
     } else {
-      reasons.push(`${name} isn't stocked at ${locationName}`);
+      const where = at.id === locationId ? locationName : `${locationName} or ${at.name}`;
+      reasons.push(`${name} isn't stocked at ${where}`);
       if (gap) gaps.push({ ...gap, kind: 'missing', candidate_ids: [], location_id: locationId, location_name: locationName });
     }
     return null;
@@ -439,7 +487,7 @@ function servingDeductions(
     if (!linked) reasons.push('Pour: the linked bottle no longer exists');
     else {
       const local = localFor(linked);
-      if (local) deduct(local, link.amount, link.amount_unit, 'Pour');
+      if (local && local !== 'skip') deduct(local, link.amount, link.amount_unit, 'Pour');
     }
   } else {
     const recipe = link.recipe_id ? ctx.recipes.get(link.recipe_id) : undefined;
@@ -463,40 +511,26 @@ function servingDeductions(
           return;
         }
         const picks = ing.location_items || {};
-        if (Object.prototype.hasOwnProperty.call(picks, locationId)) {
-          const picked = picks[locationId];
-          if (picked === null) return; // not tracked at this bar
-          const item = ctx.stock.items.get(picked);
-          if (!item || item.location_id !== locationId) {
-            reasons.push(`${label}: the bottle picked for ${locationName} no longer exists`);
-            const linked = ctx.stock.items.get(ing.inventory_item_id);
-            gaps.push({
-              recipe_id: recipe.id,
-              recipe_name: recipe.name,
-              ingredient_index: index,
-              ingredient_name: ing.name || (linked ? itemLabel(linked) : 'ingredient'),
-              inventory_item_id: ing.inventory_item_id,
-              location_id: locationId,
-              location_name: locationName,
-              kind: 'missing',
-              candidate_ids: [],
-              stale_pick: true,
-            });
-          } else deduct(item, ing.quantity, ing.unit, label);
+        const linked = ctx.stock.items.get(ing.inventory_item_id);
+        const gap: GapBase = {
+          recipe_id: recipe.id,
+          recipe_name: recipe.name,
+          ingredient_index: index,
+          ingredient_name: ing.name || (linked ? itemLabel(linked) : 'ingredient'),
+          inventory_item_id: ing.inventory_item_id,
+        };
+        const picked = pickedAt(picks, { id: locationId, name: locationName }, label, gap);
+        if (picked === 'skip' || picked === 'stale') return; // not tracked at this bar, or reported
+        if (picked !== 'none') {
+          deduct(picked, ing.quantity, ing.unit, label);
           return;
         }
-        const linked = ctx.stock.items.get(ing.inventory_item_id);
         if (!linked) {
           reasons.push(`${label}: the linked bottle no longer exists`);
           return;
         }
-        const local = localFor(linked, {
-          recipe_id: recipe.id,
-          recipe_name: recipe.name,
-          ingredient_index: index,
-          ingredient_name: ing.name || itemLabel(linked),
-          inventory_item_id: ing.inventory_item_id,
-        });
+        const local = localFor(linked, gap, picks, label);
+        if (local === 'skip') return;
         if (local) deduct(local, ing.quantity, ing.unit, label);
       });
     }
@@ -518,13 +552,14 @@ export function buildDeductionPlan(
   locations: { id: string; slug: string; name: string }[],
   allowance: LossAllowance
 ): DeductionPlan {
+  const locBySlug = new Map(locations.map(l => [l.slug, l]));
   const ctx = {
     recipes: new Map(recipes.map(r => [r.id, r])),
     stock: indexStock(items),
     allowance,
+    home: locBySlug.get(HOME_LOCATION_SLUG),
   };
   const linkMap = new Map(links.map(l => [l.toast_item_id, l]));
-  const locBySlug = new Map(locations.map(l => [l.slug, l]));
 
   const perServing = new Map<string, { deductions: Deduction[] } | { reasons: string[]; gaps: IngredientGap[] }>();
   const resolved: ResolvedLine[] = [];
