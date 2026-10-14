@@ -5,9 +5,9 @@ import {
   logPaymentToLedger,
   handlePaymentFailure,
   sendPaymentSuccessNotification,
-  addMonths,
-  addYears,
+  nextBillingDateAfterPayment,
 } from '@/lib/billing';
+import { getTodayLocalDate } from '@/lib/utils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,13 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Card payments are 'succeeded' and immediate
       // @ts-ignore - subscription_plans is a joined object, not an array
       const interval = account.subscription_plans?.interval || 'month';
-      const currentBillingDate = account.next_billing_date
-        ? account.next_billing_date.split('T')[0] // Convert to YYYY-MM-DD format
-        : new Date().toISOString().split('T')[0];
-
-      const nextBillingDate = interval === 'year'
-        ? addYears(currentBillingDate, 1)
-        : addMonths(currentBillingDate, 1);
+      const nextBillingDate = nextBillingDateAfterPayment(account.next_billing_date, interval, getTodayLocalDate());
 
       const newStatus = chargeResult.paymentIntent.status === 'processing' ? 'processing' : 'active';
 

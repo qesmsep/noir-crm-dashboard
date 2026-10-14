@@ -6,10 +6,10 @@ import {
   handlePaymentFailure,
   sendPaymentSuccessNotification,
   cancelSubscription,
-  addMonths,
-  addYears,
+  nextBillingDateAfterPayment,
   daysBetween,
 } from '@/lib/billing';
+import { getTodayLocalDate } from '@/lib/utils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -89,12 +89,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const daysSinceFailure = daysBetween(account.last_payment_failed_at, new Date());
         console.log(`   Days since failure: ${daysSinceFailure}`);
 
-        // Retry schedule: Day 3, 5, 7, 10
+        // Retry schedule: Day 3, 5, 7, 10 (>= so a missed cron day doesn't strand the account)
         const shouldRetry =
-          (daysSinceFailure === 3 && account.billing_retry_count === 0) ||
-          (daysSinceFailure === 5 && account.billing_retry_count === 1) ||
-          (daysSinceFailure === 7 && account.billing_retry_count === 2) ||
-          (daysSinceFailure === 10 && account.billing_retry_count === 3);
+          (daysSinceFailure >= 3 && account.billing_retry_count === 0) ||
+          (daysSinceFailure >= 5 && account.billing_retry_count === 1) ||
+          (daysSinceFailure >= 7 && account.billing_retry_count === 2) ||
+          (daysSinceFailure >= 10 && account.billing_retry_count === 3);
 
         if (!shouldRetry) {
           console.log(`   ⏭️  Not yet time to retry (waiting for Day 3/5/7/10)`);
@@ -114,14 +114,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Get billing interval from plan
           // @ts-ignore - subscription_plans is a joined object, not an array
           const billingInterval = account.subscription_plans?.interval || 'month';
-          const currentDate = account.next_billing_date || new Date().toISOString().split('T')[0];
 
           // Clear payment failure and move billing date forward based on interval
           // Status is already 'active' (never changed on payment failure)
           const { error: updateError } = await supabase
             .from('accounts')
             .update({
-              next_billing_date: billingInterval === 'year' ? addYears(currentDate, 1) : addMonths(currentDate, 1),
+              next_billing_date: nextBillingDateAfterPayment(account.next_billing_date, billingInterval, getTodayLocalDate()),
               billing_retry_count: 0,
               last_billing_attempt: new Date().toISOString(),
               last_payment_failed_at: null,
