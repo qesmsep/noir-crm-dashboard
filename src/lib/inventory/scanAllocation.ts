@@ -32,9 +32,11 @@ export function planMatchedAllocation<T extends StockRow>(
       if (!loc) return { kind: 'error', location_slug: slug, quantity, reason: 'unknown location' };
       if (matched.location_id === loc.id) return { kind: 'add', item: matched, location_slug: slug, quantity };
       const here = allItems.filter(i => i.location_id === loc.id && matchKey(i) === key);
-      const item = here.find(i => i.volume_ml === matched.volume_ml) || here[0];
+      if (here.length === 0) return { kind: 'create', from: matched, location_id: loc.id, location_slug: slug, quantity };
+      const item = here.find(i => (i.volume_ml || null) === (matched.volume_ml || null));
+      // Bottles of another size aren't the same count; never fold them into a different-size row.
       return item
         ? { kind: 'add', item, location_slug: slug, quantity }
-        : { kind: 'create', from: matched, location_id: loc.id, location_slug: slug, quantity };
+        : { kind: 'error', location_slug: slug, quantity, reason: 'that bar stocks it in a different bottle size — add it there by hand' };
     });
 }

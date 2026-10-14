@@ -36,6 +36,12 @@ describe('planMatchedAllocation', () => {
     expect(steps[0]).toEqual(expect.objectContaining({ kind: 'add', item: titosRoof }));
   });
 
+  it('never puts a share on a row of a different bottle size', () => {
+    const literOnly = row('t-r1', 'roof', { volume_ml: 1000 });
+    const steps = planMatchedAllocation(titosNoir, [['rooftopkc', 2]], [titosNoir, literOnly], LOCS);
+    expect(steps).toEqual([expect.objectContaining({ kind: 'error', location_slug: 'rooftopkc', quantity: 2 })]);
+  });
+
   it('skips zero shares and reports an unknown bar', () => {
     const steps = planMatchedAllocation(titosNoir, [['noirkc', 0], ['nowhere', 2]], items, LOCS);
     expect(steps).toEqual([{ kind: 'error', location_slug: 'nowhere', quantity: 2, reason: 'unknown location' }]);
