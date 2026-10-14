@@ -310,6 +310,7 @@ export default function InventoryPage() {
   // AI Scan handler - supports multi-location assignment with per-location quantities
   const handleScanConfirm = async (scannedItems: ScannedItem[]) => {
     const failures: string[] = [];
+    const saved: string[] = [];
 
     for (const scanned of scannedItems) {
       const locationQuantities = scanned.location_quantities || {};
@@ -382,8 +383,8 @@ export default function InventoryPage() {
                   par_level: 0,
                   notes: 'Added from receipt scan',
                   location_id: step.location_id,
-                  // The plan found no row with this label at the bar; the server still refuses an exact duplicate.
-                  confirm_new: true,
+                  // No confirm_new: the plan found no row with this label at the bar, and the
+                  // server's look-alike check reports a near-duplicate there instead of creating it.
                 }),
               });
               if (res.status === 409) {
@@ -396,6 +397,8 @@ export default function InventoryPage() {
             if (!res.ok) {
               const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
               failures.push(`Failed to add ${scanned.name} (${step.quantity}) at ${where}: ${errorData.error || res.statusText}`);
+            } else {
+              saved.push(`${scanned.name} (${step.quantity}) at ${where}`);
             }
           } catch (err) {
             failures.push(`Failed to add ${scanned.name} at ${where}: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -433,6 +436,8 @@ export default function InventoryPage() {
                 : (errorData.error || res.statusText);
               failures.push(`Failed to create ${scanned.name} (${quantity} units) at ${locationSlug}: ${errorMsg}`);
               console.error('Inventory creation error:', errorData);
+            } else {
+              saved.push(`${scanned.name} (${quantity}) at ${locationSlug}`);
             }
           } catch (err) {
             failures.push(`Failed to create ${scanned.name} at ${locationSlug}: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -447,7 +452,9 @@ export default function InventoryPage() {
 
     // Show failures to user if any occurred
     if (failures.length > 0) {
-      alert(`Scan completed with errors:\n\n${failures.join('\n')}`);
+      // Name what was saved too, so a retry covers only what failed.
+      const done = saved.length > 0 ? `\n\nSaved (don't re-add):\n${saved.join('\n')}` : '';
+      alert(`Scan completed with errors:\n\n${failures.join('\n')}${done}`);
     }
   };
 
