@@ -53,16 +53,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const today = getTodayLocalDate();
     const tomorrow = new Date(new Date().setDate(new Date().getDate() + 1)).toISOString().split('T')[0];
 
-    // Find accounts due for billing today (using date range to match timestamps)
+    // Find accounts due for billing today or overdue (a missed run or stale date
+    // would otherwise strand the account forever).
     // Join with subscription_plans to get billing interval and beverage credit
     // Skip accounts with subscription_cancel_at set (defensive - should be canceled already)
+    // Skip accounts in the failed-payment retry flow — retry-failed-payments owns those
     const { data: accountsToBill, error: fetchError } = await supabase
       .from('accounts')
       .select('*, subscription_plans!membership_plan_id(interval, beverage_credit)')
-      .gte('next_billing_date', today + 'T00:00:00')
       .lt('next_billing_date', tomorrow + 'T00:00:00')
       .eq('subscription_status', 'active')
-      .is('subscription_cancel_at', null);
+      .is('subscription_cancel_at', null)
+      .is('last_payment_failed_at', null);
 
     if (fetchError) {
       console.error('❌ Failed to fetch accounts:', fetchError);

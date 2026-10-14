@@ -6,10 +6,10 @@ import {
   handlePaymentFailure,
   sendPaymentSuccessNotification,
   cancelSubscription,
-  addMonths,
-  addYears,
+  nextBillingDateAfterPayment,
   daysBetween,
 } from '@/lib/billing';
+import { getTodayLocalDate } from '@/lib/utils';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -114,14 +114,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // Get billing interval from plan
           // @ts-ignore - subscription_plans is a joined object, not an array
           const billingInterval = account.subscription_plans?.interval || 'month';
-          const currentDate = account.next_billing_date || new Date().toISOString().split('T')[0];
 
           // Clear payment failure and move billing date forward based on interval
           // Status is already 'active' (never changed on payment failure)
           const { error: updateError } = await supabase
             .from('accounts')
             .update({
-              next_billing_date: billingInterval === 'year' ? addYears(currentDate, 1) : addMonths(currentDate, 1),
+              next_billing_date: nextBillingDateAfterPayment(account.next_billing_date, billingInterval, getTodayLocalDate()),
               billing_retry_count: 0,
               last_billing_attempt: new Date().toISOString(),
               last_payment_failed_at: null,

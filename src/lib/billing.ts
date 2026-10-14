@@ -625,6 +625,23 @@ export function addMonths(dateString: string, months: number): string {
 }
 
 /**
+ * Next billing date after a successful charge.
+ * Advances one interval from the current billing date (keeps the anchor day),
+ * but if that still lands on or before today (stale date), advances from today
+ * instead — otherwise the account is left with a past date and is never billed again.
+ */
+export function nextBillingDateAfterPayment(
+  currentBillingDate: string | null | undefined,
+  interval: string,
+  today: string
+): string {
+  const add = (d: string) => (interval === 'year' ? addYears(d, 1) : addMonths(d, 1));
+  const base = currentBillingDate ? currentBillingDate.split('T')[0] : today;
+  const next = add(base);
+  return next > today ? next : add(today);
+}
+
+/**
  * Add years to a date string (YYYY-MM-DD format)
  */
 export function addYears(dateString: string, years: number): string {
