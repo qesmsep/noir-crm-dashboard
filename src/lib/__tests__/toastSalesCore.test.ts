@@ -182,11 +182,19 @@ describe('buildDeductionPlan', () => {
     expect(plan.totals.get('thc-r')).toBe(1); // 2 sold × ½ can, no allowance on cans
   });
 
-  it('pulls a shared recipe from the bottle stocked where the drink was sold', () => {
+  it('pulls each ingredient from the bar that sold it, and from Noir KC when that bar does not stock it', () => {
     const plan = buildDeductionPlan([line('a', 'T-ESP', 'RooftopKC')], links, [ESPRESSO], ITEMS, LOCS, NO_ALLOWANCE);
-    // Vodka is stocked on the roof; coffee liqueur isn't, so the whole drink is held back.
+    // Vodka is stocked on the roof; coffee liqueur isn't, so it comes out of Noir's.
+    expect(plan.unresolved).toHaveLength(0);
+    expect(Array.from(plan.totals.keys()).sort()).toEqual(['kah-n', 'vod-r']);
+  });
+
+  it('holds a drink back only when neither the bar nor Noir KC stocks the ingredient', () => {
+    const noKahlua = ITEMS.filter(i => i.id !== 'kah-n');
+    const kahlua = ITEMS.find(i => i.id === 'kah-n')!;
+    const plan = buildDeductionPlan([line('a', 'T-ESP', 'RooftopKC')], links, [ESPRESSO], [...noKahlua, { ...kahlua, location_id: 'loc-op' }], LOCS, NO_ALLOWANCE);
     expect(plan.resolved).toHaveLength(0);
-    expect(plan.unresolved[0].reasons).toEqual(["Kahlua Coffee Liqueur isn't stocked at RooftopKC"]);
+    expect(plan.unresolved[0].reasons).toEqual(["Kahlua Coffee Liqueur isn't stocked at RooftopKC or Noir"]);
     expect(plan.unresolved[0].gaps).toEqual([
       {
         recipe_id: 'r-esp',
