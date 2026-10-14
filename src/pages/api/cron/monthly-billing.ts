@@ -118,19 +118,38 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // @ts-ignore - subscription_plans is a joined object, not an array
           const billingInterval = account.subscription_plans?.interval || 'month';
 
-          // Update next_billing_date based on interval and reset retry counter
-          const { error: updateError } = await supabase
+          // Update next_billing_date based on interval and reset retry counter.
+          // Overdue dates are re-selected every run, so a failed write here would
+          // re-charge the member tomorrow — retry once, then flag as critical.
+          const billingUpdate = {
+            next_billing_date: nextBillingDateAfterPayment(account.next_billing_date, billingInterval, today),
+            last_billing_attempt: new Date().toISOString(),
+            billing_retry_count: 0,
+            last_payment_failed_at: null,
+          };
+          let { error: updateError } = await supabase
             .from('accounts')
-            .update({
-              next_billing_date: nextBillingDateAfterPayment(account.next_billing_date, billingInterval, today),
-              last_billing_attempt: new Date().toISOString(),
-              billing_retry_count: 0,
-              last_payment_failed_at: null,
-            })
+            .update(billingUpdate)
             .eq('account_id', account.account_id);
 
           if (updateError) {
-            console.error('   ⚠️  Failed to update billing date:', updateError);
+            ({ error: updateError } = await supabase
+              .from('accounts')
+              .update(billingUpdate)
+              .eq('account_id', account.account_id));
+          }
+
+          if (updateError) {
+            console.error('\n🚨 CRITICAL: BILLING DATE NOT ADVANCED AFTER CHARGE 🚨');
+            console.error(`   Account: ${account.account_id}`);
+            console.error(`   Error: ${updateError.message}`);
+            console.error('   ACTION REQUIRED: set next_billing_date manually or the account is re-charged next run\n');
+            results.errors.push({
+              account_id: account.account_id,
+              error: `CRITICAL: next_billing_date not advanced after successful charge: ${updateError.message}`,
+              type: 'billing_date_update_failure',
+              payment_intent_id: result.paymentIntent?.id,
+            });
           }
 
           // Log to ledger — catch separately so a ledger failure doesn't

@@ -89,12 +89,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         const daysSinceFailure = daysBetween(account.last_payment_failed_at, new Date());
         console.log(`   Days since failure: ${daysSinceFailure}`);
 
-        // Retry schedule: Day 3, 5, 7, 10
+        // Retry schedule: Day 3, 5, 7, 10 (>= so a missed cron day doesn't strand the account)
         const shouldRetry =
-          (daysSinceFailure === 3 && account.billing_retry_count === 0) ||
-          (daysSinceFailure === 5 && account.billing_retry_count === 1) ||
-          (daysSinceFailure === 7 && account.billing_retry_count === 2) ||
-          (daysSinceFailure === 10 && account.billing_retry_count === 3);
+          (daysSinceFailure >= 3 && account.billing_retry_count === 0) ||
+          (daysSinceFailure >= 5 && account.billing_retry_count === 1) ||
+          (daysSinceFailure >= 7 && account.billing_retry_count === 2) ||
+          (daysSinceFailure >= 10 && account.billing_retry_count === 3);
 
         if (!shouldRetry) {
           console.log(`   ⏭️  Not yet time to retry (waiting for Day 3/5/7/10)`);
