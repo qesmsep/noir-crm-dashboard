@@ -138,8 +138,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   const [slotMaxTime, setSlotMaxTime] = useState<string>('26:00:00');
   const [privateEvents, setPrivateEvents] = useState<any[]>([]);
   const { settings } = useSettings();
-  // The day on screen, as a string so effects refetch only when it changes
-  const calendarDay = currentCalendarDate.toISOString();
+  // The venue-local day on screen, as a string so effects refetch only when the day changes
+  const calendarDay = fromUTC(currentCalendarDate, settings.timezone)!.toISODate()!;
   
   // Touch and mobile detection
   const [isMobile, setIsMobile] = useState(false);
@@ -314,7 +314,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         // Both are limited to the day on screen, a day either side for the
         // late-night slots. Unbounded, they hit PostgREST's 1000-row cap and
         // new bookings silently fell off the calendar.
-        const day = fromUTC(calendarDay, settings.timezone)!.startOf('day');
+        const day = DateTime.fromISO(calendarDay, { zone: settings.timezone });
         const windowStart = day.minus({ days: 1 }).toUTC().toISO()!;
         const windowEnd = day.plus({ days: 2 }).toUTC().toISO()!;
 

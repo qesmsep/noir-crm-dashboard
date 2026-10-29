@@ -69,6 +69,41 @@ describe('GET /api/reservations', () => {
     expect(json.mock.calls[0][0].data).toHaveLength(2345);
   });
 
+  it('stops on an empty page when the total is an exact multiple of the cap', async () => {
+    mockVerifyAdmin.mockResolvedValue(true);
+    const rows = Array.from({ length: 1000 }, (_, i) => ({ id: `r-${i}` }));
+    const calls = { gte: [] as any[], lte: [] as any[] };
+    mockFrom.mockImplementation(() => reservationsChain(rows, calls));
+
+    const { req, res, status, json } = createReqRes();
+    await handler(req, res);
+
+    expect(status).toHaveBeenCalledWith(200);
+    expect(json.mock.calls[0][0].data).toHaveLength(1000);
+    expect(mockFrom).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns 500 when a later page fails, not a partial list', async () => {
+    mockVerifyAdmin.mockResolvedValue(true);
+    const rows = Array.from({ length: 1500 }, (_, i) => ({ id: `r-${i}` }));
+    const calls = { gte: [] as any[], lte: [] as any[] };
+    mockFrom
+      .mockImplementationOnce(() => reservationsChain(rows, calls))
+      .mockImplementationOnce(() => {
+        const chain = reservationsChain([], calls);
+        chain.range = jest.fn(() => {
+          chain.then = (resolve: any) => resolve({ data: null, error: { message: 'boom' } });
+          return chain;
+        });
+        return chain;
+      });
+
+    const { req, res, status } = createReqRes();
+    await handler(req, res);
+
+    expect(status).toHaveBeenCalledWith(500);
+  });
+
   it('applies startDate and endDate when given', async () => {
     mockVerifyAdmin.mockResolvedValue(true);
     const calls = { gte: [] as any[], lte: [] as any[] };
