@@ -623,7 +623,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         if (!cancelled) setEventData({ resRes: { data: allReservations } });
       } catch (error) {
         console.error('Error fetching reservations:', error);
-        toast({
+        if (!cancelled) toast({
           title: 'Error loading data',
           description: 'Failed to load reservations. Please try refreshing the page.',
           status: 'error',

@@ -349,7 +349,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
 
         if (!cancelled) setEventData({ evRes: null, resRes: allReservations });
       } catch (error) {
-        toast({
+        if (!cancelled) toast({
           title: 'Error loading data',
           description: 'Failed to load reservations. Please try refreshing the page.',
           status: 'error',
