@@ -7,6 +7,7 @@ import AdminLayout from '../../components/layouts/AdminLayout';
 import { useSettings } from '../../context/SettingsContext';
 import { fromUTC, isSameDay } from '../../utils/dateUtils';
 import { supabase } from '../../lib/supabase';
+import { getAuthHeaders } from '../../lib/client-auth';
 import styles from '../../styles/Calendar.module.css';
 
 type ViewType = 'day' | 'month' | 'all';
@@ -308,7 +309,7 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
       calendarEnd.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
 
       const [reservationsResponse, privateEventsResponse] = await Promise.all([
-        fetch(`/api/reservations?startDate=${calendarStart.toISOString()}&endDate=${calendarEnd.toISOString()}`),
+        fetch(`/api/reservations?startDate=${calendarStart.toISOString()}&endDate=${calendarEnd.toISOString()}`, { headers: await getAuthHeaders() }),
         fetch(`/api/private-events?startDate=${calendarStart.toISOString()}&endDate=${calendarEnd.toISOString()}`)
       ]);
 
@@ -451,7 +452,7 @@ function AllReservationsView({ onReservationClick }: {
   const fetchAllReservations = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/reservations');
+      const response = await fetch('/api/reservations', { headers: await getAuthHeaders() });
       const data = await response.json();
       setReservations(data.data || []);
     } catch (error) {
