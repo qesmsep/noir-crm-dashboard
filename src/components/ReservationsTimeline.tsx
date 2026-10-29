@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import { useAsyncEffect } from '../hooks/useAsyncEffect';
 import { DateTime } from 'luxon';
+import { reservationFetchWindow } from '../utils/bookingDays';
 import { Box, useToast } from '@chakra-ui/react';
 import styles from '../styles/ReservationsTimeline.module.css';
 
@@ -561,6 +562,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
   // Fetch reservations and set up real-time subscription
   useEffect(() => {
+    // A day change starts a new fetch; a slower one for the previous day must not overwrite it
+    let cancelled = false;
     const fetchReservations = async () => {
       try {
         if (!locationSlug) {
@@ -583,9 +586,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         // Only the day on screen, a day either side for the late-night slots.
         // Unbounded, these hit PostgREST's 1000-row cap and new bookings
         // silently fell off the page.
-        const day = DateTime.fromISO(calendarDay, { zone: settings.timezone });
-        const windowStart = day.minus({ days: 1 }).toUTC().toISO()!;
-        const windowEnd = day.plus({ days: 2 }).toUTC().toISO()!;
+        const { start: windowStart, end: windowEnd } = reservationFetchWindow(calendarDay, settings.timezone);
 
         let allReservations: any[] = [];
 
@@ -619,7 +620,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           allReservations = allReservations.concat(privateEventReservations || []);
         }
 
-        setEventData({ resRes: { data: allReservations } });
+        if (!cancelled) setEventData({ resRes: { data: allReservations } });
       } catch (error) {
         console.error('Error fetching reservations:', error);
         toast({
@@ -646,6 +647,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       .subscribe();
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
   }, [reloadKey, localReloadKey, locationSlug, toast, calendarDay, settings.timezone]);

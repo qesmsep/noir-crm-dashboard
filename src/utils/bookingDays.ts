@@ -92,3 +92,17 @@ export function isWithinBookingWindow(
 export function earliestBookableDay(today: string, startDay: string | null): string {
   return startDay && startDay > today ? startDay : today;
 }
+
+/**
+ * The instants a day calendar fetches reservations for: the venue's `day`
+ * ('yyyy-MM-dd') with a day either side, so late-night slots past midnight
+ * and anything straddling the edges are included. Unbounded, those reads hit
+ * PostgREST's 1000-row cap and new bookings silently fell off the calendar.
+ */
+export function reservationFetchWindow(day: string, timezone: string): { start: string; end: string } {
+  const start = DateTime.fromISO(day, { zone: timezone });
+  return {
+    start: start.minus({ days: 1 }).toUTC().toISO()!,
+    end: start.plus({ days: 2 }).toUTC().toISO()!,
+  };
+}
