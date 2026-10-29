@@ -9,6 +9,7 @@ import { fromUTC, toUTC, formatDateTime, formatTime, formatDate, isSameDay } fro
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import { DateTime } from 'luxon';
+import { reservationFetchWindow } from '../utils/bookingDays';
 import styles from '../styles/MobileCalendar.module.css';
 import {
   Box,
@@ -289,6 +290,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   }, [propCurrentDate]);
 
   useEffect(() => {
+    // A day change starts a new fetch; a slower one for the previous day must not overwrite it
+    let cancelled = false;
     const fetchReservations = async () => {
       try {
         // If no location specified, don't fetch reservations
@@ -314,9 +317,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         // Both are limited to the day on screen, a day either side for the
         // late-night slots. Unbounded, they hit PostgREST's 1000-row cap and
         // new bookings silently fell off the calendar.
-        const day = DateTime.fromISO(calendarDay, { zone: settings.timezone });
-        const windowStart = day.minus({ days: 1 }).toUTC().toISO()!;
-        const windowEnd = day.plus({ days: 2 }).toUTC().toISO()!;
+        const { start: windowStart, end: windowEnd } = reservationFetchWindow(calendarDay, settings.timezone);
 
         let allReservations: any[] = [];
 
@@ -346,9 +347,9 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         if (privateError) throw privateError;
         allReservations = allReservations.concat(privateEventReservations || []);
 
-        setEventData({ evRes: null, resRes: allReservations });
+        if (!cancelled) setEventData({ evRes: null, resRes: allReservations });
       } catch (error) {
-        toast({
+        if (!cancelled) toast({
           title: 'Error loading data',
           description: 'Failed to load reservations. Please try refreshing the page.',
           status: 'error',
@@ -371,6 +372,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
       .subscribe();
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
   }, [reloadKey, localReloadKey, tableIds, locationSlug, toast, calendarDay, settings.timezone]);

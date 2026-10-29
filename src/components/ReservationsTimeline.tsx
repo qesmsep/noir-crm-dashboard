@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import { useAsyncEffect } from '../hooks/useAsyncEffect';
 import { DateTime } from 'luxon';
+import { reservationFetchWindow } from '../utils/bookingDays';
 import { Box, useToast } from '@chakra-ui/react';
 import styles from '../styles/ReservationsTimeline.module.css';
 
@@ -80,6 +81,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   const [blockedTimeRanges, setBlockedTimeRanges] = useState<{start: string, end: string}[]>([]);
   const [hasPrivateEventToday, setHasPrivateEventToday] = useState(false);
   const { settings } = useSettings();
+  // The venue-local day on screen, as a string so effects refetch only when the day changes
+  const calendarDay = DateTime.fromJSDate(currentCalendarDate).setZone(settings.timezone).toISODate()!;
   const toast = useToast();
   
   // Touch and mobile detection
@@ -559,6 +562,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
 
   // Fetch reservations and set up real-time subscription
   useEffect(() => {
+    // A day change starts a new fetch; a slower one for the previous day must not overwrite it
+    let cancelled = false;
     const fetchReservations = async () => {
       try {
         if (!locationSlug) {
@@ -578,6 +583,11 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           throw locationError;
         }
 
+        // Only the day on screen, a day either side for the late-night slots.
+        // Unbounded, these hit PostgREST's 1000-row cap and new bookings
+        // silently fell off the page.
+        const { start: windowStart, end: windowEnd } = reservationFetchWindow(calendarDay, settings.timezone);
+
         let allReservations: any[] = [];
 
         // Part 1: Regular reservations with table_id - query by location
@@ -585,7 +595,9 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           .from('reservations')
           .select('*, tables!inner(location_id)')
           .not('table_id', 'is', null)
-          .eq('tables.location_id', locationData.id);
+          .eq('tables.location_id', locationData.id)
+          .lt('start_time', windowEnd)
+          .gt('end_time', windowStart);
 
         if (tableError) {
           console.error('Error fetching table reservations:', tableError);
@@ -596,9 +608,11 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         // Part 2: Private event RSVPs (null table_id)
         const { data: privateEventReservations, error: privateError } = await supabase
           .from('reservations')
-          .select('*, private_events!inner(location_id)')
+          .select('*, private_events!inner(location_id, start_time, end_time)')
           .is('table_id', null)
-          .eq('private_events.location_id', locationData.id);
+          .eq('private_events.location_id', locationData.id)
+          .lt('private_events.start_time', windowEnd)
+          .gt('private_events.end_time', windowStart);
 
         if (privateError) {
           console.error('Error fetching private event reservations:', privateError);
@@ -606,10 +620,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           allReservations = allReservations.concat(privateEventReservations || []);
         }
 
-        setEventData({ resRes: { data: allReservations } });
+        if (!cancelled) setEventData({ resRes: { data: allReservations } });
       } catch (error) {
         console.error('Error fetching reservations:', error);
-        toast({
+        if (!cancelled) toast({
           title: 'Error loading data',
           description: 'Failed to load reservations. Please try refreshing the page.',
           status: 'error',
@@ -633,9 +647,10 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
       .subscribe();
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
-  }, [reloadKey, localReloadKey, locationSlug, toast]);
+  }, [reloadKey, localReloadKey, locationSlug, toast, calendarDay, settings.timezone]);
 
   const [eventData, setEventData] = useState<{ resRes: any }>({ resRes: null });
 

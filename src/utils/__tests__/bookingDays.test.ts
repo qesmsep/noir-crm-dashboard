@@ -6,6 +6,7 @@ import {
   earliestBookableDay,
   isPastDay,
   isWithinBookingWindow,
+  reservationFetchWindow,
   toBookingDay,
   toCalendarDay,
   venueToday,
@@ -122,6 +123,28 @@ describe('bookingDays', () => {
 
     it('honours a window that opens later', () => {
       expect(earliestBookableDay('2026-09-19', '2026-09-24')).toBe('2026-09-24');
+    });
+  });
+
+  describe('reservationFetchWindow', () => {
+    it('spans the venue day with a day either side', () => {
+      expect(reservationFetchWindow('2026-10-29', 'America/Chicago')).toEqual({
+        start: '2026-10-28T05:00:00.000Z',
+        end: '2026-10-31T05:00:00.000Z',
+      });
+    });
+
+    it('includes an 8pm booking on the day, which is the next day in UTC', () => {
+      const { start, end } = reservationFetchWindow('2026-10-30', 'America/Chicago');
+      const booking = '2026-10-31T01:00:00.000Z'; // Fri 10/30 8:00 PM Central
+      expect(booking > start && booking < end).toBe(true);
+    });
+
+    it('follows the venue clock across the November DST change', () => {
+      expect(reservationFetchWindow('2026-11-01', 'America/Chicago')).toEqual({
+        start: '2026-10-31T05:00:00.000Z',
+        end: '2026-11-03T06:00:00.000Z',
+      });
     });
   });
 });
