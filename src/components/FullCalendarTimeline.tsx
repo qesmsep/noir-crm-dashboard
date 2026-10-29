@@ -138,6 +138,8 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
   const [slotMaxTime, setSlotMaxTime] = useState<string>('26:00:00');
   const [privateEvents, setPrivateEvents] = useState<any[]>([]);
   const { settings } = useSettings();
+  // The venue-local day on screen, as a string so effects refetch only when the day changes
+  const calendarDay = fromUTC(currentCalendarDate, settings.timezone)!.toISODate()!;
   
   // Touch and mobile detection
   const [isMobile, setIsMobile] = useState(false);
@@ -308,6 +310,13 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         // Fetch reservations in two parts:
         // 1. Regular reservations with table_id (filter by table_id)
         // 2. Private event RSVPs (null table_id, filter by private_event location_id)
+        //
+        // Both are limited to the day on screen, a day either side for the
+        // late-night slots. Unbounded, they hit PostgREST's 1000-row cap and
+        // new bookings silently fell off the calendar.
+        const day = DateTime.fromISO(calendarDay, { zone: settings.timezone });
+        const windowStart = day.minus({ days: 1 }).toUTC().toISO()!;
+        const windowEnd = day.plus({ days: 2 }).toUTC().toISO()!;
 
         let allReservations: any[] = [];
 
@@ -317,7 +326,9 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
             .from('reservations')
             .select('*')
             .in('table_id', tableIds)
-            .not('table_id', 'is', null);
+            .not('table_id', 'is', null)
+            .lt('start_time', windowEnd)
+            .gt('end_time', windowStart);
 
           if (tableError) throw tableError;
           allReservations = allReservations.concat(tableReservations || []);
@@ -326,9 +337,11 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
         // Part 2: Private event RSVPs (null table_id, filtered by location)
         const { data: privateEventReservations, error: privateError } = await supabase
           .from('reservations')
-          .select('*, private_events!inner(location_id)')
+          .select('*, private_events!inner(location_id, start_time, end_time)')
           .is('table_id', null)
-          .eq('private_events.location_id', locationData.id);
+          .eq('private_events.location_id', locationData.id)
+          .lt('private_events.start_time', windowEnd)
+          .gt('private_events.end_time', windowStart);
 
         if (privateError) throw privateError;
         allReservations = allReservations.concat(privateEventReservations || []);
@@ -360,7 +373,7 @@ const FullCalendarTimeline: React.FC<FullCalendarTimelineProps> = ({ reloadKey, 
     return () => {
       subscription.unsubscribe();
     };
-  }, [reloadKey, localReloadKey, tableIds, locationSlug, toast]);
+  }, [reloadKey, localReloadKey, tableIds, locationSlug, toast, calendarDay, settings.timezone]);
 
   useEffect(() => {
     if (!resources.length || !eventData.resRes) {

@@ -78,28 +78,38 @@ interface ReservationCreateBody {
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method === 'GET') {
     try {
-      const client = supabaseAdmin || supabase;
-      console.log('GET /api/reservations - Fetching all reservations');
-      console.log('Using admin client:', !!supabaseAdmin);
-      
-      const { data, error } = await client
-        .from('reservations')
-        .select('*')
-        .order('start_time', { ascending: true });
-
-      if (error) {
-        console.error('Error fetching reservations:', error);
-        return res.status(500).json({ error: 'Failed to fetch reservations' });
+      // Every guest's name, phone and email — staff only
+      if (!(await verifyAdmin(req))) {
+        return res.status(401).json({ error: 'Unauthorized' });
       }
 
-      console.log(`GET /api/reservations - Returning ${data?.length || 0} reservations`);
-      if (data && data.length > 0) {
-        console.log('Sample reservation:', {
-          id: data[0].id,
-          start_time: data[0].start_time,
-          table_id: data[0].table_id,
-          phone: data[0].phone
-        });
+      const client = supabaseAdmin || supabase;
+      const startDate = typeof req.query.startDate === 'string' ? req.query.startDate : undefined;
+      const endDate = typeof req.query.endDate === 'string' ? req.query.endDate : undefined;
+      if ((startDate && isNaN(Date.parse(startDate))) || (endDate && isNaN(Date.parse(endDate)))) {
+        return res.status(400).json({ error: 'startDate and endDate must be ISO dates' });
+      }
+
+      // Paged past PostgREST's 1000-row cap, which otherwise silently drops reservations
+      const PAGE = 1000;
+      const data: any[] = [];
+      for (let from = 0; ; from += PAGE) {
+        let query = client
+          .from('reservations')
+          .select('*')
+          .order('start_time', { ascending: true })
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1);
+        if (startDate) query = query.gte('start_time', new Date(startDate).toISOString());
+        if (endDate) query = query.lte('start_time', new Date(endDate).toISOString());
+
+        const { data: page, error } = await query;
+        if (error) {
+          console.error('Error fetching reservations:', error);
+          return res.status(500).json({ error: 'Failed to fetch reservations' });
+        }
+        data.push(...(page || []));
+        if (!page || page.length < PAGE) break;
       }
 
       return res.status(200).json({ data });

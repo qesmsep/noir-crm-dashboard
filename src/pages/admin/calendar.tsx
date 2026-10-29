@@ -7,6 +7,8 @@ import AdminLayout from '../../components/layouts/AdminLayout';
 import { useSettings } from '../../context/SettingsContext';
 import { fromUTC, isSameDay } from '../../utils/dateUtils';
 import { supabase } from '../../lib/supabase';
+import { getAuthHeaders } from '../../lib/client-auth';
+import { useToast } from '@/hooks/useToast';
 import styles from '../../styles/Calendar.module.css';
 
 type ViewType = 'day' | 'month' | 'all';
@@ -290,6 +292,7 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
     isOpen: boolean;
   }>>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     fetchMonthData();
@@ -308,10 +311,13 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
       calendarEnd.setDate(monthEnd.getDate() + (6 - monthEnd.getDay()));
 
       const [reservationsResponse, privateEventsResponse] = await Promise.all([
-        fetch(`/api/reservations?startDate=${calendarStart.toISOString()}&endDate=${calendarEnd.toISOString()}`),
+        fetch(`/api/reservations?startDate=${calendarStart.toISOString()}&endDate=${calendarEnd.toISOString()}`, { headers: await getAuthHeaders() }),
         fetch(`/api/private-events?startDate=${calendarStart.toISOString()}&endDate=${calendarEnd.toISOString()}`)
       ]);
 
+      if (!reservationsResponse.ok) {
+        throw new Error(`Reservations request failed: ${reservationsResponse.status}`);
+      }
       const reservationsData = await reservationsResponse.json();
       const privateEventsData = await privateEventsResponse.json();
 
@@ -376,7 +382,11 @@ function MonthView({ currentDate, onDateChange, onReservationClick }: {
 
       setMonthData(calendarData);
     } catch (error) {
-      // Error handled silently
+      toast({
+        title: 'Error',
+        description: 'Failed to load reservations. Try signing in again.',
+        variant: 'error',
+      });
     } finally {
       setLoading(false);
     }
@@ -440,6 +450,7 @@ function AllReservationsView({ onReservationClick }: {
 }) {
   const [reservations, setReservations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'date' | 'name' | 'table'>('date');
   const [filterType, setFilterType] = useState<'all' | 'today' | 'upcoming' | 'past'>('all');
@@ -451,11 +462,18 @@ function AllReservationsView({ onReservationClick }: {
   const fetchAllReservations = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/reservations');
+      const response = await fetch('/api/reservations', { headers: await getAuthHeaders() });
+      if (!response.ok) {
+        throw new Error(`Reservations request failed: ${response.status}`);
+      }
       const data = await response.json();
       setReservations(data.data || []);
     } catch (error) {
-      // Error handled silently
+      toast({
+        title: 'Error',
+        description: 'Failed to load reservations. Try signing in again.',
+        variant: 'error',
+      });
     } finally {
       setLoading(false);
     }
