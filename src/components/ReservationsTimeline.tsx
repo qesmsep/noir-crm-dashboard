@@ -80,6 +80,8 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
   const [blockedTimeRanges, setBlockedTimeRanges] = useState<{start: string, end: string}[]>([]);
   const [hasPrivateEventToday, setHasPrivateEventToday] = useState(false);
   const { settings } = useSettings();
+  // The venue-local day on screen, as a string so effects refetch only when the day changes
+  const calendarDay = DateTime.fromJSDate(currentCalendarDate).setZone(settings.timezone).toISODate()!;
   const toast = useToast();
   
   // Touch and mobile detection
@@ -578,6 +580,13 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           throw locationError;
         }
 
+        // Only the day on screen, a day either side for the late-night slots.
+        // Unbounded, these hit PostgREST's 1000-row cap and new bookings
+        // silently fell off the page.
+        const day = DateTime.fromISO(calendarDay, { zone: settings.timezone });
+        const windowStart = day.minus({ days: 1 }).toUTC().toISO()!;
+        const windowEnd = day.plus({ days: 2 }).toUTC().toISO()!;
+
         let allReservations: any[] = [];
 
         // Part 1: Regular reservations with table_id - query by location
@@ -585,7 +594,9 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
           .from('reservations')
           .select('*, tables!inner(location_id)')
           .not('table_id', 'is', null)
-          .eq('tables.location_id', locationData.id);
+          .eq('tables.location_id', locationData.id)
+          .lt('start_time', windowEnd)
+          .gt('end_time', windowStart);
 
         if (tableError) {
           console.error('Error fetching table reservations:', tableError);
@@ -596,9 +607,11 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         // Part 2: Private event RSVPs (null table_id)
         const { data: privateEventReservations, error: privateError } = await supabase
           .from('reservations')
-          .select('*, private_events!inner(location_id)')
+          .select('*, private_events!inner(location_id, start_time, end_time)')
           .is('table_id', null)
-          .eq('private_events.location_id', locationData.id);
+          .eq('private_events.location_id', locationData.id)
+          .lt('private_events.start_time', windowEnd)
+          .gt('private_events.end_time', windowStart);
 
         if (privateError) {
           console.error('Error fetching private event reservations:', privateError);
@@ -635,7 +648,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
     return () => {
       subscription.unsubscribe();
     };
-  }, [reloadKey, localReloadKey, locationSlug, toast]);
+  }, [reloadKey, localReloadKey, locationSlug, toast, calendarDay, settings.timezone]);
 
   const [eventData, setEventData] = useState<{ resRes: any }>({ resRes: null });
 
