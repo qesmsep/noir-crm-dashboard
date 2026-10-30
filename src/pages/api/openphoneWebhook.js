@@ -4,7 +4,7 @@ import { DateTime } from 'luxon';
 import { enrollPhone } from './membership/intake-enroll';
 
 // A hung OpenAI call would hold the webhook until the function times out and the provider redelivers
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 15000, maxRetries: 1 });
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 10000, maxRetries: 0 });
 // gpt-4 was retired 2026-10-30 and every SMS reservation failed; overridable so the next retirement is an env change
 const SMS_PARSE_MODEL = process.env.OPENAI_SMS_MODEL || 'gpt-4o';
 
@@ -71,13 +71,18 @@ async function clearConversation(phone) {
 
 // Simple confirmation parser
 async function parseConfirmation(message) {
-  const res = await openai.chat.completions.create({
-    model: SMS_PARSE_MODEL,
-    messages: [{ role: 'user', content: `Does this message confirm the proposal? Respond with {"confirm": true} or {"confirm": false}. Message: "${message}"` }],
-    temperature: 0.0
-  });
-  try { return JSON.parse(res.choices[0].message.content.trim()).confirm; }
-  catch { return false; }
+  try {
+    const res = await openai.chat.completions.create({
+      model: SMS_PARSE_MODEL,
+      messages: [{ role: 'user', content: `Does this message confirm the proposal? Respond with JSON {"confirm": true} or {"confirm": false}. Message: "${message}"` }],
+      temperature: 0.0,
+      response_format: { type: 'json_object' },
+    });
+    return JSON.parse(res.choices[0].message.content.trim()).confirm;
+  } catch (e) {
+    console.error('[SMS_GPT_FAILED] confirmation parse:', { status: e?.status, code: e?.code, model: SMS_PARSE_MODEL, message: e?.message });
+    return false;
+  }
 }
 
 // Default timezone
