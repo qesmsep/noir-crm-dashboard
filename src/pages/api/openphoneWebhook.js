@@ -1515,7 +1515,8 @@ Thank you.`;
     console.error('Error processing SMS reservation:', error);
     const errorMessage = `Sorry, we encountered an error processing your reservation request. Please contact us directly.`;
     await sendSMS(from, errorMessage);
-    return res.status(500).json({ error: 'Internal server error' });
+    // 200, not 500: the guest has their reply, and a 500 makes OpenPhone redeliver and text the error again
+    return res.status(200).json({ error: 'Reservation processing failed; guest notified' });
   }
 }
 
