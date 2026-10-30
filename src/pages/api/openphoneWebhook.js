@@ -1,5 +1,7 @@
 import OpenAI from 'openai';
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// gpt-4 was retired 2026-10-30 and every SMS reservation failed; overridable so the next retirement is an env change
+const SMS_PARSE_MODEL = process.env.OPENAI_SMS_MODEL || 'gpt-4o';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
 import { enrollPhone } from './membership/intake-enroll';
@@ -68,7 +70,7 @@ async function clearConversation(phone) {
 // Simple confirmation parser
 async function parseConfirmation(message) {
   const res = await openai.chat.completions.create({
-    model: 'gpt-4',
+    model: SMS_PARSE_MODEL,
     messages: [{ role: 'user', content: `Does this message confirm the proposal? Respond with {"confirm": true} or {"confirm": false}. Message: "${message}"` }],
     temperature: 0.0
   });
@@ -253,11 +255,19 @@ User message: """${message}"""
   console.log('=== GPT PROMPT SENT ===');
   console.log('Sending prompt to GPT...');
   
-  const res = await openai.chat.completions.create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.0,
-  });
+  let res;
+  try {
+    res = await openai.chat.completions.create({
+      model: SMS_PARSE_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.0,
+      response_format: { type: 'json_object' },
+    });
+  } catch (e) {
+    // An OpenAI outage or retired model falls through to the regex parser rather than failing the guest
+    console.error('GPT request failed, falling back to regex:', e?.message || e);
+    return null;
+  }
   
   const text = res.choices[0].message.content.trim();
   console.log('=== GPT RESPONSE RECEIVED ===');
