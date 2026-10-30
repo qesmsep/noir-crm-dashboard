@@ -1,10 +1,12 @@
 import OpenAI from 'openai';
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-// gpt-4 was retired 2026-10-30 and every SMS reservation failed; overridable so the next retirement is an env change
-const SMS_PARSE_MODEL = process.env.OPENAI_SMS_MODEL || 'gpt-4o';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
 import { enrollPhone } from './membership/intake-enroll';
+
+// A hung OpenAI call would hold the webhook until the function times out and the provider redelivers
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 15000, maxRetries: 1 });
+// gpt-4 was retired 2026-10-30 and every SMS reservation failed; overridable so the next retirement is an env change
+const SMS_PARSE_MODEL = process.env.OPENAI_SMS_MODEL || 'gpt-4o';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -265,7 +267,7 @@ User message: """${message}"""
     });
   } catch (e) {
     // An OpenAI outage or retired model falls through to the regex parser rather than failing the guest
-    console.error('GPT request failed, falling back to regex:', e?.message || e);
+    console.error('[SMS_GPT_FAILED] falling back to regex:', { status: e?.status, code: e?.code, model: SMS_PARSE_MODEL, message: e?.message });
     return null;
   }
   
