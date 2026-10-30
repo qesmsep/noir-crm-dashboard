@@ -1,8 +1,12 @@
 import OpenAI from 'openai';
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
 import { enrollPhone } from './membership/intake-enroll';
+
+// A hung OpenAI call would hold the webhook until the function times out and the provider redelivers
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 10000, maxRetries: 0 });
+// gpt-4 was retired 2026-10-30 and every SMS reservation failed; overridable so the next retirement is an env change
+const SMS_PARSE_MODEL = process.env.OPENAI_SMS_MODEL || 'gpt-4o';
 
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
@@ -67,13 +71,18 @@ async function clearConversation(phone) {
 
 // Simple confirmation parser
 async function parseConfirmation(message) {
-  const res = await openai.chat.completions.create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: `Does this message confirm the proposal? Respond with {"confirm": true} or {"confirm": false}. Message: "${message}"` }],
-    temperature: 0.0
-  });
-  try { return JSON.parse(res.choices[0].message.content.trim()).confirm; }
-  catch { return false; }
+  try {
+    const res = await openai.chat.completions.create({
+      model: SMS_PARSE_MODEL,
+      messages: [{ role: 'user', content: `Does this message confirm the proposal? Respond with JSON {"confirm": true} or {"confirm": false}. Message: "${message}"` }],
+      temperature: 0.0,
+      response_format: { type: 'json_object' },
+    });
+    return JSON.parse(res.choices[0].message.content.trim()).confirm;
+  } catch (e) {
+    console.error('[SMS_GPT_FAILED] confirmation parse:', { status: e?.status, code: e?.code, model: SMS_PARSE_MODEL, message: e?.message });
+    return false;
+  }
 }
 
 // Default timezone
@@ -253,11 +262,19 @@ User message: """${message}"""
   console.log('=== GPT PROMPT SENT ===');
   console.log('Sending prompt to GPT...');
   
-  const res = await openai.chat.completions.create({
-    model: 'gpt-4',
-    messages: [{ role: 'user', content: prompt }],
-    temperature: 0.0,
-  });
+  let res;
+  try {
+    res = await openai.chat.completions.create({
+      model: SMS_PARSE_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature: 0.0,
+      response_format: { type: 'json_object' },
+    });
+  } catch (e) {
+    // An OpenAI outage or retired model falls through to the regex parser rather than failing the guest
+    console.error('[SMS_GPT_FAILED] falling back to regex:', { status: e?.status, code: e?.code, model: SMS_PARSE_MODEL, message: e?.message });
+    return null;
+  }
   
   const text = res.choices[0].message.content.trim();
   console.log('=== GPT RESPONSE RECEIVED ===');
@@ -1505,7 +1522,8 @@ Thank you.`;
     console.error('Error processing SMS reservation:', error);
     const errorMessage = `Sorry, we encountered an error processing your reservation request. Please contact us directly.`;
     await sendSMS(from, errorMessage);
-    return res.status(500).json({ error: 'Internal server error' });
+    // 200, not 500: the guest has their reply, and a 500 makes OpenPhone redeliver and text the error again
+    return res.status(200).json({ error: 'Reservation processing failed; guest notified' });
   }
 }
 
