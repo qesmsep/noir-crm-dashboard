@@ -362,6 +362,22 @@ export default function MemberDashboardPage() {
             </h1>
           </div>
 
+          {/* Noir.life Card: opens the news and events feed */}
+          <button
+            type="button"
+            onClick={() => router.push('/member/noir-life')}
+            className="w-full flex items-center justify-between rounded-2xl bg-[#23201C] text-[#ECEDE8] shadow-lg hover:shadow-xl active:scale-[0.99] transition-all px-6 py-6 text-left"
+            style={{ touchAction: 'manipulation' }}
+          >
+            <span
+              className="text-3xl"
+              style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', letterSpacing: '0.06em' }}
+            >
+              Noir.life
+            </span>
+            <span aria-hidden="true" className="text-2xl text-[#A59480]">›</span>
+          </button>
+
           {/* Profile Card - Moved to Top */}
           <Card
             className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer pt-0 pb-0"

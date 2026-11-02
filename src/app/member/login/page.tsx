@@ -12,6 +12,18 @@ import { PhoneDialPad } from '@/components/member/PhoneDialPad';
 import { Fingerprint } from 'lucide-react';
 import { FEATURES } from '@/lib/features';
 
+
+// Where to go after sign-in: a ?next= member page if one was given, else the dashboard.
+// Only same-site /member/ paths are allowed, so the param can't send anyone off-site.
+function getPostLoginPath(): string {
+  if (typeof window === 'undefined') return '/member/dashboard';
+  const next = new URLSearchParams(window.location.search).get('next');
+  if (next && next.startsWith('/member/') && !next.startsWith('//') && !next.includes('://') && !next.startsWith('/member/login')) {
+    return next;
+  }
+  return '/member/dashboard';
+}
+
 export default function MemberLoginPage() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -47,7 +59,7 @@ export default function MemberLoginPage() {
       if (!member.has_password || member.password_is_temporary) {
         router.push('/member/change-password');
       } else {
-        router.push('/member/dashboard');
+        router.push(getPostLoginPath());
       }
     }
   }, [mounted, member, router]);
@@ -170,7 +182,7 @@ export default function MemberLoginPage() {
           description: 'You are now signed in.',
           variant: 'success',
         });
-        router.push('/member/dashboard');
+        router.push(getPostLoginPath());
       }
     } catch (error: any) {
       toast({
@@ -205,7 +217,7 @@ export default function MemberLoginPage() {
           description: 'You are now signed in.',
           variant: 'success',
         });
-        router.push('/member/dashboard');
+        router.push(getPostLoginPath());
       }
     } catch (error: any) {
       toast({

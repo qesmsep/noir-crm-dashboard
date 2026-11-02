@@ -17,7 +17,8 @@ import {
   CreditCard,
   Package,
   UserPlus,
-  MessageSquare
+  MessageSquare,
+  Newspaper
 } from 'lucide-react';
 
 interface AdminLayoutProps {
@@ -149,6 +150,7 @@ export default function AdminLayout({ children, isFullScreen = false }: AdminLay
     { href: '/admin/membership', label: 'Membership', icon: UserPlus },
     { href: '/admin/communication', label: 'Campaigns', icon: MessageSquare },
     { href: '/admin/event-calendar', label: 'Events', icon: Calendar },
+    { href: '/admin/noir-life', label: 'Noir.life', icon: Newspaper },
     { href: '/admin/inventory', label: 'Inventory', icon: Package },
     { href: '/admin/homepage', label: 'Home', icon: Home },
     { href: '/member/dashboard', label: 'Portal', icon: UserCircle },
