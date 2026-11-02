@@ -126,38 +126,21 @@ export default function Home() {
                     color: '#BCA892'
                   }}
                 >
-                  To get access or ask questions:
-                </p>
-                <p
-                  className="text-base sm:text-lg"
-                  style={{
-                    fontFamily: 'Montserrat, sans-serif',
-                    color: '#ECEDE8'
-                  }}
-                >
-                  Text <strong>MEMBERSHIP</strong> to{' '}
-                  <a
-                    href="sms:9137774488?body=MEMBERSHIP"
-                    className="font-semibold underline hover:no-underline transition-all"
-                    style={{ color: '#BCA892' }}
-                    aria-label="Text MEMBERSHIP to 913.777.4488"
-                  >
-                    913.777.4488
-                  </a>
+                  Membership is by invitation.
                 </p>
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
                 <a
-                  href="sms:9137774488?body=MEMBERSHIP"
+                  href="/member/noir-op"
                   className="mobile-button mobile-accessible px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-[#BCA892] text-[#23201C] text-base sm:text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200 text-center active:scale-95"
                   style={{
                     fontFamily: 'Montserrat, sans-serif',
                     letterSpacing: '0.05em',
                     touchAction: 'manipulation'
                   }}
-                  aria-label="Start SMS about membership"
+                  aria-label="Member sign in"
                 >
-                  Text MEMBERSHIP
+                  Member sign in
                 </a>
               </div>
             </div>
@@ -312,25 +295,6 @@ export default function Home() {
             </div>
             
           </div>
-        </div>
-        <div className="w-full flex justify-center mt-8 sm:mt-10 px-4">
-          <button
-            onClick={() => {
-              const message = "MEMBERSHIP";
-              const phoneNumber = "9137774488";
-              const url = `sms:${phoneNumber}?body=${encodeURIComponent(message)}`;
-              window.open(url, '_blank');
-            }}
-            className="mobile-button mobile-accessible inline-block px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-[#BCA892] text-[#23201C] text-base sm:text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200 text-center active:scale-95"
-            style={{
-              fontFamily: 'Montserrat, sans-serif',
-              letterSpacing: '0.05em',
-              touchAction: 'manipulation'
-            }}
-            aria-label="Text MEMBERSHIP to 913.777.4488 for membership information"
-          >
-            Text MEMBERSHIP to 913.777.4488 for more information
-          </button>
         </div>
       </section>
 

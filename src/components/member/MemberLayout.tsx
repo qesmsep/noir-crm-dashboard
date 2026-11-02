@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useMemberAuth } from '@/context/MemberAuthContext';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import MemberNav from './MemberNav';
 
 interface MemberLayoutProps {
@@ -13,13 +13,16 @@ interface MemberLayoutProps {
 export default function MemberLayout({ children, showNav = true }: MemberLayoutProps) {
   const { member, loading } = useMemberAuth();
   const router = useRouter();
+  const pathname = usePathname();
 
   // Redirect to login if not authenticated (after loading)
   React.useEffect(() => {
     if (!loading && !member) {
-      router.push('/member/login');
+      // Bring the member back to this page after they sign in
+      const next = pathname && pathname !== '/member/dashboard' ? `?next=${encodeURIComponent(pathname)}` : '';
+      router.push(`/member/login${next}`);
     }
-  }, [loading, member, router]);
+  }, [loading, member, router, pathname]);
 
   if (loading) {
     return (
