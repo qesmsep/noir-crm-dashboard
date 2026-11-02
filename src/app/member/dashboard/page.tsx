@@ -17,6 +17,7 @@ import UpcomingEventsModal from '@/components/member/UpcomingEventsModal';
 import RSVPModal from '@/components/member/RSVPModal';
 import SimpleReservationRequestModal from '@/components/member/SimpleReservationRequestModal';
 import BiometricRegistrationPrompt from '@/components/member/BiometricRegistrationPrompt';
+import NoirLifeCard, { NoirLifeCardPost } from '@/components/member/NoirLifeCard';
 import { FEATURES } from '@/lib/features';
 
 export default function MemberDashboardPage() {
@@ -83,6 +84,8 @@ export default function MemberDashboardPage() {
   const [subscriptionData, setSubscriptionData] = useState<any>(null);
   const [copiedReferralLink, setCopiedReferralLink] = useState(false);
   const [referralCount, setReferralCount] = useState<number>(0);
+  const [noirLifePosts, setNoirLifePosts] = useState<NoirLifeCardPost[]>([]);
+  const [loadingNoirLife, setLoadingNoirLife] = useState(true);
 
   useEffect(() => {
     setMounted(true);
@@ -122,7 +125,25 @@ export default function MemberDashboardPage() {
     fetchAccountMembers();
     fetchSubscriptionData();
     fetchReferralCount();
+    fetchNoirLifePosts();
   }, [member]);
+
+  // Latest Noir.life posts for the dashboard card (card fields only, no post bodies)
+  const fetchNoirLifePosts = async () => {
+    try {
+      const response = await fetch('/api/member/noir-life?fields=card&limit=3', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setNoirLifePosts(data.posts || []);
+      }
+    } catch (error) {
+      console.error('Error fetching Noir.life posts:', error);
+    } finally {
+      setLoadingNoirLife(false);
+    }
+  };
 
   const fetchNextReservation = async () => {
     try {
@@ -362,22 +383,6 @@ export default function MemberDashboardPage() {
             </h1>
           </div>
 
-          {/* Noir.life Card: opens the news and events feed */}
-          <button
-            type="button"
-            onClick={() => router.push('/member/noir-life')}
-            className="w-full flex items-center justify-between rounded-2xl bg-[#23201C] text-[#ECEDE8] shadow-lg hover:shadow-xl active:scale-[0.99] transition-all px-6 py-6 text-left"
-            style={{ touchAction: 'manipulation' }}
-          >
-            <span
-              className="text-3xl"
-              style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', letterSpacing: '0.06em' }}
-            >
-              Noir.life
-            </span>
-            <span aria-hidden="true" className="text-2xl text-[#A59480]">›</span>
-          </button>
-
           {/* Profile Card - Moved to Top */}
           <Card
             className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer pt-0 pb-0"
@@ -410,6 +415,14 @@ export default function MemberDashboardPage() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Noir.life Card: latest posts, opens the news and events feed */}
+          <NoirLifeCard
+            posts={noirLifePosts}
+            loading={loadingNoirLife}
+            onOpenFeed={() => router.push('/member/noir-life')}
+            onOpenPost={(id) => router.push(`/member/noir-life/${id}`)}
+          />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Next Reservation Card */}
