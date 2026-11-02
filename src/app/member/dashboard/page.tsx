@@ -18,6 +18,7 @@ import RSVPModal from '@/components/member/RSVPModal';
 import SimpleReservationRequestModal from '@/components/member/SimpleReservationRequestModal';
 import BiometricRegistrationPrompt from '@/components/member/BiometricRegistrationPrompt';
 import { FEATURES } from '@/lib/features';
+import { MEMBER_UPDATES, CLUB_LABEL, formatUpdateDate } from '@/lib/memberUpdates';
 
 export default function MemberDashboardPage() {
   const router = useRouter();
@@ -361,6 +362,32 @@ export default function MemberDashboardPage() {
               Welcome back, {member.first_name}
             </h1>
           </div>
+
+          {/* Updates Card: latest Noir and Noir OP news */}
+          <Card
+            className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
+            onClick={() => router.push('/member/updates')}
+          >
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center justify-between">
+                <span className="flex items-center gap-3">
+                  <List className="w-5 h-5 text-[#A59480]" />
+                  <span className="text-xl font-semibold text-[#1F1F1F]">Updates</span>
+                </span>
+                <span className="text-sm font-medium text-[#A59480]">See all</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-0 pb-4 space-y-3">
+              {MEMBER_UPDATES.slice(0, 2).map((u) => (
+                <div key={u.id} className="bg-[#F6F5F2] rounded-lg p-3">
+                  <p className="text-xs text-[#8C7C6D]">
+                    <span className="font-semibold text-[#A59480]">{CLUB_LABEL[u.club]}</span> · {formatUpdateDate(u.date)}
+                  </p>
+                  <p className="text-sm font-semibold text-[#1F1F1F] mt-0.5">{u.title}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
 
           {/* Profile Card - Moved to Top */}
           <Card

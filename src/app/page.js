@@ -131,7 +131,7 @@ export default function Home() {
               </div>
               <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 w-full sm:w-auto">
                 <a
-                  href="/member/noir-op"
+                  href="/member/login"
                   className="mobile-button mobile-accessible px-6 sm:px-8 py-3 sm:py-4 rounded-full bg-[#BCA892] text-[#23201C] text-base sm:text-lg font-semibold shadow-lg hover:bg-[#ECEDE8] transition-all duration-200 text-center active:scale-95"
                   style={{
                     fontFamily: 'Montserrat, sans-serif',
