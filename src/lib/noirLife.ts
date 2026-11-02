@@ -148,6 +148,10 @@ export interface NoirLifeEvent {
 export const NOIR_LIFE_POST_COLUMNS =
   'id, club, title, summary, cover_image_url, blocks, private_event_id, is_pinned, is_published, published_at, created_at, updated_at, private_events(id, title, start_time, end_time, rsvp_enabled, rsvp_url)';
 
+/** What a feed card shows. No blocks, no linked event: used for previews such as the dashboard card. */
+export const NOIR_LIFE_POST_CARD_COLUMNS =
+  'id, club, title, summary, cover_image_url, is_pinned, published_at';
+
 /** Postgres "relation does not exist": the posts table has not been created yet. */
 export function isMissingTable(error: { code?: string } | null | undefined) {
   return error?.code === '42P01' || error?.code === 'PGRST205';

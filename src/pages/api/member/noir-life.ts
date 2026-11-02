@@ -1,13 +1,15 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { parse } from 'cookie';
-import { NOIR_LIFE_POST_COLUMNS, isMissingTable } from '@/lib/noirLife';
+import { NOIR_LIFE_POST_CARD_COLUMNS, NOIR_LIFE_POST_COLUMNS, isMissingTable } from '@/lib/noirLife';
 
 /**
  * Noir.life feed for the logged-in member.
- * GET            -> { posts, events } (published posts + upcoming member events)
- * GET ?id=<uuid> -> { post } (one published post)
+ * GET                        -> { posts, events } (published posts + upcoming member events)
+ * GET ?id=<uuid>             -> { post } (one published post)
+ * GET ?fields=card&limit=<n> -> { posts, events: [] } (card fields only, no blocks; for previews)
  */
+const MAX_POSTS = 50;
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -46,16 +48,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     const nowIso = new Date().toISOString();
+    const cardOnly = req.query.fields === 'card';
+    const requestedLimit = parseInt(String(req.query.limit), 10);
+    const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), MAX_POSTS) : MAX_POSTS;
+
+    const postsQuery = supabaseAdmin
+      .from('noir_life_posts')
+      .select(cardOnly ? NOIR_LIFE_POST_CARD_COLUMNS : NOIR_LIFE_POST_COLUMNS)
+      .eq('is_published', true)
+      .lte('published_at', nowIso)
+      .order('is_pinned', { ascending: false })
+      .order('published_at', { ascending: false })
+      .limit(limit);
+
+    if (cardOnly) {
+      const { data, error } = await postsQuery;
+      if (error && !isMissingTable(error)) throw error;
+      return res.status(200).json({ posts: data || [], events: [] });
+    }
 
     const [postsResult, eventsResult] = await Promise.all([
-      supabaseAdmin
-        .from('noir_life_posts')
-        .select(NOIR_LIFE_POST_COLUMNS)
-        .eq('is_published', true)
-        .lte('published_at', nowIso)
-        .order('is_pinned', { ascending: false })
-        .order('published_at', { ascending: false })
-        .limit(50),
+      postsQuery,
       supabaseAdmin
         .from('private_events')
         .select('id, title, start_time, end_time, event_description, rsvp_enabled, rsvp_url, background_image_url')
