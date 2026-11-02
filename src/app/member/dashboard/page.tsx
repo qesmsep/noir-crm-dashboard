@@ -18,7 +18,6 @@ import RSVPModal from '@/components/member/RSVPModal';
 import SimpleReservationRequestModal from '@/components/member/SimpleReservationRequestModal';
 import BiometricRegistrationPrompt from '@/components/member/BiometricRegistrationPrompt';
 import { FEATURES } from '@/lib/features';
-import { MEMBER_UPDATES, CLUB_LABEL, formatUpdateDate } from '@/lib/memberUpdates';
 
 export default function MemberDashboardPage() {
   const router = useRouter();
@@ -363,31 +362,21 @@ export default function MemberDashboardPage() {
             </h1>
           </div>
 
-          {/* Updates Card: latest Noir and Noir OP news */}
-          <Card
-            className="bg-white rounded-2xl border border-[#ECEAE5] shadow-lg hover:shadow-xl transition-shadow cursor-pointer"
-            onClick={() => router.push('/member/updates')}
+          {/* Noir.life Card: opens the news and events feed */}
+          <button
+            type="button"
+            onClick={() => router.push('/member/noir-life')}
+            className="w-full flex items-center justify-between rounded-2xl bg-[#23201C] text-[#ECEDE8] shadow-lg hover:shadow-xl active:scale-[0.99] transition-all px-6 py-6 text-left"
+            style={{ touchAction: 'manipulation' }}
           >
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center justify-between">
-                <span className="flex items-center gap-3">
-                  <List className="w-5 h-5 text-[#A59480]" />
-                  <span className="text-xl font-semibold text-[#1F1F1F]">Updates</span>
-                </span>
-                <span className="text-sm font-medium text-[#A59480]">See all</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-0 pb-4 space-y-3">
-              {MEMBER_UPDATES.slice(0, 2).map((u) => (
-                <div key={u.id} className="bg-[#F6F5F2] rounded-lg p-3">
-                  <p className="text-xs text-[#8C7C6D]">
-                    <span className="font-semibold text-[#A59480]">{CLUB_LABEL[u.club]}</span> · {formatUpdateDate(u.date)}
-                  </p>
-                  <p className="text-sm font-semibold text-[#1F1F1F] mt-0.5">{u.title}</p>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+            <span
+              className="text-3xl"
+              style={{ fontFamily: 'IvyJournalThin, IvyJournal-Thin, serif', letterSpacing: '0.06em' }}
+            >
+              Noir.life
+            </span>
+            <span aria-hidden="true" className="text-2xl text-[#A59480]">›</span>
+          </button>
 
           {/* Profile Card - Moved to Top */}
           <Card
