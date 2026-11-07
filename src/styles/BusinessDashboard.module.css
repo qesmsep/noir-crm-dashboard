@@ -761,7 +761,6 @@
   font-weight: 600;
 }
 
-/* Print */
 /* ============================================
    PAYMENT ISSUES — top of page, phone-first list
    ============================================ */
@@ -895,6 +894,7 @@
   }
 }
 
+/* Print */
 @media print {
   .root {
     background: #fff;

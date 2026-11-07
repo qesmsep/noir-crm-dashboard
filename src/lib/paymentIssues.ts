@@ -35,6 +35,7 @@ export interface VoidedDuesRow {
   date: string; // YYYY-MM-DD
   amount: number;
   reason: string | null;
+  paymentIntentId?: string;
 }
 
 /** What Stripe says about a pending row's PaymentIntent. Missing = lookup failed. */
@@ -55,6 +56,8 @@ export interface PaymentIssue {
   detail: string;
   /** Number of unpaid dues charges (bank returns) */
   count: number;
+  /** Stripe PaymentIntents behind a bank_returned issue — what "Mark resolved" resolves */
+  paymentIntentIds?: string[];
 }
 
 export interface PaymentIssuesSummary {
@@ -106,7 +109,7 @@ export function computePaymentIssues(
   for (const v of voidedRows) {
     if (!byId.has(v.accountId)) continue; // active accounts only
     const list = returned.get(v.accountId) || [];
-    list.push({ accountId: v.accountId, date: v.date, amount: v.amount, paymentIntentId: '' });
+    list.push({ accountId: v.accountId, date: v.date, amount: v.amount, paymentIntentId: v.paymentIntentId || '' });
     returned.set(v.accountId, list);
     if (v.reason) reasons.set(v.accountId, v.reason);
   }
@@ -145,6 +148,7 @@ export function computePaymentIssues(
       amount,
       since: rows[0].date,
       count: rows.length,
+      paymentIntentIds: [...new Set(rows.map(r => r.paymentIntentId).filter(Boolean))],
       detail:
         rows.length === 1
           ? `Bank payment bounced (${fmtShort(latest)})${reason ? ` — ${shortReason(reason)}` : ''}`

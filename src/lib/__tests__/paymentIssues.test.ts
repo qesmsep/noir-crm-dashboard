@@ -93,4 +93,14 @@ describe('computePaymentIssues', () => {
     expect(s.issues[0]).toMatchObject({ kind: 'bank_returned', amount: 350, since: '2026-10-20' });
     expect(s.issues[0].detail).toContain('1 more not confirmed since Oct 20');
   });
+
+  it('lists the PaymentIntents behind a bounced issue, so resolve touches only those', () => {
+    const accounts = [acct({ accountId: 'a' })];
+    const voided = [
+      { accountId: 'a', date: '2026-10-01', amount: 150, reason: null, paymentIntentId: 'pi_oct' },
+      { accountId: 'a', date: '2026-11-01', amount: 150, reason: null, paymentIntentId: 'pi_nov' },
+    ];
+    const s = computePaymentIssues(accounts, [], new Map(), today, voided);
+    expect(s.issues[0].paymentIntentIds?.sort()).toEqual(['pi_nov', 'pi_oct']);
+  });
 });

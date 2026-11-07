@@ -42,9 +42,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2025-08-27.basil',
 });
 
-const CACHE_TTL_MS = 60_000;
 const MAX_STRIPE_LOOKUPS = 50;
-let cached: { at: number; payload: unknown } | null = null;
 
 // Succeeded / failed are final in Stripe, so remember them across requests.
 const finalIntents = new Map<string, IntentStatus>();
@@ -83,10 +81,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    // No browser caching: after "Mark resolved" the refetch must see the change.
-    // The 60s server-side cache below is cleared by resolve().
+    // No caching anywhere: after "Mark resolved" the refetch must see the
+    // change, and a per-instance server cache can't promise that on Vercel.
     res.setHeader('Cache-Control', 'private, no-store');
-    if (cached && Date.now() - cached.at < CACHE_TTL_MS) return res.status(200).json(cached.payload);
 
     const today = todayChicago();
 
@@ -168,17 +165,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const resolved = new Set((resolvedRes.data || []).map((r: any) => r.stripe_payment_intent_id));
     const voidedRows: VoidedDuesRow[] = [
       ...(failedRes.data || [])
-        .filter((r: any) => !r.stripe_payment_intent_id || !resolved.has(r.stripe_payment_intent_id))
+        .filter((r: any) => r.stripe_payment_intent_id && !resolved.has(r.stripe_payment_intent_id))
         .map((r: any) => ({
           accountId: r.account_id,
           date: String(r.date).slice(0, 10),
           amount: Number(r.amount) || 0,
-          reason: (r.stripe_payment_intent_id && reasonByIntent.get(r.stripe_payment_intent_id)) || null,
+          reason: reasonByIntent.get(r.stripe_payment_intent_id) || null,
+          paymentIntentId: r.stripe_payment_intent_id,
         })),
     ];
 
     const payload = computePaymentIssues(accounts, pendingRows, intents, today, voidedRows);
-    cached = { at: Date.now(), payload };
     return res.status(200).json(payload);
   } catch (error: any) {
     console.error('payment-issues error:', error);
@@ -199,6 +196,13 @@ function shortStripeReason(msg: string | null | undefined): string {
 async function resolve(req: AuthenticatedRequest, res: NextApiResponse) {
   const accountId = typeof req.body?.accountId === 'string' ? req.body.accountId : '';
   if (!/^[0-9a-f-]{36}$/i.test(accountId)) return res.status(400).json({ error: 'accountId required' });
+  // Only the payments the admin saw on the card — never a bounce recorded
+  // after the page loaded.
+  const ids: string[] = Array.isArray(req.body?.paymentIntentIds) ? req.body.paymentIntentIds : [];
+  if (ids.length === 0 || ids.length > 100 || !ids.every(id => typeof id === 'string' && /^pi_[A-Za-z0-9]+$/.test(id))) {
+    return res.status(400).json({ error: 'paymentIntentIds required' });
+  }
+  const wanted = new Set(ids);
   const by = req.user?.email || req.user?.id || 'admin';
 
   // Missed-webhook case: Stripe says failed, ledger still says pending.
@@ -209,7 +213,7 @@ async function resolve(req: AuthenticatedRequest, res: NextApiResponse) {
     .eq('account_id', accountId)
     .in('type', ['credit', 'payment'])
     .eq('status', 'pending')
-    .not('stripe_payment_intent_id', 'is', null);
+    .in('stripe_payment_intent_id', ids);
   if (staleErr) return res.status(500).json({ error: staleErr.message });
   const staleRows: PendingDuesRow[] = (stale || []).map((r: any) => ({
     accountId: r.account_id,
@@ -241,7 +245,7 @@ async function resolve(req: AuthenticatedRequest, res: NextApiResponse) {
     .eq('account_id', accountId)
     .in('type', ['credit', 'payment'])
     .eq('status', 'failed')
-    .not('stripe_payment_intent_id', 'is', null);
+    .in('stripe_payment_intent_id', ids);
   if (openErr) return res.status(500).json({ error: openErr.message });
   const rows = [...new Set((open || []).map((r: any) => r.stripe_payment_intent_id))].map(pi => ({
     stripe_payment_intent_id: pi,
@@ -258,7 +262,6 @@ async function resolve(req: AuthenticatedRequest, res: NextApiResponse) {
     console.error('payment-issues resolve error:', error);
     return res.status(500).json({ error: error.message });
   }
-  cached = null;
   return res.status(200).json({ resolved: data?.length || 0 });
 }
 
