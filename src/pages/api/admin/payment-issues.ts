@@ -18,7 +18,10 @@ import {
  *
  * GET  — the list. Read-only.
  * POST { accountId } — mark that account's bounced bank payments resolved
- *       (sets ledger_voided.resolved_at). Changes nothing in the ledger or Stripe.
+ *       (rows in payment_issue_resolutions). Changes nothing in the ledger or Stripe.
+ *
+ * A bounced bank payment is a ledger row with status 'failed' (the webhook
+ * marks it and posts a reversal); it stays listed until resolved.
  *
  * Separate from business-metrics so a slow Stripe call never holds up the
  * rest of the dashboard. Pending bank payments are checked against the
@@ -79,7 +82,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const today = todayChicago();
 
-    const [accountsRes, membersRes, pendingRes, voidedRes] = await Promise.all([
+    const [accountsRes, membersRes, pendingRes, failedRes, resolvedRes] = await Promise.all([
       supabaseAdmin
         .from('accounts')
         .select('account_id, monthly_dues, next_billing_date, last_payment_failed_at, billing_retry_count')
@@ -92,15 +95,17 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .eq('status', 'pending')
         .not('stripe_payment_intent_id', 'is', null),
       supabaseAdmin
-        .from('ledger_voided')
-        .select('account_id, date, amount, void_reason')
+        .from('ledger')
+        .select('account_id, date, amount, note, stripe_payment_intent_id')
         .in('type', ['credit', 'payment'])
-        .is('resolved_at', null),
+        .eq('status', 'failed'),
+      supabaseAdmin.from('payment_issue_resolutions').select('stripe_payment_intent_id'),
     ]);
     if (accountsRes.error) throw new Error(`accounts fetch: ${accountsRes.error.message}`);
     if (membersRes.error) throw new Error(`members fetch: ${membersRes.error.message}`);
     if (pendingRes.error) throw new Error(`ledger fetch: ${pendingRes.error.message}`);
-    if (voidedRes.error) throw new Error(`ledger_voided fetch: ${voidedRes.error.message}`);
+    if (failedRes.error) throw new Error(`failed ledger fetch: ${failedRes.error.message}`);
+    if (resolvedRes.error) throw new Error(`resolutions fetch: ${resolvedRes.error.message}`);
 
     // Display name: earliest-joined active member, else earliest-joined member
     const nameOf = new Map<string, { name: string; join: string; active: boolean }>();
@@ -136,12 +141,15 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const ids = [...new Set(rowsToCheck(pendingRows, today).map(r => r.paymentIntentId))];
     const intents = await lookupIntents(ids);
 
-    const voidedRows: VoidedDuesRow[] = (voidedRes.data || []).map((v: any) => ({
-      accountId: v.account_id,
-      date: String(v.date).slice(0, 10),
-      amount: Number(v.amount) || 0,
-      reason: v.void_reason || null,
-    }));
+    const resolved = new Set((resolvedRes.data || []).map((r: any) => r.stripe_payment_intent_id));
+    const voidedRows: VoidedDuesRow[] = (failedRes.data || [])
+      .filter((r: any) => !r.stripe_payment_intent_id || !resolved.has(r.stripe_payment_intent_id))
+      .map((r: any) => ({
+        accountId: r.account_id,
+        date: String(r.date).slice(0, 10),
+        amount: Number(r.amount) || 0,
+        reason: null,
+      }));
 
     const payload = computePaymentIssues(accounts, pendingRows, intents, today, voidedRows);
     cached = { at: Date.now(), payload };
@@ -156,12 +164,25 @@ async function resolve(req: AuthenticatedRequest, res: NextApiResponse) {
   const accountId = typeof req.body?.accountId === 'string' ? req.body.accountId : '';
   if (!/^[0-9a-f-]{36}$/i.test(accountId)) return res.status(400).json({ error: 'accountId required' });
   const by = req.user?.email || req.user?.id || 'admin';
-  const { data, error } = await supabaseAdmin
-    .from('ledger_voided')
-    .update({ resolved_at: new Date().toISOString(), resolved_by: String(by) })
+  const { data: open, error: openErr } = await supabaseAdmin
+    .from('ledger')
+    .select('stripe_payment_intent_id')
     .eq('account_id', accountId)
-    .is('resolved_at', null)
-    .select('id');
+    .in('type', ['credit', 'payment'])
+    .eq('status', 'failed')
+    .not('stripe_payment_intent_id', 'is', null);
+  if (openErr) return res.status(500).json({ error: openErr.message });
+  const rows = [...new Set((open || []).map((r: any) => r.stripe_payment_intent_id))].map(pi => ({
+    stripe_payment_intent_id: pi,
+    account_id: accountId,
+    resolved_by: String(by),
+  }));
+  const { data, error } = rows.length
+    ? await supabaseAdmin
+        .from('payment_issue_resolutions')
+        .upsert(rows, { onConflict: 'stripe_payment_intent_id', ignoreDuplicates: true })
+        .select('stripe_payment_intent_id')
+    : { data: [], error: null };
   if (error) {
     console.error('payment-issues resolve error:', error);
     return res.status(500).json({ error: error.message });

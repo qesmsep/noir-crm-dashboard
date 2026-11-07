@@ -587,27 +587,29 @@ export default async function handler(req, res) {
         });
 
         // The billing cron wrote this payment to the ledger as 'pending' when it
-        // was submitted. The bank returned it, so it never happened: move its
-        // rows (dues credit + fee lines) out of the ledger into ledger_voided so
-        // it stops counting toward the member's balance. The Payment Issues
-        // card on /admin/business lists it until an admin resolves it.
+        // was submitted. The bank returned it. The ledger is the history, so
+        // nothing is removed: the payment's rows (dues credit + fee lines) are
+        // marked 'failed' and each gets a reversing entry dated the day the
+        // payment failed, so the balance nets out. The Payment Issues card on
+        // /admin/business lists it until an admin marks it resolved.
         if (!charge.payment_intent) {
-          console.warn('ACH charge.failed with no payment_intent, nothing to void:', charge.id);
+          console.warn('ACH charge.failed with no payment_intent, nothing to reverse:', charge.id);
           return res.json({ success: true, message: 'ACH payment failure logged (no payment intent)' });
         }
-        const reason = `ACH returned${charge.failure_code ? ` (${charge.failure_code})` : ''}: ${charge.failure_message || 'payment failed'}`;
-        const { data: moved, error: voidError } = await supabase.rpc('void_ledger_for_payment_intent', {
+        const failedOn = new Date(event.created * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+        const why = (charge.failure_message || charge.failure_code || 'failed').replace(/^The customer's account has /i, '').replace(/ to cover this payment\.?$/i, '').replace(/_/g, ' ');
+        const { data: reversed, error: reverseError } = await supabase.rpc('reverse_failed_payment_intent', {
           p_payment_intent_id: charge.payment_intent,
-          p_reason: reason,
-          p_voided_by: `stripe_webhook:${charge.id}`,
+          p_reason: `bank payment returned: ${why}`,
+          p_date: failedOn,
         });
-        if (voidError) {
+        if (reverseError) {
           // 500 makes Stripe redeliver; the function is safe to run twice
-          console.error('Error voiding ledger rows for failed ACH payment:', voidError);
-          return res.status(500).json({ error: 'Failed to void ledger rows' });
+          console.error('Error reversing failed ACH payment:', reverseError);
+          return res.status(500).json({ error: 'Failed to record ACH failure' });
         }
-        console.log(`ACH payment failed (${charge.failure_message}); voided ${moved} ledger row(s) for`, charge.payment_intent);
-        return res.json({ success: true, message: 'ACH payment failure recorded', voided: moved });
+        console.log(`ACH payment failed (${charge.failure_message}) on ${failedOn}; ${reversed} reversal(s) posted for`, charge.payment_intent);
+        return res.json({ success: true, message: 'ACH payment failure recorded', reversed });
       }
     }
 

@@ -71,7 +71,7 @@ async function fetchAllLedger(): Promise<LedgerRow[]> {
   for (;;) {
     const { data, error } = await supabaseAdmin
       .from('ledger')
-      .select('account_id, type, amount, note, source, date')
+      .select('account_id, type, amount, note, source, date, status')
       .range(from, from + pageSize - 1);
     if (error) throw new Error(`ledger fetch: ${error.message}`);
     if (!data || data.length === 0) break;

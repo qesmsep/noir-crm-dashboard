@@ -29,7 +29,7 @@ export interface PendingDuesRow {
   paymentIntentId: string;
 }
 
-/** A bounced payment already moved off the ledger (ledger_voided), not yet resolved. */
+/** A bounced payment: ledger row marked 'failed' (reversal posted), not yet resolved. */
 export interface VoidedDuesRow {
   accountId: string;
   date: string; // YYYY-MM-DD

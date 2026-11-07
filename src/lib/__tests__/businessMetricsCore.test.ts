@@ -298,3 +298,18 @@ describe('zonedMidnightIso', () => {
     expect(zonedMidnightIso('2026-11-01')).toBe('2026-11-01T05:00:00.000Z');
   });
 });
+
+describe('aggregateLedger — returned bank payments', () => {
+  it('does not count a failed dues row or its reversals as dues cash, and nets the balance to zero', () => {
+    const rows: CoreLedgerRow[] = [
+      { account_id: 'a', type: 'credit', amount: 175, note: 'Monthly dues - November 2026', source: 'billing_cron', date: '2026-11-01', status: 'failed' },
+      { account_id: 'a', type: 'charge', amount: -50, note: 'Membership administration fee', source: 'billing_cron', date: '2026-11-01', status: 'failed' },
+      { account_id: 'a', type: 'charge', amount: -175, note: 'Reversal — Monthly dues - November 2026 (bank payment returned: insufficient funds)', source: 'ach_return', date: '2026-11-03', status: 'cleared' },
+      { account_id: 'a', type: 'credit', amount: 50, note: 'Reversal — Membership administration fee (bank payment returned: insufficient funds)', source: 'ach_return', date: '2026-11-03', status: 'cleared' },
+      { account_id: 'b', type: 'credit', amount: 150, note: 'Monthly dues - November 2026', source: 'billing_cron', date: '2026-11-01', status: 'cleared' },
+    ];
+    const agg = aggregateLedger(rows, '2026-11-01', '2026-12-01', '2026-10-01', ['2026-11-01']);
+    expect(agg.duesCashMTD).toBe(150);
+    expect(Math.round((agg.balanceByAccount.get('a') || 0) * 100) / 100).toBe(0);
+  });
+});

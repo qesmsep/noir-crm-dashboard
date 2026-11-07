@@ -97,19 +97,28 @@ $$;
 REVOKE ALL ON FUNCTION public.reverse_failed_payment_intent(text, text, date) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.reverse_failed_payment_intent(text, text, date) TO service_role;
 
--- 2. Reverse everything restored in step 0 (dated the original void day).
+-- 2. Reverse everything restored in step 0, dated the day the payment failed.
+--    Stripe keeps charge.failed events 30 days, so the exact failure date is
+--    known only for the two November returns (both failed 2026-11-03,
+--    Chicago time). For older returns the date is no longer available, and the
+--    reversal is dated the day the payment was attempted (the original row's
+--    date) — within the 2-4 business days a bank takes to return.
 DO $$
 DECLARE
   r record;
 BEGIN
   IF to_regclass('public.ledger_voided') IS NOT NULL THEN
     FOR r IN
-      SELECT DISTINCT stripe_payment_intent_id AS pi,
-             min(void_reason) AS reason,
-             min(voided_at AT TIME ZONE 'America/Chicago')::date AS d
-      FROM public.ledger_voided
-      WHERE stripe_payment_intent_id IS NOT NULL
-      GROUP BY stripe_payment_intent_id
+      SELECT v.stripe_payment_intent_id AS pi,
+             min(v.void_reason) AS reason,
+             coalesce(min(k.failed_on), min(v.date)) AS d
+      FROM public.ledger_voided v
+      LEFT JOIN (VALUES
+        ('pi_3UWzJWFdjSPifIH51BmJcoLO', DATE '2026-11-03'),
+        ('pi_3UWzJhFdjSPifIH50HRacrA9', DATE '2026-11-03')
+      ) AS k(pi, failed_on) ON k.pi = v.stripe_payment_intent_id
+      WHERE v.stripe_payment_intent_id IS NOT NULL
+      GROUP BY v.stripe_payment_intent_id
     LOOP
       PERFORM public.reverse_failed_payment_intent(
         r.pi,
