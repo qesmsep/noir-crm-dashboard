@@ -8,12 +8,17 @@ import {
   rowsToCheck,
   IssueAccountInput,
   PendingDuesRow,
+  VoidedDuesRow,
   IntentStatus,
 } from '../../../lib/paymentIssues';
 
 /**
  * Payment issues for the top of /admin/business: active accounts whose dues
- * did not clear. Read-only — it changes nothing in the ledger or in Stripe.
+ * did not clear.
+ *
+ * GET  — the list. Read-only.
+ * POST { accountId } — mark that account's bounced bank payments resolved
+ *       (sets ledger_voided.resolved_at). Changes nothing in the ledger or Stripe.
  *
  * Separate from business-metrics so a slow Stripe call never holds up the
  * rest of the dashboard. Pending bank payments are checked against the
@@ -65,6 +70,7 @@ async function lookupIntents(ids: string[]): Promise<Map<string, IntentStatus>> 
 }
 
 async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
+  if (req.method === 'POST') return resolve(req, res);
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
@@ -73,7 +79,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const today = todayChicago();
 
-    const [accountsRes, membersRes, pendingRes] = await Promise.all([
+    const [accountsRes, membersRes, pendingRes, voidedRes] = await Promise.all([
       supabaseAdmin
         .from('accounts')
         .select('account_id, monthly_dues, next_billing_date, last_payment_failed_at, billing_retry_count')
@@ -85,10 +91,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .in('type', ['credit', 'payment'])
         .eq('status', 'pending')
         .not('stripe_payment_intent_id', 'is', null),
+      supabaseAdmin
+        .from('ledger_voided')
+        .select('account_id, date, amount, void_reason')
+        .in('type', ['credit', 'payment'])
+        .is('resolved_at', null),
     ]);
     if (accountsRes.error) throw new Error(`accounts fetch: ${accountsRes.error.message}`);
     if (membersRes.error) throw new Error(`members fetch: ${membersRes.error.message}`);
     if (pendingRes.error) throw new Error(`ledger fetch: ${pendingRes.error.message}`);
+    if (voidedRes.error) throw new Error(`ledger_voided fetch: ${voidedRes.error.message}`);
 
     // Display name: earliest-joined active member, else earliest-joined member
     const nameOf = new Map<string, { name: string; join: string; active: boolean }>();
@@ -124,13 +136,38 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const ids = [...new Set(rowsToCheck(pendingRows, today).map(r => r.paymentIntentId))];
     const intents = await lookupIntents(ids);
 
-    const payload = computePaymentIssues(accounts, pendingRows, intents, today);
+    const voidedRows: VoidedDuesRow[] = (voidedRes.data || []).map((v: any) => ({
+      accountId: v.account_id,
+      date: String(v.date).slice(0, 10),
+      amount: Number(v.amount) || 0,
+      reason: v.void_reason || null,
+    }));
+
+    const payload = computePaymentIssues(accounts, pendingRows, intents, today, voidedRows);
     cached = { at: Date.now(), payload };
     return res.status(200).json(payload);
   } catch (error: any) {
     console.error('payment-issues error:', error);
     return res.status(500).json({ error: error.message || 'Internal error' });
   }
+}
+
+async function resolve(req: AuthenticatedRequest, res: NextApiResponse) {
+  const accountId = typeof req.body?.accountId === 'string' ? req.body.accountId : '';
+  if (!/^[0-9a-f-]{36}$/i.test(accountId)) return res.status(400).json({ error: 'accountId required' });
+  const by = req.user?.email || req.user?.id || 'admin';
+  const { data, error } = await supabaseAdmin
+    .from('ledger_voided')
+    .update({ resolved_at: new Date().toISOString(), resolved_by: String(by) })
+    .eq('account_id', accountId)
+    .is('resolved_at', null)
+    .select('id');
+  if (error) {
+    console.error('payment-issues resolve error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+  cached = null;
+  return res.status(200).json({ resolved: data?.length || 0 });
 }
 
 export default withRateLimitAndAuth(handler);

@@ -398,6 +398,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .map(m => {
         const next = nextYearlyOccurrence(m.dob, today, CELEBRATION_WINDOW_DAYS);
         return next && next.years >= 1 && next.years <= MAX_PLAUSIBLE_AGE && {
+          account_id: m.account_id || undefined,
           member_id: m.member_id,
           name: `${m.first_name || ''} ${m.last_name || ''}`.trim() || 'Unknown',
           ...next,

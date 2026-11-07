@@ -70,4 +70,18 @@ describe('computePaymentIssues', () => {
     const s = computePaymentIssues([], rows, new Map([['pi_g', { status: 'requires_payment_method' }]]), today);
     expect(s.accounts).toBe(0);
   });
+
+  it('lists bounced payments already moved off the ledger, merged with ones Stripe reports', () => {
+    const accounts = [acct({ accountId: 'l', name: 'Lindsey' })];
+    const voided = [{ accountId: 'l', date: '2026-09-01', amount: 175, reason: 'ACH returned (insufficient_funds): ...' }];
+    const rows = [{ accountId: 'l', date: '2026-11-01', amount: 175, paymentIntentId: 'pi_n' }];
+    const s = computePaymentIssues(accounts, rows, new Map([['pi_n', { status: 'requires_payment_method' }]]), today, voided);
+    expect(s.issues[0]).toMatchObject({ kind: 'bank_returned', count: 2, amount: 350, since: '2026-09-01' });
+    expect(s.issues[0].detail).toContain('insufficient funds');
+  });
+
+  it('ignores voided rows for accounts that are no longer active', () => {
+    const s = computePaymentIssues([], [], new Map(), today, [{ accountId: 'x', date: '2026-10-01', amount: 150, reason: null }]);
+    expect(s.accounts).toBe(0);
+  });
 });

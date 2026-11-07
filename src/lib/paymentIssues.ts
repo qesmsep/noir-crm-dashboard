@@ -29,6 +29,14 @@ export interface PendingDuesRow {
   paymentIntentId: string;
 }
 
+/** A bounced payment already moved off the ledger (ledger_voided), not yet resolved. */
+export interface VoidedDuesRow {
+  accountId: string;
+  date: string; // YYYY-MM-DD
+  amount: number;
+  reason: string | null;
+}
+
 /** What Stripe says about a pending row's PaymentIntent. Missing = lookup failed. */
 export interface IntentStatus {
   status: string; // Stripe PaymentIntent status
@@ -84,7 +92,8 @@ export function computePaymentIssues(
   accounts: IssueAccountInput[],
   pendingRows: PendingDuesRow[],
   intents: Map<string, IntentStatus>,
-  today: string
+  today: string,
+  voidedRows: VoidedDuesRow[] = []
 ): PaymentIssuesSummary {
   const byId = new Map(accounts.map(a => [a.accountId, a]));
   const issues = new Map<string, PaymentIssue>();
@@ -94,6 +103,13 @@ export function computePaymentIssues(
   const returned = new Map<string, PendingDuesRow[]>();
   const unconfirmed = new Map<string, PendingDuesRow[]>();
   const reasons = new Map<string, string>();
+  for (const v of voidedRows) {
+    if (!byId.has(v.accountId)) continue; // active accounts only
+    const list = returned.get(v.accountId) || [];
+    list.push({ accountId: v.accountId, date: v.date, amount: v.amount, paymentIntentId: '' });
+    returned.set(v.accountId, list);
+    if (v.reason) reasons.set(v.accountId, v.reason);
+  }
   for (const row of rowsToCheck(pendingRows, today)) {
     if (!byId.has(row.accountId)) continue; // active accounts only
     const intent = intents.get(row.paymentIntentId);
@@ -202,8 +218,8 @@ export function computePaymentIssues(
 }
 
 function shortReason(msg: string): string {
-  if (/insufficient funds/i.test(msg)) return 'insufficient funds';
-  if (/closed/i.test(msg)) return 'account closed';
+  if (/insufficient[ _]funds/i.test(msg)) return 'insufficient funds';
+  if (/closed|R02/i.test(msg)) return 'account closed';
   if (/authoriz/i.test(msg)) return 'not authorized';
   return msg.length > 40 ? msg.slice(0, 40).trimEnd() + '…' : msg;
 }

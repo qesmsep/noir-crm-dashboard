@@ -413,9 +413,9 @@ function CelebrationList({
       ) : (
         <ul className={styles.dateList}>
           {rows.map(r => (
-            <li key={r.account_id || r.member_id || r.name} className={styles.dateRow}>
+            <li key={`${r.account_id || ""}-${r.member_id || r.name}`} className={styles.dateRow}>
               <span className={styles.dateRowName}>
-                {r.member_id ? <a href={`/admin/members/${r.member_id}`}>{r.name}</a> : r.name}
+                {r.account_id ? <a href={`/admin/members/${r.account_id}`}>{r.name}</a> : r.name}
                 <span className={styles.dateRowDetail}> · {detail(r)}</span>
               </span>
               <span className={r.daysAway <= 7 ? styles.dateRowWhenSoon : styles.dateRowWhen}>{fmtWhen(r)}</span>
@@ -509,7 +509,15 @@ interface PaymentIssues {
   issues: PaymentIssue[];
 }
 
-function PaymentIssuesCard({ data, error }: { data: PaymentIssues | null; error: string | null }) {
+function PaymentIssuesCard({
+  data,
+  error,
+  onResolve,
+}: {
+  data: PaymentIssues | null;
+  error: string | null;
+  onResolve: (accountId: string, name: string) => void;
+}) {
   if (error) {
     return <div className={styles.issuesCard}><div className={styles.issuesEmpty}>Couldn&apos;t check payment issues: {error}</div></div>;
   }
@@ -529,7 +537,7 @@ function PaymentIssuesCard({ data, error }: { data: PaymentIssues | null; error:
       </div>
       <ul className={styles.issuesList}>
         {data.issues.map(i => (
-          <li key={i.accountId}>
+          <li key={i.accountId} className={styles.issueItem}>
             <a href={`/admin/members/${i.accountId}`} className={styles.issueRow}>
               <span className={styles.issueMain}>
                 <span className={styles.issueName}>{i.name}</span>
@@ -538,6 +546,11 @@ function PaymentIssuesCard({ data, error }: { data: PaymentIssues | null; error:
               <span className={styles.issueAmount}>{fmtCurrencyDec(i.amount)}</span>
               <span className={styles.issueChevron} aria-hidden>›</span>
             </a>
+            {i.kind === 'bank_returned' && (
+              <button type="button" className={styles.issueResolve} onClick={() => onResolve(i.accountId, i.name)}>
+                Mark resolved
+              </button>
+            )}
           </li>
         ))}
       </ul>
@@ -602,6 +615,26 @@ export default function BusinessDashboard() {
     }
   }, []);
 
+  // A bounced bank payment stays on the card until someone has dealt with it
+  // (collected another way, or the member removed). Card declines and
+  // unbilled accounts clear themselves when billing succeeds.
+  const resolveIssue = useCallback(async (accountId: string, name: string) => {
+    if (!window.confirm(`Mark ${name}'s bounced payment as resolved? It will leave this list. Only do this once it is collected or the member is removed.`)) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const res = await fetch('/api/admin/payment-issues', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      await fetchIssues();
+    } catch (err: any) {
+      window.alert(`Could not mark resolved: ${err.message || err}`);
+    }
+  }, [fetchIssues]);
+
   useEffect(() => {
     fetchMetrics();
     fetchIssues();
@@ -634,7 +667,7 @@ export default function BusinessDashboard() {
 
         {error && <div className={styles.error}>{error}</div>}
 
-        <PaymentIssuesCard data={issues} error={issuesError} />
+        <PaymentIssuesCard data={issues} error={issuesError} onResolve={resolveIssue} />
 
         {m && (m.dataQuality?.unknownPlanAccounts ?? 0) > 0 && (
           <div className={styles.error}>
@@ -893,8 +926,8 @@ export default function BusinessDashboard() {
                         {m.engagement.atRisk.map(r => (
                           <tr key={r.account_id}>
                             <td>
-                              {r.member_id ? (
-                                <a href={`/admin/members/${r.member_id}`} style={{ color: '#A59480', textDecoration: 'none' }}>
+                              {r.account_id ? (
+                                <a href={`/admin/members/${r.account_id}`} style={{ color: '#A59480', textDecoration: 'none' }}>
                                   {r.name}
                                 </a>
                               ) : (

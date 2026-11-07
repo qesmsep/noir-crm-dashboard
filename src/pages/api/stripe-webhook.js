@@ -586,11 +586,28 @@ export default async function handler(req, res) {
           failureMessage: charge.failure_message,
         });
 
-        // TODO: Notify customer of failed ACH payment
-        // You can send email/SMS here to alert them
-
-        console.log('ACH payment failed:', charge.failure_message);
-        return res.json({ success: true, message: 'ACH payment failure logged' });
+        // The billing cron wrote this payment to the ledger as 'pending' when it
+        // was submitted. The bank returned it, so it never happened: move its
+        // rows (dues credit + fee lines) out of the ledger into ledger_voided so
+        // it stops counting toward the member's balance. The Payment Issues
+        // card on /admin/business lists it until an admin resolves it.
+        if (!charge.payment_intent) {
+          console.warn('ACH charge.failed with no payment_intent, nothing to void:', charge.id);
+          return res.json({ success: true, message: 'ACH payment failure logged (no payment intent)' });
+        }
+        const reason = `ACH returned${charge.failure_code ? ` (${charge.failure_code})` : ''}: ${charge.failure_message || 'payment failed'}`;
+        const { data: moved, error: voidError } = await supabase.rpc('void_ledger_for_payment_intent', {
+          p_payment_intent_id: charge.payment_intent,
+          p_reason: reason,
+          p_voided_by: `stripe_webhook:${charge.id}`,
+        });
+        if (voidError) {
+          // 500 makes Stripe redeliver; the function is safe to run twice
+          console.error('Error voiding ledger rows for failed ACH payment:', voidError);
+          return res.status(500).json({ error: 'Failed to void ledger rows' });
+        }
+        console.log(`ACH payment failed (${charge.failure_message}); voided ${moved} ledger row(s) for`, charge.payment_intent);
+        return res.json({ success: true, message: 'ACH payment failure recorded', voided: moved });
       }
     }
 
