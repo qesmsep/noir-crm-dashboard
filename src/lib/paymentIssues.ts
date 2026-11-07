@@ -222,7 +222,8 @@ export function computePaymentIssues(
 
 function shortReason(msg: string): string {
   if (/insufficient[ _]funds/i.test(msg)) return 'insufficient funds';
-  if (/closed|R02/i.test(msg)) return 'account closed';
+  if (/account closed|account is closed|R02/i.test(msg)) return 'account closed';
   if (/authoriz/i.test(msg)) return 'not authorized';
+  if (/canceled before/i.test(msg)) return 'canceled before it cleared';
   return msg.length > 40 ? msg.slice(0, 40).trimEnd() + '…' : msg;
 }

@@ -17,9 +17,13 @@ import {
  * Payment issues for the top of /admin/business: active accounts whose dues
  * did not clear.
  *
- * GET  — the list. Read-only.
- * POST { accountId } — mark that account's bounced bank payments resolved
- *       (rows in payment_issue_resolutions). Changes nothing in the ledger or Stripe.
+ * GET  — the list. Read-only: never writes.
+ * POST { accountId } — "Mark resolved". First, if a bank payment of this
+ *       account is still 'pending' in the ledger but Stripe says it failed (the
+ *       charge.failed webhook was missed), record it the way the webhook would:
+ *       mark failed + post reversals, dated the attempt date (the real failure
+ *       date isn't known here). Then record every failed payment of the
+ *       account in payment_issue_resolutions so it leaves the card.
  *
  * A bounced bank payment is a ledger row with status 'failed' (the webhook
  * marks it and posts a reversal); it stays listed until resolved.
@@ -39,6 +43,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
 });
 
 const CACHE_TTL_MS = 60_000;
+const MAX_STRIPE_LOOKUPS = 50;
 let cached: { at: number; payload: unknown } | null = null;
 
 // Succeeded / failed are final in Stripe, so remember them across requests.
@@ -78,7 +83,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   try {
-    res.setHeader('Cache-Control', 'private, max-age=60');
+    // No browser caching: after "Mark resolved" the refetch must see the change.
+    // The 60s server-side cache below is cleared by resolve().
+    res.setHeader('Cache-Control', 'private, no-store');
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) return res.status(200).json(cached.payload);
 
     const today = todayChicago();
@@ -138,7 +145,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     }));
     const activeIds = new Set(accounts.map(a => a.accountId));
 
-    let pendingRows: PendingDuesRow[] = (pendingRes.data || [])
+    const pendingRows: PendingDuesRow[] = (pendingRes.data || [])
       .filter((r: any) => activeIds.has(r.account_id))
       .map((r: any) => ({
         accountId: r.account_id,
@@ -147,7 +154,9 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         paymentIntentId: r.stripe_payment_intent_id,
       }));
 
-    const ids = [...new Set(rowsToCheck(pendingRows, today).map(r => r.paymentIntentId))];
+    // Capped so a backlog (e.g. after a webhook outage) can't stall the page;
+    // anything past the cap is still flagged as unconfirmed once old enough.
+    const ids = [...new Set(rowsToCheck(pendingRows, today).map(r => r.paymentIntentId))].slice(0, MAX_STRIPE_LOOKUPS);
     const intents = await lookupIntents(ids);
 
     const reasonByIntent = new Map<string, string>();
@@ -155,32 +164,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       const m = /returned: ([^)]+)\)\s*$/.exec(r.note || '');
       if (m && r.stripe_payment_intent_id) reasonByIntent.set(r.stripe_payment_intent_id, m[1]);
     }
-
-    // Safety net for a missed charge.failed webhook: Stripe says the bank
-    // payment failed but the ledger still has it pending. Record it the same
-    // way the webhook would (mark failed + post reversals), so the balance is
-    // right and "Mark resolved" works on it. Dated today: the real failure
-    // date is not known here.
-    const healed = new Set<string>();
-    for (const id of ids) {
-      const intent = intents.get(id);
-      if (!intent || (intent.status !== 'requires_payment_method' && intent.status !== 'canceled')) continue;
-      const why = shortStripeReason(intent.failureMessage);
-      const { error } = await supabaseAdmin.rpc('reverse_failed_payment_intent', {
-        p_payment_intent_id: id,
-        p_reason: `bank payment returned: ${why}`,
-        p_date: today,
-      });
-      if (error) {
-        console.error(`[payment-issues] could not reverse ${id}:`, error.message);
-        continue; // still listed from the Stripe status below
-      }
-      healed.add(id);
-      reasonByIntent.set(id, why);
-    }
-
-    const healedRows = pendingRows.filter(r => healed.has(r.paymentIntentId));
-    pendingRows = pendingRows.filter(r => !healed.has(r.paymentIntentId));
 
     const resolved = new Set((resolvedRes.data || []).map((r: any) => r.stripe_payment_intent_id));
     const voidedRows: VoidedDuesRow[] = [
@@ -192,12 +175,6 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
           amount: Number(r.amount) || 0,
           reason: (r.stripe_payment_intent_id && reasonByIntent.get(r.stripe_payment_intent_id)) || null,
         })),
-      ...healedRows.map(r => ({
-        accountId: r.accountId,
-        date: r.date,
-        amount: r.amount,
-        reason: reasonByIntent.get(r.paymentIntentId) || null,
-      })),
     ];
 
     const payload = computePaymentIssues(accounts, pendingRows, intents, today, voidedRows);
@@ -223,6 +200,41 @@ async function resolve(req: AuthenticatedRequest, res: NextApiResponse) {
   const accountId = typeof req.body?.accountId === 'string' ? req.body.accountId : '';
   if (!/^[0-9a-f-]{36}$/i.test(accountId)) return res.status(400).json({ error: 'accountId required' });
   const by = req.user?.email || req.user?.id || 'admin';
+
+  // Missed-webhook case: Stripe says failed, ledger still says pending.
+  const today = todayChicago();
+  const { data: stale, error: staleErr } = await supabaseAdmin
+    .from('ledger')
+    .select('account_id, date, amount, stripe_payment_intent_id')
+    .eq('account_id', accountId)
+    .in('type', ['credit', 'payment'])
+    .eq('status', 'pending')
+    .not('stripe_payment_intent_id', 'is', null);
+  if (staleErr) return res.status(500).json({ error: staleErr.message });
+  const staleRows: PendingDuesRow[] = (stale || []).map((r: any) => ({
+    accountId: r.account_id,
+    date: String(r.date).slice(0, 10),
+    amount: Number(r.amount) || 0,
+    paymentIntentId: r.stripe_payment_intent_id,
+  }));
+  const checkRows = rowsToCheck(staleRows, today);
+  const intents = await lookupIntents([...new Set(checkRows.map(r => r.paymentIntentId))]);
+  for (const row of checkRows) {
+    const intent = intents.get(row.paymentIntentId);
+    if (!intent || (intent.status !== 'requires_payment_method' && intent.status !== 'canceled')) continue;
+    const reason = intent.status === 'canceled'
+      ? 'payment canceled before it cleared'
+      : `bank payment returned: ${shortStripeReason(intent.failureMessage)}`;
+    const { error } = await supabaseAdmin.rpc('reverse_failed_payment_intent', {
+      p_payment_intent_id: row.paymentIntentId,
+      p_reason: reason,
+      p_date: row.date,
+    });
+    if (error) {
+      console.error(`[payment-issues] could not reverse ${row.paymentIntentId}:`, error.message);
+      return res.status(500).json({ error: `Could not record failed payment: ${error.message}` });
+    }
+  }
   const { data: open, error: openErr } = await supabaseAdmin
     .from('ledger')
     .select('stripe_payment_intent_id')

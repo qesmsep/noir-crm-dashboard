@@ -13,9 +13,13 @@
 
 BEGIN;
 
+-- Only the reversals this migration posted for the backed-up rows (matched by
+-- exact key), never a reversal posted later for some other payment.
 DELETE FROM public.ledger
 WHERE source = 'ach_return'
-  AND stripe_payment_intent_id IN (SELECT stripe_payment_intent_id FROM public.ledger_voided);
+  AND ledger_entry_key IN (
+    SELECT coalesce(v.ledger_entry_key, v.id::text) || ':reversal' FROM public.ledger_voided v
+  );
 
 UPDATE public.ledger l
 SET status = (v.original_row->>'status')::ledger_status

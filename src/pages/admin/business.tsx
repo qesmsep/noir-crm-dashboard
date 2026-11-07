@@ -606,6 +606,7 @@ export default function BusinessDashboard() {
       if (!session) throw new Error('Not authenticated');
       const res = await fetch('/api/admin/payment-issues', {
         headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
       });
       if (!res.ok) throw new Error(`${res.status}`);
       setIssues(await res.json());
