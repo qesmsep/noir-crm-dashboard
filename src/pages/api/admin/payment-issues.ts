@@ -9,7 +9,9 @@ import {
   rowsToCheck,
   IssueAccountInput,
   PendingDuesRow,
-  VoidedDuesRow,
+  FailedDuesRow,
+  stripeFailureReason,
+  reasonFromReversalNote,
   IntentStatus,
 } from '../../../lib/paymentIssues';
 
@@ -153,17 +155,23 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     // Capped so a backlog (e.g. after a webhook outage) can't stall the page;
     // anything past the cap is still flagged as unconfirmed once old enough.
-    const ids = [...new Set(rowsToCheck(pendingRows, today).map(r => r.paymentIntentId))].slice(0, MAX_STRIPE_LOOKUPS);
+    // Newest first: a fresh bounce is what matters, and old pending rows whose
+    // payment actually succeeded (webhook missed) must not crowd it out.
+    const ids = [...new Set(
+      rowsToCheck(pendingRows, today)
+        .sort((x, y) => y.date.localeCompare(x.date))
+        .map(r => r.paymentIntentId)
+    )].slice(0, MAX_STRIPE_LOOKUPS);
     const intents = await lookupIntents(ids);
 
     const reasonByIntent = new Map<string, string>();
     for (const r of reversalRes.data || []) {
-      const m = /returned: ([^)]+)\)\s*$/.exec(r.note || '');
-      if (m && r.stripe_payment_intent_id) reasonByIntent.set(r.stripe_payment_intent_id, m[1]);
+      const reason = reasonFromReversalNote(r.note);
+      if (reason && r.stripe_payment_intent_id) reasonByIntent.set(r.stripe_payment_intent_id, reason);
     }
 
     const resolved = new Set((resolvedRes.data || []).map((r: any) => r.stripe_payment_intent_id));
-    const voidedRows: VoidedDuesRow[] = [
+    const failedRows: FailedDuesRow[] = [
       ...(failedRes.data || [])
         .filter((r: any) => r.stripe_payment_intent_id && !resolved.has(r.stripe_payment_intent_id))
         .map((r: any) => ({
@@ -175,7 +183,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         })),
     ];
 
-    const payload = computePaymentIssues(accounts, pendingRows, intents, today, voidedRows);
+    const payload = computePaymentIssues(accounts, pendingRows, intents, today, failedRows);
     return res.status(200).json(payload);
   } catch (error: any) {
     console.error('payment-issues error:', error);
@@ -187,11 +195,6 @@ function chicagoDate(ts: string): string {
   return new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
 }
 
-function shortStripeReason(msg: string | null | undefined): string {
-  return (msg || 'failed')
-    .replace(/^The customer's account has /i, '')
-    .replace(/ to cover this payment\.?$/i, '');
-}
 
 async function resolve(req: AuthenticatedRequest, res: NextApiResponse) {
   const accountId = typeof req.body?.accountId === 'string' ? req.body.accountId : '';
@@ -228,7 +231,7 @@ async function resolve(req: AuthenticatedRequest, res: NextApiResponse) {
     if (!intent || (intent.status !== 'requires_payment_method' && intent.status !== 'canceled')) continue;
     const reason = intent.status === 'canceled'
       ? 'payment canceled before it cleared'
-      : `bank payment returned: ${shortStripeReason(intent.failureMessage)}`;
+      : `bank payment returned: ${stripeFailureReason(intent.failureMessage)}`;
     const { error } = await supabaseAdmin.rpc('reverse_failed_payment_intent', {
       p_payment_intent_id: row.paymentIntentId,
       p_reason: reason,

@@ -30,7 +30,7 @@ export interface PendingDuesRow {
 }
 
 /** A bounced payment: ledger row marked 'failed' (reversal posted), not yet resolved. */
-export interface VoidedDuesRow {
+export interface FailedDuesRow {
   accountId: string;
   date: string; // YYYY-MM-DD
   amount: number;
@@ -96,7 +96,7 @@ export function computePaymentIssues(
   pendingRows: PendingDuesRow[],
   intents: Map<string, IntentStatus>,
   today: string,
-  voidedRows: VoidedDuesRow[] = []
+  failedRows: FailedDuesRow[] = []
 ): PaymentIssuesSummary {
   const byId = new Map(accounts.map(a => [a.accountId, a]));
   const issues = new Map<string, PaymentIssue>();
@@ -106,7 +106,7 @@ export function computePaymentIssues(
   const returned = new Map<string, PendingDuesRow[]>();
   const unconfirmed = new Map<string, PendingDuesRow[]>();
   const reasons = new Map<string, string>();
-  for (const v of voidedRows) {
+  for (const v of failedRows) {
     if (!byId.has(v.accountId)) continue; // active accounts only
     const list = returned.get(v.accountId) || [];
     list.push({ accountId: v.accountId, date: v.date, amount: v.amount, paymentIntentId: v.paymentIntentId || '' });
@@ -230,4 +230,18 @@ function shortReason(msg: string): string {
   if (/authoriz/i.test(msg)) return 'not authorized';
   if (/canceled before/i.test(msg)) return 'canceled before it cleared';
   return msg.length > 40 ? msg.slice(0, 40).trimEnd() + '…' : msg;
+}
+
+/** Stripe's failure_message, trimmed to the part worth showing: "insufficient funds". */
+export function stripeFailureReason(msg: string | null | undefined): string {
+  return (msg || 'failed')
+    .replace(/^The customer's account has /i, '')
+    .replace(/ to cover this payment\.?$/i, '')
+    .replace(/_/g, ' ');
+}
+
+/** Reason back out of a reversal note: "Reversal — … (bank payment returned: insufficient funds)". */
+export function reasonFromReversalNote(note: string | null | undefined): string | null {
+  const m = /returned: ([^)]+)\)\s*$/.exec(note || '');
+  return m ? m[1] : null;
 }

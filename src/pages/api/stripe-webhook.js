@@ -8,6 +8,7 @@ import {
   findPendingEntryForAchCharge,
   resolveAccountIdForCharge,
 } from '../../lib/achPaymentRecovery';
+import { stripeFailureReason } from '../../lib/paymentIssues';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-08-16',
@@ -597,7 +598,7 @@ export default async function handler(req, res) {
           return res.json({ success: true, message: 'ACH payment failure logged (no payment intent)' });
         }
         const failedOn = new Date(event.created * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
-        const why = (charge.failure_message || charge.failure_code || 'failed').replace(/^The customer's account has /i, '').replace(/ to cover this payment\.?$/i, '').replace(/_/g, ' ');
+        const why = stripeFailureReason(charge.failure_message || charge.failure_code);
         const { data: reversed, error: reverseError } = await supabase.rpc('reverse_failed_payment_intent', {
           p_payment_intent_id: charge.payment_intent,
           p_reason: `bank payment returned: ${why}`,
@@ -608,7 +609,13 @@ export default async function handler(req, res) {
           console.error('Error reversing failed ACH payment:', reverseError);
           return res.status(500).json({ error: 'Failed to record ACH failure' });
         }
-        console.log(`ACH payment failed (${charge.failure_message}) on ${failedOn}; ${reversed} reversal(s) posted for`, charge.payment_intent);
+        if (!reversed) {
+          // Already recorded (redelivery), or refused because the payment row
+          // is cleared — a return after success is a dispute. Make it visible.
+          console.warn(`ACH charge.failed for ${charge.payment_intent}: nothing reversed (already recorded, or payment row is cleared — check for a dispute)`);
+        } else {
+          console.log(`ACH payment failed (${charge.failure_message}) on ${failedOn}; ${reversed} reversal(s) posted for`, charge.payment_intent);
+        }
         return res.json({ success: true, message: 'ACH payment failure recorded', reversed });
       }
     }

@@ -22,6 +22,11 @@ BEGIN
 END $$;
 
 -- 1. Mark-and-reverse, atomically. Safe to call twice (returns 0).
+--    Concurrency: the NOT EXISTS check below is not what prevents duplicate
+--    reversals — idx_ledger_unique_entry_key (UNIQUE on ledger_entry_key WHERE
+--    NOT NULL, 20260330_prevent_duplicate_ledger_entries) does. Reversal keys
+--    are never NULL, so a concurrent second insert fails with a unique
+--    violation and the whole call rolls back; the caller retries and gets 0.
 --    Refuses if the PaymentIntent's own payment row is cleared: a return
 --    after success is a dispute, not this.
 CREATE OR REPLACE FUNCTION public.reverse_failed_payment_intent(
@@ -138,6 +143,7 @@ CREATE TABLE IF NOT EXISTS public.payment_issue_resolutions (
   resolved_by              text NOT NULL
 );
 CREATE INDEX IF NOT EXISTS payment_issue_resolutions_account_idx ON public.payment_issue_resolutions (account_id);
+-- RLS on with no policies: service role (API routes) only, by design.
 ALTER TABLE public.payment_issue_resolutions ENABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT ON public.payment_issue_resolutions TO service_role;
 
