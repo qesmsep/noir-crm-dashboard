@@ -413,9 +413,9 @@ function CelebrationList({
       ) : (
         <ul className={styles.dateList}>
           {rows.map(r => (
-            <li key={r.account_id || r.member_id || r.name} className={styles.dateRow}>
+            <li key={`${r.account_id || ""}-${r.member_id || r.name}`} className={styles.dateRow}>
               <span className={styles.dateRowName}>
-                {r.member_id ? <a href={`/admin/members/${r.member_id}`}>{r.name}</a> : r.name}
+                {r.account_id ? <a href={`/admin/members/${r.account_id}`}>{r.name}</a> : r.name}
                 <span className={styles.dateRowDetail}> · {detail(r)}</span>
               </span>
               <span className={r.daysAway <= 7 ? styles.dateRowWhenSoon : styles.dateRowWhen}>{fmtWhen(r)}</span>
@@ -488,12 +488,84 @@ function EventsList({ rows, today, windowDays }: { rows: EventRow[]; today: stri
 // Main
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Payment issues — dues that did not clear (top of the page)
+// ---------------------------------------------------------------------------
+
+interface PaymentIssue {
+  accountId: string;
+  name: string;
+  kind: 'bank_returned' | 'bank_unconfirmed' | 'card_failed' | 'not_billed';
+  amount: number;
+  since: string;
+  detail: string;
+  count: number;
+  paymentIntentIds?: string[];
+}
+
+interface PaymentIssues {
+  asOf: string;
+  accounts: number;
+  amount: number;
+  issues: PaymentIssue[];
+}
+
+function PaymentIssuesCard({
+  data,
+  error,
+  onResolve,
+}: {
+  data: PaymentIssues | null;
+  error: string | null;
+  onResolve: (issue: PaymentIssue) => void;
+}) {
+  if (error) {
+    return <div className={styles.issuesCard}><div className={styles.issuesEmpty}>Couldn&apos;t check payment issues: {error}</div></div>;
+  }
+  if (!data) {
+    return <div className={styles.issuesCard}><div className={styles.issuesEmpty}>Checking dues payments…</div></div>;
+  }
+  if (data.accounts === 0) {
+    return <div className={`${styles.issuesCard} ${styles.issuesClear}`}>✓ All active members&apos; dues have cleared.</div>;
+  }
+  return (
+    <div className={`${styles.issuesCard} ${styles.issuesAlert}`}>
+      <div className={styles.issuesHeader}>
+        <span className={styles.issuesTitle}>⚠ Payment Issues</span>
+        <span className={styles.issuesTotal}>
+          {data.accounts} member{data.accounts > 1 ? 's' : ''} · {fmtCurrency(data.amount)} not collected
+        </span>
+      </div>
+      <ul className={styles.issuesList}>
+        {data.issues.map(i => (
+          <li key={i.accountId} className={styles.issueItem}>
+            <a href={`/admin/members/${i.accountId}`} className={styles.issueRow}>
+              <span className={styles.issueMain}>
+                <span className={styles.issueName}>{i.name}</span>
+                <span className={styles.issueDetail}>{i.detail}</span>
+              </span>
+              <span className={styles.issueAmount}>{fmtCurrencyDec(i.amount)}</span>
+              <span className={styles.issueChevron} aria-hidden>›</span>
+            </a>
+            {i.kind === 'bank_returned' && (i.paymentIntentIds?.length ?? 0) > 0 && (
+              <button type="button" className={styles.issueResolve} onClick={() => onResolve(i)}>
+                Mark resolved
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export default function BusinessDashboard() {
   const [m, setMetrics] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showAtRisk, setShowAtRisk] = useState(false);
-  const [showOverdue, setShowOverdue] = useState(false);
+  const [issues, setIssues] = useState<PaymentIssues | null>(null);
+  const [issuesError, setIssuesError] = useState<string | null>(null);
   // Tile explanations are hidden by default to keep the dashboard compact;
   // the choice is remembered per browser.
   const [showDetails, setShowDetails] = useState(false);
@@ -527,9 +599,48 @@ export default function BusinessDashboard() {
     }
   }, []);
 
+  // Fetched separately: it calls Stripe, and must not hold up the rest of the page
+  const fetchIssues = useCallback(async () => {
+    setIssuesError(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const res = await fetch('/api/admin/payment-issues', {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
+      });
+      if (!res.ok) throw new Error(`${res.status}`);
+      setIssues(await res.json());
+    } catch (err: any) {
+      console.error('Payment issues fetch error:', err);
+      setIssuesError(err.message || 'failed to load');
+    }
+  }, []);
+
+  // A bounced bank payment stays on the card until someone has dealt with it
+  // (collected another way, or the member removed). Card declines and
+  // unbilled accounts clear themselves when billing succeeds.
+  const resolveIssue = useCallback(async ({ accountId, name, paymentIntentIds }: PaymentIssue) => {
+    if (!window.confirm(`Mark ${name}'s bounced payment as resolved? It will leave this list. Only do this once it is collected or the member is removed.`)) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+      const res = await fetch('/api/admin/payment-issues', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accountId, paymentIntentIds }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+      await fetchIssues();
+    } catch (err: any) {
+      window.alert(`Could not mark resolved: ${err.message || err}`);
+    }
+  }, [fetchIssues]);
+
   useEffect(() => {
     fetchMetrics();
-  }, [fetchMetrics]);
+    fetchIssues();
+  }, [fetchMetrics, fetchIssues]);
 
   if (loading) {
     return (
@@ -557,6 +668,8 @@ export default function BusinessDashboard() {
         </div>
 
         {error && <div className={styles.error}>{error}</div>}
+
+        <PaymentIssuesCard data={issues} error={issuesError} onResolve={resolveIssue} />
 
         {m && (m.dataQuality?.unknownPlanAccounts ?? 0) > 0 && (
           <div className={styles.error}>
@@ -710,62 +823,6 @@ export default function BusinessDashboard() {
                 </div>
               ))}
             </div>
-            {m.cashflow.overdueBilling.accounts > 0 && (
-              <div
-                className={styles.error}
-                style={{ marginTop: '0.5rem', cursor: 'pointer' }}
-                role="button"
-                tabIndex={0}
-                aria-expanded={showOverdue}
-                onClick={() => setShowOverdue(v => !v)}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setShowOverdue(v => !v); } }}
-              >
-                ⚠ {m.cashflow.overdueBilling.accounts} active account{m.cashflow.overdueBilling.accounts > 1 ? 's have' : ' has'} a billing
-                date in the past ({fmtCurrency(m.cashflow.overdueBilling.amount)} of dues) — billing may be stalled.{' '}
-                <span style={{ textDecoration: 'underline' }}>{showOverdue ? 'Hide accounts' : 'View accounts'}</span>
-              </div>
-            )}
-            {showOverdue && m.cashflow.overdueBilling.list.length > 0 && (
-              <div className={styles.tableCard} style={{ marginTop: '0.5rem' }}>
-                <div className={styles.chartContainer}>
-                  <table className={styles.dataTable}>
-                    <thead>
-                      <tr>
-                        <th>Account</th>
-                        <th>Billing Date</th>
-                        <th>Status</th>
-                        <th className={styles.textRight}>Dues</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {m.cashflow.overdueBilling.list.map((o, i) => (
-                        <tr key={o.accountId || i}>
-                          <td>
-                            {o.accountId ? (
-                              <a href={`/admin/members/${o.accountId}`} style={{ color: '#A59480', textDecoration: 'none' }}>
-                                {o.name}
-                              </a>
-                            ) : (
-                              o.name
-                            )}
-                          </td>
-                          <td>{o.nextBillingDate}</td>
-                          <td>
-                            {!o.paymentFailedAt
-                              ? 'Not billed'
-                              : o.retryCount >= 4
-                                ? `Payment failed ${o.paymentFailedAt} — retries exhausted`
-                                : `Payment failed ${o.paymentFailedAt} — retry ${o.retryCount}/4`}
-                          </td>
-                          <td className={styles.textRight}>{fmtCurrencyDec(o.dues)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-
             {/* ------------------------------------------------------- */}
             <h2 className={styles.sectionTitle}>Location Performance</h2>
             <div className={styles.kpiGrid}>
@@ -871,8 +928,8 @@ export default function BusinessDashboard() {
                         {m.engagement.atRisk.map(r => (
                           <tr key={r.account_id}>
                             <td>
-                              {r.member_id ? (
-                                <a href={`/admin/members/${r.member_id}`} style={{ color: '#A59480', textDecoration: 'none' }}>
+                              {r.account_id ? (
+                                <a href={`/admin/members/${r.account_id}`} style={{ color: '#A59480', textDecoration: 'none' }}>
                                   {r.name}
                                 </a>
                               ) : (

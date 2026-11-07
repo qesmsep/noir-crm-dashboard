@@ -8,6 +8,7 @@ import {
   findPendingEntryForAchCharge,
   resolveAccountIdForCharge,
 } from '../../lib/achPaymentRecovery';
+import { stripeFailureReason } from '../../lib/paymentIssues';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
   apiVersion: '2023-08-16',
@@ -586,11 +587,36 @@ export default async function handler(req, res) {
           failureMessage: charge.failure_message,
         });
 
-        // TODO: Notify customer of failed ACH payment
-        // You can send email/SMS here to alert them
-
-        console.log('ACH payment failed:', charge.failure_message);
-        return res.json({ success: true, message: 'ACH payment failure logged' });
+        // The billing cron wrote this payment to the ledger as 'pending' when it
+        // was submitted. The bank returned it. The ledger is the history, so
+        // nothing is removed: the payment's rows (dues credit + fee lines) are
+        // marked 'failed' and each gets a reversing entry dated the day the
+        // payment failed, so the balance nets out. The Payment Issues card on
+        // /admin/business lists it until an admin marks it resolved.
+        if (!charge.payment_intent) {
+          console.warn('ACH charge.failed with no payment_intent, nothing to reverse:', charge.id);
+          return res.json({ success: true, message: 'ACH payment failure logged (no payment intent)' });
+        }
+        const failedOn = new Date(event.created * 1000).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+        const why = stripeFailureReason(charge.failure_message || charge.failure_code);
+        const { data: reversed, error: reverseError } = await supabase.rpc('reverse_failed_payment_intent', {
+          p_payment_intent_id: charge.payment_intent,
+          p_reason: `bank payment returned: ${why}`,
+          p_date: failedOn,
+        });
+        if (reverseError) {
+          // 500 makes Stripe redeliver; the function is safe to run twice
+          console.error('Error reversing failed ACH payment:', reverseError);
+          return res.status(500).json({ error: 'Failed to record ACH failure' });
+        }
+        if (!reversed) {
+          // Already recorded (redelivery), or refused because the payment row
+          // is cleared — a return after success is a dispute. Make it visible.
+          console.warn(`ACH charge.failed for ${charge.payment_intent}: nothing reversed (already recorded, or payment row is cleared — check for a dispute)`);
+        } else {
+          console.log(`ACH payment failed (${charge.failure_message}) on ${failedOn}; ${reversed} reversal(s) posted for`, charge.payment_intent);
+        }
+        return res.json({ success: true, message: 'ACH payment failure recorded', reversed });
       }
     }
 

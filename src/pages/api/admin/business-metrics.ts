@@ -71,7 +71,7 @@ async function fetchAllLedger(): Promise<LedgerRow[]> {
   for (;;) {
     const { data, error } = await supabaseAdmin
       .from('ledger')
-      .select('account_id, type, amount, note, source, date')
+      .select('account_id, type, amount, note, source, date, status')
       .range(from, from + pageSize - 1);
     if (error) throw new Error(`ledger fetch: ${error.message}`);
     if (!data || data.length === 0) break;
@@ -398,6 +398,7 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       .map(m => {
         const next = nextYearlyOccurrence(m.dob, today, CELEBRATION_WINDOW_DAYS);
         return next && next.years >= 1 && next.years <= MAX_PLAUSIBLE_AGE && {
+          account_id: m.account_id || undefined,
           member_id: m.member_id,
           name: `${m.first_name || ''} ${m.last_name || ''}`.trim() || 'Unknown',
           ...next,

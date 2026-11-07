@@ -117,14 +117,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       } else {
         // Reactivating but NOT charging today: calculate next billing from their last renewal cycle
-        const { data: lastPayment } = await supabase
+        // Anchor on the last payment that actually happened: skip bank
+        // payments that were returned (status 'failed') and the reversal rows
+        // posted for them (source 'ach_return', which can be type 'credit').
+        const { data: recentPayments } = await supabase
           .from('ledger')
-          .select('date')
+          .select('date, status, source')
           .eq('account_id', account_id)
           .in('type', ['credit', 'payment'])
           .order('date', { ascending: false })
-          .limit(1)
-          .single();
+          .limit(20);
+        const lastPayment = (recentPayments || []).find(
+          (r: any) => r.status !== 'failed' && r.source !== 'ach_return'
+        );
 
         const baseDate = lastPayment?.date ? new Date(lastPayment.date) : new Date(account.subscription_start_date || new Date());
         nextBillingDate = new Date(baseDate);
