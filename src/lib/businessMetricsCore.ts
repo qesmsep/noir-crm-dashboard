@@ -202,6 +202,8 @@ export interface CoreLedgerRow {
   note: string | null;
   source: string | null;
   date: string; // YYYY-MM-DD
+  /** 'failed' = bank payment returned; a reversal row (source 'ach_return') offsets it */
+  status?: string | null;
 }
 
 export interface LocationAgg {
@@ -268,7 +270,10 @@ export function aggregateLedger(
   for (const r of ledger) {
     agg.balanceByAccount.set(r.account_id, (agg.balanceByAccount.get(r.account_id) || 0) + r.amount);
 
-    if (r.amount > 0 && isDuesCash(r.type, r.note, r.source)) {
+    // A returned bank payment never became cash: skip the failed row and its
+    // reversal (the reversal of a fee is a positive credit — not dues).
+    const returned = r.status === 'failed' || r.source === 'ach_return';
+    if (!returned && r.amount > 0 && isDuesCash(r.type, r.note, r.source)) {
       if (r.date >= monthStart && r.date < nextMonthStart) agg.duesCashMTD += r.amount;
       else if (r.date >= lastMonthStart && r.date < monthStart) agg.duesCashLastMonth += r.amount;
     }
