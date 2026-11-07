@@ -84,4 +84,13 @@ describe('computePaymentIssues', () => {
     const s = computePaymentIssues([], [], new Map(), today, [{ accountId: 'x', date: '2026-10-01', amount: 150, reason: null }]);
     expect(s.accounts).toBe(0);
   });
+
+  it('keeps count, since and detail consistent when unconfirmed payments join a bounced one', () => {
+    const accounts = [acct({ accountId: 'a' })];
+    const voided = [{ accountId: 'a', date: '2026-11-01', amount: 175, reason: 'insufficient funds' }];
+    const rows = [{ accountId: 'a', date: '2026-10-20', amount: 175, paymentIntentId: 'pi_slow' }];
+    const s = computePaymentIssues(accounts, rows, new Map(), today, voided);
+    expect(s.issues[0]).toMatchObject({ kind: 'bank_returned', amount: 350, since: '2026-10-20' });
+    expect(s.issues[0].detail).toContain('1 more not confirmed since Oct 20');
+  });
 });

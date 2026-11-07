@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { withRateLimitAndAuth, AuthenticatedRequest } from '../../../lib/api-auth';
 import { todayChicago } from '../../../lib/businessMetricsCore';
+import { ACTIVE_SUBSCRIPTION_STATUSES } from '../../../lib/memberStatusFilter';
 import {
   computePaymentIssues,
   rowsToCheck,
@@ -82,11 +83,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
 
     const today = todayChicago();
 
-    const [accountsRes, membersRes, pendingRes, failedRes, resolvedRes] = await Promise.all([
+    const [accountsRes, membersRes, pendingRes, failedRes, resolvedRes, reversalRes] = await Promise.all([
       supabaseAdmin
         .from('accounts')
         .select('account_id, monthly_dues, next_billing_date, last_payment_failed_at, billing_retry_count')
-        .eq('subscription_status', 'active'),
+        // 'processing' = an ACH payment (e.g. a retry) still clearing; its bounce must show too
+        .in('subscription_status', ACTIVE_SUBSCRIPTION_STATUSES),
       supabaseAdmin.from('members').select('member_id, account_id, first_name, last_name, status, join_date'),
       supabaseAdmin
         .from('ledger')
@@ -100,12 +102,19 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
         .in('type', ['credit', 'payment'])
         .eq('status', 'failed'),
       supabaseAdmin.from('payment_issue_resolutions').select('stripe_payment_intent_id'),
+      // The failure reason lives in the reversal's note: "... (bank payment returned: insufficient funds)"
+      supabaseAdmin
+        .from('ledger')
+        .select('stripe_payment_intent_id, note')
+        .eq('source', 'ach_return')
+        .in('type', ['charge', 'debit']),
     ]);
     if (accountsRes.error) throw new Error(`accounts fetch: ${accountsRes.error.message}`);
     if (membersRes.error) throw new Error(`members fetch: ${membersRes.error.message}`);
     if (pendingRes.error) throw new Error(`ledger fetch: ${pendingRes.error.message}`);
     if (failedRes.error) throw new Error(`failed ledger fetch: ${failedRes.error.message}`);
     if (resolvedRes.error) throw new Error(`resolutions fetch: ${resolvedRes.error.message}`);
+    if (reversalRes.error) throw new Error(`reversals fetch: ${reversalRes.error.message}`);
 
     // Display name: earliest-joined active member, else earliest-joined member
     const nameOf = new Map<string, { name: string; join: string; active: boolean }>();
@@ -124,12 +133,12 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
       name: nameOf.get(a.account_id)?.name || 'Unknown',
       monthlyDues: Number(a.monthly_dues) || 0,
       nextBillingDate: a.next_billing_date ? a.next_billing_date.slice(0, 10) : null,
-      lastPaymentFailedAt: a.last_payment_failed_at ? a.last_payment_failed_at.slice(0, 10) : null,
+      lastPaymentFailedAt: a.last_payment_failed_at ? chicagoDate(a.last_payment_failed_at) : null,
       billingRetryCount: a.billing_retry_count || 0,
     }));
     const activeIds = new Set(accounts.map(a => a.accountId));
 
-    const pendingRows: PendingDuesRow[] = (pendingRes.data || [])
+    let pendingRows: PendingDuesRow[] = (pendingRes.data || [])
       .filter((r: any) => activeIds.has(r.account_id))
       .map((r: any) => ({
         accountId: r.account_id,
@@ -141,15 +150,55 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     const ids = [...new Set(rowsToCheck(pendingRows, today).map(r => r.paymentIntentId))];
     const intents = await lookupIntents(ids);
 
+    const reasonByIntent = new Map<string, string>();
+    for (const r of reversalRes.data || []) {
+      const m = /returned: ([^)]+)\)\s*$/.exec(r.note || '');
+      if (m && r.stripe_payment_intent_id) reasonByIntent.set(r.stripe_payment_intent_id, m[1]);
+    }
+
+    // Safety net for a missed charge.failed webhook: Stripe says the bank
+    // payment failed but the ledger still has it pending. Record it the same
+    // way the webhook would (mark failed + post reversals), so the balance is
+    // right and "Mark resolved" works on it. Dated today: the real failure
+    // date is not known here.
+    const healed = new Set<string>();
+    for (const id of ids) {
+      const intent = intents.get(id);
+      if (!intent || (intent.status !== 'requires_payment_method' && intent.status !== 'canceled')) continue;
+      const why = shortStripeReason(intent.failureMessage);
+      const { error } = await supabaseAdmin.rpc('reverse_failed_payment_intent', {
+        p_payment_intent_id: id,
+        p_reason: `bank payment returned: ${why}`,
+        p_date: today,
+      });
+      if (error) {
+        console.error(`[payment-issues] could not reverse ${id}:`, error.message);
+        continue; // still listed from the Stripe status below
+      }
+      healed.add(id);
+      reasonByIntent.set(id, why);
+    }
+
+    const healedRows = pendingRows.filter(r => healed.has(r.paymentIntentId));
+    pendingRows = pendingRows.filter(r => !healed.has(r.paymentIntentId));
+
     const resolved = new Set((resolvedRes.data || []).map((r: any) => r.stripe_payment_intent_id));
-    const voidedRows: VoidedDuesRow[] = (failedRes.data || [])
-      .filter((r: any) => !r.stripe_payment_intent_id || !resolved.has(r.stripe_payment_intent_id))
-      .map((r: any) => ({
-        accountId: r.account_id,
-        date: String(r.date).slice(0, 10),
-        amount: Number(r.amount) || 0,
-        reason: null,
-      }));
+    const voidedRows: VoidedDuesRow[] = [
+      ...(failedRes.data || [])
+        .filter((r: any) => !r.stripe_payment_intent_id || !resolved.has(r.stripe_payment_intent_id))
+        .map((r: any) => ({
+          accountId: r.account_id,
+          date: String(r.date).slice(0, 10),
+          amount: Number(r.amount) || 0,
+          reason: (r.stripe_payment_intent_id && reasonByIntent.get(r.stripe_payment_intent_id)) || null,
+        })),
+      ...healedRows.map(r => ({
+        accountId: r.accountId,
+        date: r.date,
+        amount: r.amount,
+        reason: reasonByIntent.get(r.paymentIntentId) || null,
+      })),
+    ];
 
     const payload = computePaymentIssues(accounts, pendingRows, intents, today, voidedRows);
     cached = { at: Date.now(), payload };
@@ -158,6 +207,16 @@ async function handler(req: AuthenticatedRequest, res: NextApiResponse) {
     console.error('payment-issues error:', error);
     return res.status(500).json({ error: error.message || 'Internal error' });
   }
+}
+
+function chicagoDate(ts: string): string {
+  return new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/Chicago' });
+}
+
+function shortStripeReason(msg: string | null | undefined): string {
+  return (msg || 'failed')
+    .replace(/^The customer's account has /i, '')
+    .replace(/ to cover this payment\.?$/i, '');
 }
 
 async function resolve(req: AuthenticatedRequest, res: NextApiResponse) {

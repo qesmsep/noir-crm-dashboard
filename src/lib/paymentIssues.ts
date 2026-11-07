@@ -156,7 +156,10 @@ export function computePaymentIssues(
     if (issues.has(accountId)) {
       // Already flagged as bounced; add the unconfirmed amount to it
       const existing = issues.get(accountId)!;
+      rows.sort((x, y) => x.date.localeCompare(y.date));
       existing.amount = r2(existing.amount + rows.reduce((s, r) => s + r.amount, 0));
+      if (rows[0].date < existing.since) existing.since = rows[0].date;
+      existing.detail += ` · ${rows.length} more not confirmed since ${fmtShort(rows[0].date)}`;
       continue;
     }
     const a = byId.get(accountId)!;

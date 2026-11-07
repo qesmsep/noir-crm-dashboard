@@ -1,9 +1,15 @@
 -- Rollback for 20261107010000_ach_failures_mark_and_reverse.sql
--- Returns the ledger to exactly how it was before that migration ran:
--- removes the reversal rows it posted and puts each restored row's original
--- status back, from the backup kept in ledger_voided.original_row.
--- (The 21 rows then sit in BOTH tables; to also undo 20261107000000, run
--- its rollback after this one.)
+--
+-- What it does: removes the reversal rows that migration posted and puts each
+-- restored row's original status back (from the backup in
+-- ledger_voided.original_row). Net effect on the ledger: as it was BEFORE THIS
+-- PR — the bounced dues are back to 'pending' and count toward balances again.
+-- (It does not recreate the intermediate state of 20261107000000, where those
+-- rows sat outside the ledger.)
+--
+-- Run it only after the webhook code from this PR is rolled back too: the
+-- deployed webhook calls reverse_failed_payment_intent, which this drops, and
+-- would return 500 to Stripe on every ACH failure.
 
 BEGIN;
 
