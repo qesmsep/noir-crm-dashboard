@@ -141,16 +141,9 @@ CREATE INDEX IF NOT EXISTS payment_issue_resolutions_account_idx ON public.payme
 ALTER TABLE public.payment_issue_resolutions ENABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT ON public.payment_issue_resolutions TO service_role;
 
--- 4. Retire the move-out approach. Every row it held is back in ledger (step 0)
---    — checked, not assumed: abort the whole migration if any is missing.
-DO $$
-BEGIN
-  IF to_regclass('public.ledger_voided') IS NOT NULL AND EXISTS (
-    SELECT 1 FROM public.ledger_voided v
-    WHERE NOT EXISTS (SELECT 1 FROM public.ledger l WHERE l.id = v.id)
-  ) THEN
-    RAISE EXCEPTION 'ledger_voided has rows not restored to ledger; refusing to drop';
-  END IF;
-END $$;
+-- 4. Retire the move-out function. ledger_voided is KEPT as a read-only
+--    backup: its original_row holds each restored row's original status, which
+--    is what makes the rollback exact. Drop it later, once this is confirmed.
 DROP FUNCTION IF EXISTS public.void_ledger_for_payment_intent(text, text, text);
-DROP TABLE IF EXISTS public.ledger_voided;
+COMMENT ON TABLE public.ledger_voided IS
+  'BACKUP ONLY (2026-11-07). Rows were restored to ledger as failed + reversed by 20261107010000. original_row keeps their original status for rollback.';
