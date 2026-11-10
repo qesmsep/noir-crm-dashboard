@@ -19,6 +19,7 @@ interface CampaignActions {
   create_onboarding_link?: { enabled?: boolean; selected_membership?: string; token_expiry_hours?: number };
   add_ledger_charge?: { enabled?: boolean; amount?: number; description?: string };
   create_event_rsvp?: { enabled?: boolean; event_id?: string; party_size?: number };
+  add_to_waitlist?: { enabled?: boolean };
 }
 
 interface CampaignRecord {
@@ -170,6 +171,54 @@ async function executeCreateOnboardingLink(
   }
 
   return { onboard_url: `${baseUrl}/onboard/${signupToken}` };
+}
+
+// ── Action: Add to Waitlist ────────────────────────────────────────────────
+// Puts the phone back in the waitlist review queue. Re-opens the most recent
+// existing entry (keeping the application data) or creates a new one.
+async function executeAddToWaitlist(phone: string): Promise<{ waitlist_id: string; reopened: boolean }> {
+  const digits = phone.replace(/\D/g, '');
+  const last10 = digits.slice(-10);
+  const variants = [...new Set([phone, digits, last10, '+1' + last10, '1' + last10])];
+
+  const { data: existing, error: findError } = await supabaseAdmin
+    .from('waitlist')
+    .select('id')
+    .in('phone', variants)
+    .order('submitted_at', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (findError) throw new Error('Failed to look up waitlist entry');
+
+  const nowIso = new Date().toISOString();
+
+  if (existing) {
+    const { error } = await supabaseAdmin
+      .from('waitlist')
+      .update({ status: 'review', submitted_at: nowIso })
+      .eq('id', existing.id);
+    if (error) throw new Error('Failed to re-open waitlist entry');
+    return { waitlist_id: existing.id, reopened: true };
+  }
+
+  // Use member details if this phone belongs to a member; otherwise space
+  // placeholders satisfy NOT NULL (matches the onboarding-link pattern above)
+  const member = await lookupMemberByPhone(phone);
+  const { data: created, error } = await supabaseAdmin
+    .from('waitlist')
+    .insert({
+      phone,
+      first_name: member?.first_name || ' ',
+      last_name: member?.last_name || ' ',
+      email: member?.email || ' ',
+      status: 'review',
+      submitted_at: nowIso,
+    })
+    .select('id')
+    .single();
+  if (error || !created) throw new Error('Failed to create waitlist entry');
+  return { waitlist_id: created.id, reopened: false };
 }
 
 // ── Action: Add Ledger Charge ──────────────────────────────────────────────
@@ -431,6 +480,17 @@ export async function enrollPhone(params: {
     } catch (err: unknown) {
       console.error('Error creating onboarding link:', err);
       actionResults.push({ action: 'create_onboarding_link', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
+    }
+  }
+
+  // Action: Add to Waitlist (skipped if onboarding link ran — that approves the entry)
+  if (actions.add_to_waitlist?.enabled && !actions.create_onboarding_link?.enabled) {
+    try {
+      await executeAddToWaitlist(phone);
+      actionResults.push({ action: 'add_to_waitlist', success: true });
+    } catch (err: unknown) {
+      console.error('Error adding to waitlist:', err);
+      actionResults.push({ action: 'add_to_waitlist', success: false, error: err instanceof Error ? err.message : 'Unknown error' });
     }
   }
 
