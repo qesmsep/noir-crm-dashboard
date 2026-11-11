@@ -685,7 +685,9 @@ export default function IntakeCampaignManager() {
                   {actions.add_to_waitlist?.enabled && (
                     <p className="ml-6 text-xs text-text-muted">
                       Puts this phone back in the waitlist for review. Re-opens an existing entry
-                      (keeps their application) or creates a new one. Can&apos;t be combined with Create Onboarding Link.
+                      (keeps their application) or creates a new one. Already-approved applicants
+                      are sent the INVITATION campaign instead of this one. Can&apos;t be combined with
+                      Create Onboarding Link.
                     </p>
                   )}
                 </div>

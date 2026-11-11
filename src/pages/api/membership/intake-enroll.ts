@@ -176,21 +176,30 @@ async function executeCreateOnboardingLink(
 // ── Action: Add to Waitlist ────────────────────────────────────────────────
 // Puts the phone back in the waitlist review queue. Re-opens the most recent
 // existing entry (keeping the application data) or creates a new one.
-async function executeAddToWaitlist(phone: string): Promise<{ waitlist_id: string; reopened: boolean }> {
+// Approved entries never reach here — enrollPhone hands them to INVITATION.
+const INVITATION_TRIGGER_WORD = 'INVITATION';
+
+async function findLatestWaitlistEntry(phone: string): Promise<{ id: string; status: string } | null> {
   const digits = phone.replace(/\D/g, '');
   const last10 = digits.slice(-10);
   const variants = [...new Set([phone, digits, last10, '+1' + last10, '1' + last10])];
 
-  const { data: existing, error: findError } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('waitlist')
-    .select('id')
+    .select('id, status')
     .in('phone', variants)
     .order('submitted_at', { ascending: false, nullsFirst: false })
     .limit(1)
     .maybeSingle();
 
-  if (findError) throw new Error('Failed to look up waitlist entry');
+  if (error) throw new Error('Failed to look up waitlist entry');
+  return data;
+}
 
+async function executeAddToWaitlist(
+  phone: string,
+  existing: { id: string } | null
+): Promise<{ waitlist_id: string; reopened: boolean }> {
   const nowIso = new Date().toISOString();
 
   if (existing) {
@@ -444,6 +453,31 @@ export async function enrollPhone(params: {
     templateVars.member_name = member.first_name;
   }
 
+  // ── Add to Waitlist: approved applicants get the invitation instead ──
+  // Someone already approved shouldn't be sent back to review or get this
+  // campaign's waitlist messages — enroll them in INVITATION instead.
+  const runAddToWaitlist =
+    actions.add_to_waitlist?.enabled && !actions.create_onboarding_link?.enabled;
+  let waitlistEntry: { id: string; status: string } | null = null;
+
+  if (runAddToWaitlist) {
+    waitlistEntry = await findLatestWaitlistEntry(phone);
+
+    if (waitlistEntry?.status === 'approved') {
+      if (campaignData.trigger_word.trim().toUpperCase() === INVITATION_TRIGGER_WORD) {
+        // Misconfigured: INVITATION itself has Add to Waitlist on. Don't loop.
+        console.error('INVITATION campaign has Add to Waitlist enabled — skipping hand-off');
+      } else {
+        const invite = await enrollPhone({ trigger_word: INVITATION_TRIGGER_WORD, phone, source });
+        if (invite.status === 404) {
+          console.error(`Approved applicant ${phone} texted ${campaignData.trigger_word} but no active INVITATION campaign exists`);
+          return { status: 200, body: { message: 'Approved applicant — INVITATION campaign not active, nothing sent', redirected_to: null } };
+        }
+        return { status: invite.status, body: { ...invite.body, redirected_to: INVITATION_TRIGGER_WORD } };
+      }
+    }
+  }
+
   // ── Create Enrollment FIRST (before side effects) ───────────────────
   // This ensures no financial actions are committed without an enrollment record
   const { data: enrollment, error: enrollError } = await supabaseAdmin
@@ -484,9 +518,9 @@ export async function enrollPhone(params: {
   }
 
   // Action: Add to Waitlist (skipped if onboarding link ran — that approves the entry)
-  if (actions.add_to_waitlist?.enabled && !actions.create_onboarding_link?.enabled) {
+  if (runAddToWaitlist) {
     try {
-      await executeAddToWaitlist(phone);
+      await executeAddToWaitlist(phone, waitlistEntry);
       actionResults.push({ action: 'add_to_waitlist', success: true });
     } catch (err: unknown) {
       console.error('Error adding to waitlist:', err);
