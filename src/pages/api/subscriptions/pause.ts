@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { verifyAdmin } from '@/lib/admin-auth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,7 +8,7 @@ const supabase = createClient(
 );
 
 /**
- * POST /api/subscriptions/pause
+ * POST /api/subscriptions/pause — admin only (Bearer token).
  *
  * Pauses an account's subscription (app-managed, no Stripe subscription)
  * When paused, billing is stopped until resumed
@@ -22,6 +23,10 @@ const supabase = createClient(
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (!(await verifyAdmin(req))) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const { account_id, reason } = req.body;

@@ -1,6 +1,7 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
+import { parseFeePercentage } from '@/lib/billing';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -34,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .select('credit_card_fee_percentage')
       .single();
 
-    const ccFeePercentage = (settings?.credit_card_fee_percentage || 4.0) / 100; // Convert to decimal
+    const ccFeePercentage = parseFeePercentage(settings?.credit_card_fee_percentage) / 100; // Convert to decimal
     console.log('[CREATE INTENT] CC Fee Percentage:', (ccFeePercentage * 100).toFixed(2) + '%');
 
     // Get waitlist entry

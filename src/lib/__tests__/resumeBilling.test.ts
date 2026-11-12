@@ -1,7 +1,7 @@
 jest.mock('stripe', () => jest.fn().mockImplementation(() => ({})));
 jest.mock('@supabase/supabase-js', () => ({ createClient: () => ({}) }));
 
-import { nextCycleDate, computeDuesCharge } from '../billing';
+import { nextCycleDate, computeDuesCharge, parseFeePercentage } from '../billing';
 
 describe('nextCycleDate', () => {
   it('returns the next billing day after today (Kiah: anchor 8/15, unpaused 11/12 → 11/15)', () => {
@@ -30,6 +30,32 @@ describe('nextCycleDate', () => {
   it('accepts a timestamp anchor and an anchor already in the future', () => {
     expect(nextCycleDate('2026-08-15 00:00:00+00', 'month', '2026-11-12')).toBe('2026-11-15');
     expect(nextCycleDate('2026-12-01', 'month', '2026-11-12')).toBe('2026-12-01');
+  });
+});
+
+describe('parseFeePercentage', () => {
+  it('keeps a configured 0% as 0% (was turned into 4% by `|| 4.0`)', () => {
+    expect(parseFeePercentage(0)).toBe(0);
+    expect(parseFeePercentage('0.00')).toBe(0);
+  });
+
+  it('reads numeric and string settings values', () => {
+    expect(parseFeePercentage(4)).toBe(4);
+    expect(parseFeePercentage('4.00')).toBe(4);
+    expect(parseFeePercentage('3.5')).toBe(3.5);
+  });
+
+  it('falls back to 4% only when unset or invalid', () => {
+    expect(parseFeePercentage(null)).toBe(4);
+    expect(parseFeePercentage(undefined)).toBe(4);
+    expect(parseFeePercentage('')).toBe(4);
+    expect(parseFeePercentage('abc')).toBe(4);
+    expect(parseFeePercentage(-1)).toBe(4);
+  });
+
+  it('a 0% setting charges only the Stripe-cost floor, not 4%', () => {
+    // max(0%, 2.9% + $0.30) on $150 = $4.65 — was $6.00 when 0 fell back to 4%
+    expect(computeDuesCharge(150, true, parseFeePercentage(0)).creditCardFee).toBe(4.65);
   });
 });
 

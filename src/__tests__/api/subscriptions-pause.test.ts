@@ -20,8 +20,26 @@ function chain(table: string) {
 }
 jest.mock('@supabase/supabase-js', () => ({ createClient: () => ({ from: (t: string) => chain(t) }) }));
 
+const mockVerifyAdmin = jest.fn();
+jest.mock('@/lib/admin-auth', () => ({ verifyAdmin: (...a: any[]) => mockVerifyAdmin(...a) }));
+
 import type { NextApiRequest, NextApiResponse } from 'next';
 import handler from '../../pages/api/subscriptions/pause';
+
+beforeEach(() => {
+  inserts.length = 0;
+  mockVerifyAdmin.mockReset().mockResolvedValue(true);
+});
+
+it('refuses non-admins and writes nothing', async () => {
+  mockVerifyAdmin.mockResolvedValue(false);
+  const req = { method: 'POST', body: { account_id: 'acct-1' }, headers: {} } as unknown as NextApiRequest;
+  const res: any = { json: jest.fn() };
+  res.status = jest.fn(() => res);
+  await handler(req, res as NextApiResponse);
+  expect(res.status).toHaveBeenCalledWith(401);
+  expect(inserts).toHaveLength(0);
+});
 
 it('records the cleared next_billing_date in the pause event', async () => {
   const req = { method: 'POST', body: { account_id: 'acct-1' }, headers: {} } as unknown as NextApiRequest;

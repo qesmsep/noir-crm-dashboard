@@ -88,14 +88,25 @@ export async function describeDefaultPaymentMethod(
 }
 
 /**
- * Read the dues fee percentage from settings (default 4%).
+ * Fee percentage from a settings value. A configured 0 means no fee; only a
+ * missing or unparseable value falls back to 4%. (Was `|| 4.0`, which turned
+ * a configured 0% into 4%.)
+ */
+export function parseFeePercentage(value: unknown): number {
+  if (value === null || value === undefined || value === '') return 4.0;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 4.0;
+}
+
+/**
+ * Read the dues fee percentage from settings (default 4% only when unset).
  */
 export async function getCreditCardFeePercentage(): Promise<number> {
   const { data: settings } = await supabase
     .from('settings')
     .select('credit_card_fee_percentage')
     .single();
-  return settings?.credit_card_fee_percentage || 4.0;
+  return parseFeePercentage(settings?.credit_card_fee_percentage);
 }
 
 /**
