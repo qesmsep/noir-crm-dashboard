@@ -201,6 +201,21 @@ describe('POST resume', () => {
     expect(mockCharge).not.toHaveBeenCalled();
   });
 
+  it('only counts prior resume charges inside the window (old events don\'t block forever)', async () => {
+    let gtFilter: any = null;
+    tableResults['subscription_events.select'] = (r: Op) => {
+      if (r.filters.some((f: any[]) => f[1] === 'payment_succeeded')) gtFilter = 'checked';
+      return { data: [], error: null };
+    };
+    mockCharge.mockResolvedValue({ success: true, paymentIntent: { id: 'pi_1', amount: 15600, status: 'succeeded' } });
+    const { req, res } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
+    await handler(req, res);
+    expect(gtFilter).toBe('checked');
+    const since = mockFindCharge.mock.calls[0][2];
+    expect(Date.now() - Date.parse(since)).toBeLessThanOrEqual(24 * 3600 * 1000 + 5000); // no pause → 24h
+    expect(mockCharge).toHaveBeenCalledTimes(1);
+  });
+
   it('does not charge if Stripe cannot be checked', async () => {
     mockFindCharge.mockRejectedValue(new Error('stripe down'));
     const { req, res, status } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
@@ -263,6 +278,7 @@ describe('POST resume', () => {
     expect(status).toHaveBeenCalledWith(500);
     expect(json.mock.calls[0][0]).toMatchObject({ payment_intent_id: 'pi_9' });
     expect(json.mock.calls[0][0].error).toMatch(/Do not charge again/);
+    expect(json.mock.calls[0][0].charge_recorded).toBe(true);
     // recorded, so a retry is refused (see test above)
     const logged = writes('subscription_events', 'insert').map((o) => o.payload);
     expect(logged).toContainEqual(expect.objectContaining({

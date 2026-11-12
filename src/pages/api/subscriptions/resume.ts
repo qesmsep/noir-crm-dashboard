@@ -114,19 +114,19 @@ async function billingAnchor(account: any, today: string): Promise<{ date: strin
 async function unappliedResumeCharge(account: any): Promise<string | null> {
   const account_id = account.account_id;
   const pause = await latestPause(account_id);
+  const since = pause?.created_at || new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   let q = supabase
     .from('subscription_events')
     .select('metadata, created_at')
     .eq('account_id', account_id)
     .eq('event_type', 'payment_succeeded')
     .eq('metadata->>context', 'resume_charge_now');
-  if (pause?.created_at) q = q.gt('created_at', pause.created_at);
+  q = q.gt('created_at', since);
   const { data } = await q.order('created_at', { ascending: false }).limit(1);
   const logged = data?.[0]?.metadata?.payment_intent_id;
   if (logged) return logged;
 
   if (!account.stripe_customer_id) return null;
-  const since = pause?.created_at || new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   return findAppChargeSince(account.stripe_customer_id, account_id, since);
 }
 
@@ -202,7 +202,7 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
         return res.status(400).json({ error: 'expected_total is required to charge: reopen Resume and confirm the amount' });
       }
       const { totalAmount } = computeDuesCharge(dues, !!account.credit_card_fee_enabled, await getCreditCardFeePercentage());
-      if (Math.abs(expected_total - totalAmount) > 0.005) {
+      if (Math.round(expected_total * 100) !== Math.round(totalAmount * 100)) {
         return res.status(409).json({
           error: `The amount changed to $${totalAmount.toFixed(2)} since this was opened. Reopen Resume and confirm — nothing was charged.`,
         });
@@ -288,15 +288,19 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
         // Card was charged but the account wasn't updated. Say so loudly.
         console.error(`🚨 CRITICAL: resume charge ${paymentIntent.id} succeeded but account ${account_id} not updated: ${reason}`);
         // Recorded so a retry is refused instead of charging again
-        await logEvent({
+        const recorded = await logEvent({
           account_id,
           event_type: 'payment_succeeded',
           new_mrr: dues,
           metadata: { context: 'resume_charge_now', payment_intent_id: paymentIntent.id, amount: paymentIntent.amount / 100, billing_period: today, account_not_updated: reason },
         });
+        if (!recorded) {
+          console.error(`🚨 CRITICAL: charge ${paymentIntent.id} for ${account_id} not recorded in subscription_events; only the Stripe check now blocks a re-charge`);
+        }
         return res.status(500).json({
-          error: `Charged (${paymentIntent.id}) but the membership could not be set active: ${reason}. Do not charge again — fix the account manually.`,
+          error: `Charged (${paymentIntent.id}) but the membership could not be set active: ${reason}. Do not charge again — fix the account manually.${recorded ? '' : ' The charge record also failed to save.'}`,
           payment_intent_id: paymentIntent.id,
+          charge_recorded: recorded,
         });
       }
       return res.status(409).json({ error: `Could not resume: ${reason}` });
