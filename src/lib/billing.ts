@@ -113,6 +113,7 @@ export async function getCreditCardFeePercentage(): Promise<number> {
  * What a dues charge will total. Single source of truth for chargeAccount and
  * for anything that shows the amount before charging (e.g. the resume prompt).
  * Fee = the greater of the settings percentage or Stripe's 2.9% + $0.30.
+ * A 0% setting means no fee at all — the business absorbs Stripe's cost.
  */
 export function computeDuesCharge(
   dues: number,
@@ -120,7 +121,7 @@ export function computeDuesCharge(
   feePercentage: number
 ): { dues: number; creditCardFee: number; totalAmount: number } {
   let creditCardFee = 0;
-  if (creditCardFeeEnabled && dues > 0) {
+  if (creditCardFeeEnabled && dues > 0 && feePercentage > 0) {
     const flatRate = dues * (feePercentage / 100);
     const stripeFee = dues * 0.029 + 0.30;
     creditCardFee = Math.round(Math.max(flatRate, stripeFee) * 100) / 100;

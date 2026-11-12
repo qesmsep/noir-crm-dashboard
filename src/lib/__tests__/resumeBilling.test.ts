@@ -53,9 +53,8 @@ describe('parseFeePercentage', () => {
     expect(parseFeePercentage(-1)).toBe(4);
   });
 
-  it('a 0% setting charges only the Stripe-cost floor, not 4%', () => {
-    // max(0%, 2.9% + $0.30) on $150 = $4.65 — was $6.00 when 0 fell back to 4%
-    expect(computeDuesCharge(150, true, parseFeePercentage(0)).creditCardFee).toBe(4.65);
+  it('a 0% setting charges no fee at all (no Stripe-cost floor)', () => {
+    expect(computeDuesCharge(150, true, parseFeePercentage(0))).toEqual({ dues: 150, creditCardFee: 0, totalAmount: 150 });
   });
 });
 
