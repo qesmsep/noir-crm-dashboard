@@ -66,6 +66,58 @@ export async function getDefaultPaymentMethod(stripe_customer_id: string): Promi
 }
 
 /**
+ * Short description of the payment method chargeAccount would use, for display.
+ * Returns null when there is none.
+ */
+export async function describeDefaultPaymentMethod(
+  stripe_customer_id: string | null | undefined
+): Promise<{ type: string; brand: string | null; last4: string | null } | null> {
+  if (!stripe_customer_id) return null;
+  const id = await getDefaultPaymentMethod(stripe_customer_id);
+  if (!id) return null;
+  try {
+    const pm = await stripe.paymentMethods.retrieve(id);
+    if (pm.type === 'us_bank_account') {
+      return { type: 'bank', brand: pm.us_bank_account?.bank_name || null, last4: pm.us_bank_account?.last4 || null };
+    }
+    return { type: pm.type, brand: pm.card?.brand || null, last4: pm.card?.last4 || null };
+  } catch (error) {
+    console.error(`Failed to retrieve payment method ${id}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Read the dues fee percentage from settings (default 4%).
+ */
+export async function getCreditCardFeePercentage(): Promise<number> {
+  const { data: settings } = await supabase
+    .from('settings')
+    .select('credit_card_fee_percentage')
+    .single();
+  return settings?.credit_card_fee_percentage || 4.0;
+}
+
+/**
+ * What a dues charge will total. Single source of truth for chargeAccount and
+ * for anything that shows the amount before charging (e.g. the resume prompt).
+ * Fee = the greater of the settings percentage or Stripe's 2.9% + $0.30.
+ */
+export function computeDuesCharge(
+  dues: number,
+  creditCardFeeEnabled: boolean,
+  feePercentage: number
+): { dues: number; creditCardFee: number; totalAmount: number } {
+  let creditCardFee = 0;
+  if (creditCardFeeEnabled && dues > 0) {
+    const flatRate = dues * (feePercentage / 100);
+    const stripeFee = dues * 0.029 + 0.30;
+    creditCardFee = Math.round(Math.max(flatRate, stripeFee) * 100) / 100;
+  }
+  return { dues, creditCardFee, totalAmount: Math.round((dues + creditCardFee) * 100) / 100 };
+}
+
+/**
  * Charge an account for their monthly dues
  * Returns { success: boolean, paymentIntent?: Stripe.PaymentIntent, error?: any }
  */
@@ -104,16 +156,11 @@ export async function chargeAccount(account: any): Promise<{
     const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
 
     // 4. Add credit card fee if enabled
-    let totalAmount = amount;
-    let creditCardFee = 0;
-
-    if (account.credit_card_fee_enabled) {
-      // Use dynamic percentage from settings
-      const flatRate = amount * ccFeePercentage;
-      const stripeFee = amount * 0.029 + 0.30;
-      creditCardFee = Math.round(Math.max(flatRate, stripeFee) * 100) / 100;
-      totalAmount = amount + creditCardFee;
-    }
+    const { creditCardFee, totalAmount } = computeDuesCharge(
+      amount,
+      !!account.credit_card_fee_enabled,
+      ccFeePercentage * 100
+    );
 
     // 4. Create payment intent
     const paymentIntentParams: any = {
@@ -639,6 +686,28 @@ export function nextBillingDateAfterPayment(
   const base = currentBillingDate ? currentBillingDate.slice(0, 10) : today;
   const next = add(base);
   return next > today ? next : add(today);
+}
+
+/**
+ * The member's next regular billing date strictly after `today`, keeping their
+ * billing day (the anchor). Steps are counted from the anchor, clamped to month
+ * end, so a 31st anchor bills Feb 28 then Mar 31 — no drift.
+ * All dates are YYYY-MM-DD.
+ */
+export function nextCycleDate(anchor: string, interval: string, today: string): string {
+  const [ay, am, ad] = anchor.slice(0, 10).split('-').map(Number);
+  const stepMonths = interval === 'year' ? 12 : 1;
+  const at = (k: number): string => {
+    const total = (am - 1) + k * stepMonths;
+    const y = ay + Math.floor(total / 12);
+    const m = total % 12; // 0-based
+    const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    const d = Math.min(ad, lastDay);
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  };
+  let k = 0;
+  while (at(k) <= today) k++;
+  return at(k);
 }
 
 /**

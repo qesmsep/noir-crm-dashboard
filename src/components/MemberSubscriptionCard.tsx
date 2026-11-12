@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/useToast';
 import { supabase } from '@/lib/supabase';
 import styles from '../styles/MemberSubscriptionCard.module.css';
 import UpdatePlanModal from './UpdatePlanModal';
+import ResumeMembershipModal from './ResumeMembershipModal';
 import PaymentMethodModal from './member/PaymentMethodModal';
 import CreateSubscriptionModal from './CreateSubscriptionModal';
 
@@ -48,6 +49,7 @@ export default function MemberSubscriptionCard({
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [showUpdatePlanModal, setShowUpdatePlanModal] = useState(false);
+  const [showResumeModal, setShowResumeModal] = useState(false);
   const [showUpdatePaymentModal, setShowUpdatePaymentModal] = useState(false);
   const [showCreateSubscriptionModal, setShowCreateSubscriptionModal] = useState(false);
   const [additionalMembersCount, setAdditionalMembersCount] = useState(0);
@@ -387,38 +389,6 @@ export default function MemberSubscriptionCard({
     }
   };
 
-  const handleResumeSubscription = async () => {
-    setActionLoading(true);
-    try {
-      const response = await fetch('/api/subscriptions/resume', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ account_id: accountId }),
-      });
-
-      const data = await response.json();
-
-      if (data.error) {
-        throw new Error(data.error);
-      }
-
-      toast({
-        title: 'Success',
-        description: 'Subscription resumed successfully',
-      });
-
-      fetchSubscriptionData();
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to resume subscription',
-        variant: 'error',
-      });
-    } finally {
-      setActionLoading(false);
-    }
-  };
-
   const handleRetryPayment = async () => {
     setActionLoading(true);
     try {
@@ -748,10 +718,10 @@ export default function MemberSubscriptionCard({
           <>
             <button
               className={styles.resumeButton}
-              onClick={handleResumeSubscription}
+              onClick={() => setShowResumeModal(true)}
               disabled={actionLoading}
             >
-              {actionLoading ? 'Processing...' : 'Resume Membership'}
+              Resume Membership
             </button>
             <button
               className={styles.updateButton}
@@ -843,6 +813,18 @@ export default function MemberSubscriptionCard({
           </>
         )}
       </div>
+
+      {showResumeModal && (
+        <ResumeMembershipModal
+          accountId={accountId}
+          onSuccess={() => {
+            setShowResumeModal(false);
+            fetchSubscriptionData();
+            fetchPaymentStatus();
+          }}
+          onClose={() => setShowResumeModal(false)}
+        />
+      )}
 
       {showUpdatePlanModal && (
         <UpdatePlanModal
