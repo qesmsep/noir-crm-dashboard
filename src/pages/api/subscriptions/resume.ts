@@ -32,8 +32,8 @@ const supabase = createClient(
  *           next billing date one interval from today. On failure nothing changes
  *           and the account stays paused.
  *   false → set active now, first charge on the member's next regular billing
- *           date (their billing day, from their last automatic dues charge, or
- *           their start date).
+ *           date (their billing day — see billingAnchor). Months spent paused
+ *           are not back-billed.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -65,8 +65,23 @@ async function loadPausedAccount(account_id: string): Promise<Loaded> {
   return { ok: true, account, interval };
 }
 
-/** The member's billing day: last automatic dues charge, else start date, else today. */
+/**
+ * The member's billing day, best source first:
+ *  1. the next billing date the account had when it was paused (pause records it),
+ *  2. the last automatic dues charge (can drift if that charge was a late retry),
+ *  3. the start date, 4. today.
+ */
 async function billingAnchor(account: any, today: string): Promise<string> {
+  const { data: pauses } = await supabase
+    .from('subscription_events')
+    .select('metadata, created_at')
+    .eq('account_id', account.account_id)
+    .eq('event_type', 'pause')
+    .order('created_at', { ascending: false })
+    .limit(1);
+  const saved = pauses?.[0]?.metadata?.next_billing_date;
+  if (saved) return String(saved).slice(0, 10);
+
   const { data: rows } = await supabase
     .from('ledger')
     .select('date, status')
@@ -117,12 +132,13 @@ async function preview(req: NextApiRequest, res: NextApiResponse) {
   }
 }
 
-async function logEvent(row: Record<string, any>) {
+async function logEvent(row: Record<string, any>): Promise<boolean> {
   const { error } = await supabase.from('subscription_events').insert({
     effective_date: new Date().toISOString(),
     ...row,
   });
   if (error) console.error(`Failed to log ${row.event_type} event for ${row.account_id}:`, error);
+  return !error;
 }
 
 async function resume(req: NextApiRequest, res: NextApiResponse) {
@@ -144,6 +160,24 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
     const warnings: string[] = [];
 
     if (charge_now) {
+      // Claim the account before charging so two concurrent requests (double
+      // click, retry, two admins) can't both charge: compare-and-set on
+      // last_billing_attempt — only one update can match the value we read.
+      let claim = supabase
+        .from('accounts')
+        .update({ last_billing_attempt: new Date().toISOString() })
+        .eq('account_id', account_id)
+        .eq('subscription_status', 'paused');
+      claim = account.last_billing_attempt
+        ? claim.eq('last_billing_attempt', account.last_billing_attempt)
+        : claim.is('last_billing_attempt', null);
+      const { data: claimed, error: claimError } = await claim.select('account_id');
+      if (claimError || !claimed || claimed.length === 0) {
+        return res.status(409).json({
+          error: 'This membership is already being resumed or changed. Refresh and check before trying again — no charge was made by this request.',
+        });
+      }
+
       const result = await chargeAccount(account);
       if (!result.success) {
         const message = result.error?.message || 'Payment failed';
@@ -216,13 +250,14 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
       warnings.push('Members on the account could not be set active — check their status.');
     }
 
-    await logEvent({
+    const resumeLogged = await logEvent({
       account_id,
       event_type: 'resume',
       previous_mrr: 0,
       new_mrr: dues,
       metadata: { resumed_by: 'admin', charge_now, next_billing_date: nextBillingDate, payment_intent_id: paymentIntent?.id || null },
     });
+    if (!resumeLogged) warnings.push('Resumed, but the event history entry failed to save.');
     if (paymentIntent) {
       await logEvent({
         account_id,

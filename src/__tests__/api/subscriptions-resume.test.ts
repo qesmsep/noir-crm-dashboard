@@ -78,7 +78,11 @@ beforeEach(() => {
   mockLedger.mockReset().mockResolvedValue(undefined);
   tableResults = {
     'accounts.select': { data: pausedAccount, error: null },
-    'accounts.update': (r: Op) => ({ data: { ...pausedAccount, ...r.payload }, error: null }),
+    // The pre-charge claim only sets last_billing_attempt and expects rows back
+    'accounts.update': (r: Op) =>
+      'subscription_status' in r.payload
+        ? { data: { ...pausedAccount, ...r.payload }, error: null }
+        : { data: [{ account_id: 'acct-1' }], error: null },
     'ledger.select': { data: [{ date: '2026-08-15', status: 'cleared' }], error: null },
     'members.update': { data: null, error: null },
     'subscription_events.insert': { data: null, error: null },
@@ -108,6 +112,14 @@ describe('GET preview', () => {
       charge_now_next_billing_date: '2026-12-12',
       next_cycle_billing_date: '2026-11-15',
     }));
+  });
+
+  it('keeps the billing day saved at pause time over a drifted last charge', async () => {
+    tableResults['subscription_events.select'] = { data: [{ metadata: { next_billing_date: '2026-10-01 00:00:00+00' } }], error: null };
+    tableResults['ledger.select'] = { data: [{ date: '2026-09-05', status: 'cleared' }], error: null }; // late retry
+    const { req, res, json } = call('GET', { query: { account_id: 'acct-1' } });
+    await handler(req, res);
+    expect(json.mock.calls[0][0].next_cycle_billing_date).toBe('2026-12-01');
   });
 
   it('falls back to the start date when there is no automatic dues charge yet', async () => {
@@ -140,12 +152,31 @@ describe('POST resume', () => {
     await handler(req, res);
 
     expect(mockCharge).toHaveBeenCalledTimes(1);
-    const [update] = writes('accounts', 'update');
+    const update = writes('accounts', 'update')[1];
     expect(update.payload).toMatchObject({ subscription_status: 'active', next_billing_date: '2026-12-12', last_payment_failed_at: null });
     expect(update.filters).toContainEqual(['subscription_status', 'paused']);
     expect(mockLedger).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ id: 'pi_1' }));
     expect(writes('subscription_events', 'insert').map((o) => o.payload.event_type)).toEqual(['resume', 'payment_succeeded']);
     expect(json).toHaveBeenCalledWith(expect.objectContaining({ success: true, charged: true, next_billing_date: '2026-12-12' }));
+  });
+
+  it('charge now claims the account before charging (compare-and-set on last_billing_attempt)', async () => {
+    mockCharge.mockResolvedValue({ success: true, paymentIntent: { id: 'pi_1', amount: 15600, status: 'succeeded' } });
+    const { req, res } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    await handler(req, res);
+    const [claim, finalUpdate] = writes('accounts', 'update');
+    expect(Object.keys(claim.payload)).toEqual(['last_billing_attempt']);
+    expect(claim.filters).toContainEqual(['subscription_status', 'paused']);
+    expect(finalUpdate.payload.subscription_status).toBe('active');
+  });
+
+  it('charge now loses the claim (concurrent request): 409 and no charge', async () => {
+    tableResults['accounts.update'] = { data: [], error: null };
+    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    await handler(req, res);
+    expect(status).toHaveBeenCalledWith(409);
+    expect(json.mock.calls[0][0].error).toMatch(/no charge was made/);
+    expect(mockCharge).not.toHaveBeenCalled();
   });
 
   it('charge now, card declined: account stays paused, failure is logged, nothing else changes', async () => {
@@ -155,14 +186,18 @@ describe('POST resume', () => {
 
     expect(status).toHaveBeenCalledWith(402);
     expect(json.mock.calls[0][0].error).toMatch(/still paused/);
-    expect(writes('accounts', 'update')).toHaveLength(0);
+    // only the claim — status untouched
+    expect(writes('accounts', 'update').map((o) => Object.keys(o.payload))).toEqual([['last_billing_attempt']]);
     expect(writes('members', 'update')).toHaveLength(0);
     expect(writes('subscription_events', 'insert').map((o) => o.payload.event_type)).toEqual(['payment_failed']);
   });
 
   it('charge now succeeded but account update failed: says charged, do not charge again', async () => {
     mockCharge.mockResolvedValue({ success: true, paymentIntent: { id: 'pi_9', amount: 15600, status: 'succeeded' } });
-    tableResults['accounts.update'] = { data: null, error: { message: 'boom' } };
+    tableResults['accounts.update'] = (r: Op) =>
+      'subscription_status' in r.payload
+        ? { data: null, error: { message: 'boom' } }
+        : { data: [{ account_id: 'acct-1' }], error: null };
     const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
     await handler(req, res);
     expect(status).toHaveBeenCalledWith(500);

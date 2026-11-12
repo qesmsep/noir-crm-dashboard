@@ -169,7 +169,7 @@ export default function ResumeMembershipModal({ accountId, onSuccess, onClose }:
                         Charge on next billing date: {longDate(preview.next_cycle_billing_date)}
                       </div>
                       <div className={styles.optionDescription}>
-                        Resumes now. No charge today; {noDues ? 'billing restarts' : `${money(preview.totalAmount)} is charged`} on {longDate(preview.next_cycle_billing_date)}.
+                        Resumes now. No charge today; {noDues ? 'billing restarts' : `${money(preview.totalAmount)} is charged`} on {longDate(preview.next_cycle_billing_date)}, their regular billing day.
                       </div>
                     </div>
                   </label>
@@ -178,6 +178,12 @@ export default function ResumeMembershipModal({ accountId, onSuccess, onClose }:
             </>
           )}
         </div>
+
+        {preview && (
+          <p className={styles.optionDescription} style={{ padding: '0 24px' }}>
+            Time spent paused is not charged retroactively.
+          </p>
+        )}
 
         <div className={styles.footer}>
           <button className={styles.cancelButton} onClick={onClose} disabled={submitting}>

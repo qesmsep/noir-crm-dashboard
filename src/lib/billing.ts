@@ -127,13 +127,8 @@ export async function chargeAccount(account: any): Promise<{
   error?: any;
 }> {
   try {
-    // 1. Get settings for dynamic CC fee percentage
-    const { data: settings } = await supabase
-      .from('settings')
-      .select('credit_card_fee_percentage')
-      .single();
-
-    const ccFeePercentage = (settings?.credit_card_fee_percentage || 4.0) / 100;
+    // 1. Get settings for dynamic CC fee percentage (same source as the resume preview)
+    const feePercentage = await getCreditCardFeePercentage();
 
     // 2. Get amount to charge
     const amount = account.monthly_dues || 0;
@@ -159,7 +154,7 @@ export async function chargeAccount(account: any): Promise<{
     const { creditCardFee, totalAmount } = computeDuesCharge(
       amount,
       !!account.credit_card_fee_enabled,
-      ccFeePercentage * 100
+      feePercentage
     );
 
     // 4. Create payment intent

@@ -34,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Fetch account
     const { data: account, error: accountError } = await supabase
       .from('accounts')
-      .select('account_id, subscription_status, monthly_dues')
+      .select('account_id, subscription_status, monthly_dues, next_billing_date')
       .eq('account_id', account_id)
       .single();
 
@@ -82,6 +82,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadata: {
         reason: reason || 'No reason provided',
         paused_by: 'admin',
+        // Cleared on the account below; resume reads it back to keep the billing day
+        next_billing_date: account.next_billing_date || null,
       },
     });
 
