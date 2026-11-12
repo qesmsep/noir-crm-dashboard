@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { useToast } from '@/hooks/useToast';
-import { supabase } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/client-auth';
 import styles from '../styles/UpdatePlanModal.module.css';
 
 interface Preview {
@@ -34,9 +34,9 @@ const longDate = (ymd: string) => {
 };
 
 async function authHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session?.access_token) throw new Error('Your session has expired. Sign in again.');
-  return { Authorization: `Bearer ${session.access_token}` };
+  const headers = await getAuthHeaders();
+  if (!headers.Authorization) throw new Error('Your session has expired. Sign in again.');
+  return headers;
 }
 
 const methodLabel = (pm: Preview['payment_method']) => {

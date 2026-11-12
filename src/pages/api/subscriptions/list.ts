@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { verifyAdmin } from '@/lib/admin-auth';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 
@@ -26,6 +27,10 @@ const supabase = createClient(
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (!(await verifyAdmin(req))) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const { status = 'all', limit = 100 } = req.query;

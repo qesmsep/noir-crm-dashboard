@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { supabase } from '@/lib/supabase';
+import { getAuthHeaders } from '@/lib/client-auth';
 import styles from '../styles/MemberSubscriptionCard.module.css';
 import UpdatePlanModal from './UpdatePlanModal';
 import ResumeMembershipModal from './ResumeMembershipModal';
@@ -292,7 +293,7 @@ export default function MemberSubscriptionCard({
     try {
       const response = await fetch('/api/subscriptions/cancel', {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({
           account_id: accountId,
         }),
@@ -326,7 +327,7 @@ export default function MemberSubscriptionCard({
     try {
       const response = await fetch('/api/subscriptions/reactivate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({ account_id: accountId }),
       });
 
@@ -360,13 +361,9 @@ export default function MemberSubscriptionCard({
 
     setActionLoading(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('Your session has expired. Sign in again.');
-      }
       const response = await fetch('/api/subscriptions/pause', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({ account_id: accountId }),
       });
 
@@ -398,7 +395,7 @@ export default function MemberSubscriptionCard({
     try {
       const response = await fetch('/api/subscriptions/retry-payment', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({ account_id: accountId }),
       });
 
