@@ -71,16 +71,22 @@ async function loadPausedAccount(account_id: string): Promise<Loaded> {
  *  2. the last automatic dues charge (can drift if that charge was a late retry),
  *  3. the start date, 4. today.
  */
-async function billingAnchor(account: any, today: string): Promise<string> {
-  const { data: pauses } = await supabase
+type AnchorSource = 'pause_record' | 'last_charge' | 'start_date' | 'today';
+
+async function latestPause(account_id: string): Promise<{ metadata: any; created_at: string } | null> {
+  const { data } = await supabase
     .from('subscription_events')
     .select('metadata, created_at')
-    .eq('account_id', account.account_id)
+    .eq('account_id', account_id)
     .eq('event_type', 'pause')
     .order('created_at', { ascending: false })
     .limit(1);
-  const saved = pauses?.[0]?.metadata?.next_billing_date;
-  if (saved) return String(saved).slice(0, 10);
+  return data?.[0] || null;
+}
+
+async function billingAnchor(account: any, today: string): Promise<{ date: string; source: AnchorSource }> {
+  const saved = (await latestPause(account.account_id))?.metadata?.next_billing_date;
+  if (saved) return { date: String(saved).slice(0, 10), source: 'pause_record' };
 
   const { data: rows } = await supabase
     .from('ledger')
@@ -91,9 +97,28 @@ async function billingAnchor(account: any, today: string): Promise<string> {
     .order('date', { ascending: false })
     .limit(10);
   const last = (rows || []).find((r: any) => r.status !== 'failed');
-  if (last?.date) return String(last.date).slice(0, 10);
-  if (account.subscription_start_date) return String(account.subscription_start_date).slice(0, 10);
-  return today;
+  if (last?.date) return { date: String(last.date).slice(0, 10), source: 'last_charge' };
+  if (account.subscription_start_date) {
+    return { date: String(account.subscription_start_date).slice(0, 10), source: 'start_date' };
+  }
+  return { date: today, source: 'today' };
+}
+
+/**
+ * A resume charge that succeeded while the account is still paused (the
+ * "charged but not activated" path). Retrying would charge twice.
+ */
+async function unappliedResumeCharge(account_id: string): Promise<string | null> {
+  const pause = await latestPause(account_id);
+  let q = supabase
+    .from('subscription_events')
+    .select('metadata, created_at')
+    .eq('account_id', account_id)
+    .eq('event_type', 'payment_succeeded')
+    .eq('metadata->>context', 'resume_charge_now');
+  if (pause?.created_at) q = q.gt('created_at', pause.created_at);
+  const { data } = await q.order('created_at', { ascending: false }).limit(1);
+  return data?.[0]?.metadata?.payment_intent_id || null;
 }
 
 async function preview(req: NextApiRequest, res: NextApiResponse) {
@@ -124,7 +149,10 @@ async function preview(req: NextApiRequest, res: NextApiResponse) {
       ...charge,
       payment_method: paymentMethod,
       charge_now_next_billing_date: nextBillingDateAfterPayment(null, interval, today),
-      next_cycle_billing_date: nextCycleDate(anchor, interval, today),
+      next_cycle_billing_date: nextCycleDate(anchor.date, interval, today),
+      // Anything but pause_record is an estimate (account paused before pauses
+      // recorded the billing date); the prompt says so.
+      billing_day_source: anchor.source,
     });
   } catch (error: any) {
     console.error('Error building resume preview:', error);
@@ -142,7 +170,7 @@ async function logEvent(row: Record<string, any>): Promise<boolean> {
 }
 
 async function resume(req: NextApiRequest, res: NextApiResponse) {
-  const { account_id, charge_now } = req.body || {};
+  const { account_id, charge_now, expected_total } = req.body || {};
   if (!account_id) return res.status(400).json({ error: 'account_id is required' });
   if (typeof charge_now !== 'boolean') {
     return res.status(400).json({ error: 'charge_now is required: choose charge now or next billing date' });
@@ -160,6 +188,22 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
     const warnings: string[] = [];
 
     if (charge_now) {
+      // Charge only what the admin was shown.
+      const { totalAmount } = computeDuesCharge(dues, !!account.credit_card_fee_enabled, await getCreditCardFeePercentage());
+      if (typeof expected_total === 'number' && Math.abs(expected_total - totalAmount) > 0.005) {
+        return res.status(409).json({
+          error: `The amount changed to $${totalAmount.toFixed(2)} since this was opened. Reopen Resume and confirm — nothing was charged.`,
+        });
+      }
+
+      const priorCharge = await unappliedResumeCharge(account_id);
+      if (priorCharge) {
+        return res.status(409).json({
+          error: `Already charged for this resume (${priorCharge}) but the membership wasn't set active. Fix the account manually — not charging again.`,
+          payment_intent_id: priorCharge,
+        });
+      }
+
       // Claim the account before charging so two concurrent requests (double
       // click, retry, two admins) can't both charge: compare-and-set on
       // last_billing_attempt — only one update can match the value we read.
@@ -195,7 +239,7 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
       paymentIntent = result.paymentIntent || null;
       nextBillingDate = nextBillingDateAfterPayment(null, interval, today);
     } else {
-      nextBillingDate = nextCycleDate(await billingAnchor(account, today), interval, today);
+      nextBillingDate = nextCycleDate((await billingAnchor(account, today)).date, interval, today);
     }
 
     const accountUpdate: Record<string, any> = {
@@ -223,6 +267,13 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
       if (paymentIntent) {
         // Card was charged but the account wasn't updated. Say so loudly.
         console.error(`🚨 CRITICAL: resume charge ${paymentIntent.id} succeeded but account ${account_id} not updated: ${reason}`);
+        // Recorded so a retry is refused instead of charging again
+        await logEvent({
+          account_id,
+          event_type: 'payment_succeeded',
+          new_mrr: dues,
+          metadata: { context: 'resume_charge_now', payment_intent_id: paymentIntent.id, amount: paymentIntent.amount / 100, billing_period: today, account_not_updated: reason },
+        });
         return res.status(500).json({
           error: `Charged (${paymentIntent.id}) but the membership could not be set active: ${reason}. Do not charge again — fix the account manually.`,
           payment_intent_id: paymentIntent.id,

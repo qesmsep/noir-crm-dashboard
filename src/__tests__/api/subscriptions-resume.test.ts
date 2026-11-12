@@ -13,7 +13,7 @@ let tableResults: Record<string, any> = {};
 function chain(table: string) {
   const record: Op = { table, op: 'select', filters: [] };
   const c: any = {};
-  for (const m of ['select', 'eq', 'order', 'limit', 'in', 'neq', 'is']) {
+  for (const m of ['select', 'eq', 'order', 'limit', 'in', 'neq', 'is', 'gt']) {
     c[m] = jest.fn((...args: any[]) => { if (m === 'eq') record.filters.push(args); return c; });
   }
   for (const m of ['update', 'insert']) {
@@ -111,6 +111,7 @@ describe('GET preview', () => {
       payment_method: { type: 'card', brand: 'mastercard', last4: '0461' },
       charge_now_next_billing_date: '2026-12-12',
       next_cycle_billing_date: '2026-11-15',
+      billing_day_source: 'last_charge', // estimate — flagged in the prompt
     }));
   });
 
@@ -120,6 +121,7 @@ describe('GET preview', () => {
     const { req, res, json } = call('GET', { query: { account_id: 'acct-1' } });
     await handler(req, res);
     expect(json.mock.calls[0][0].next_cycle_billing_date).toBe('2026-12-01');
+    expect(json.mock.calls[0][0].billing_day_source).toBe('pause_record');
   });
 
   it('falls back to the start date when there is no automatic dues charge yet', async () => {
@@ -179,6 +181,35 @@ describe('POST resume', () => {
     expect(mockCharge).not.toHaveBeenCalled();
   });
 
+  it('charge now refuses if the amount changed since the prompt opened', async () => {
+    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 150 } });
+    await handler(req, res);
+    expect(status).toHaveBeenCalledWith(409);
+    expect(json.mock.calls[0][0].error).toMatch(/\$156\.00/);
+    expect(mockCharge).not.toHaveBeenCalled();
+  });
+
+  it('charge now proceeds when the shown amount matches', async () => {
+    mockCharge.mockResolvedValue({ success: true, paymentIntent: { id: 'pi_1', amount: 15600, status: 'succeeded' } });
+    const { req, res, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
+    await handler(req, res);
+    expect(mockCharge).toHaveBeenCalledTimes(1);
+    expect(json.mock.calls[0][0].success).toBe(true);
+  });
+
+  it('refuses to charge again after a charged-but-not-activated resume', async () => {
+    tableResults['subscription_events.select'] = (r: Op) =>
+      r.filters.some((f: any[]) => f[0] === 'event_type' && f[1] === 'payment_succeeded')
+        ? { data: [{ metadata: { payment_intent_id: 'pi_9' } }], error: null }
+        : { data: [], error: null };
+    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    await handler(req, res);
+    expect(status).toHaveBeenCalledWith(409);
+    expect(json.mock.calls[0][0]).toMatchObject({ payment_intent_id: 'pi_9' });
+    expect(mockCharge).not.toHaveBeenCalled();
+    expect(writes('accounts', 'update')).toHaveLength(0);
+  });
+
   it('charge now, card declined: account stays paused, failure is logged, nothing else changes', async () => {
     mockCharge.mockResolvedValue({ success: false, error: { code: 'card_declined', message: 'Your card was declined.' } });
     const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
@@ -203,6 +234,12 @@ describe('POST resume', () => {
     expect(status).toHaveBeenCalledWith(500);
     expect(json.mock.calls[0][0]).toMatchObject({ payment_intent_id: 'pi_9' });
     expect(json.mock.calls[0][0].error).toMatch(/Do not charge again/);
+    // recorded, so a retry is refused (see test above)
+    const logged = writes('subscription_events', 'insert').map((o) => o.payload);
+    expect(logged).toContainEqual(expect.objectContaining({
+      event_type: 'payment_succeeded',
+      metadata: expect.objectContaining({ context: 'resume_charge_now', payment_intent_id: 'pi_9' }),
+    }));
   });
 
   it('next billing date: no charge, active now, first charge on their billing day', async () => {

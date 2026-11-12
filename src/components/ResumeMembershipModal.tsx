@@ -13,6 +13,7 @@ interface Preview {
   payment_method: { type: string; brand: string | null; last4: string | null } | null;
   charge_now_next_billing_date: string;
   next_cycle_billing_date: string;
+  billing_day_source: 'pause_record' | 'last_charge' | 'start_date' | 'today';
 }
 
 interface Props {
@@ -80,7 +81,11 @@ export default function ResumeMembershipModal({ accountId, onSuccess, onClose }:
       const response = await fetch('/api/subscriptions/resume', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-        body: JSON.stringify({ account_id: accountId, charge_now: choice === 'now' }),
+        body: JSON.stringify({
+          account_id: accountId,
+          charge_now: choice === 'now',
+          expected_total: preview?.totalAmount,
+        }),
       });
       const data = await response.json();
       if (!response.ok || data.error) throw new Error(data.error || 'Failed to resume membership');
@@ -170,6 +175,9 @@ export default function ResumeMembershipModal({ accountId, onSuccess, onClose }:
                       </div>
                       <div className={styles.optionDescription}>
                         Resumes now. No charge today; {noDues ? 'billing restarts' : `${money(preview.totalAmount)} is charged`} on {longDate(preview.next_cycle_billing_date)}, their regular billing day.
+                        {preview.billing_day_source !== 'pause_record' && (
+                          <> Billing day estimated from their {preview.billing_day_source === 'last_charge' ? 'last automatic charge' : preview.billing_day_source === 'start_date' ? 'start date' : 'unpause date'} — check it's right.</>
+                        )}
                       </div>
                     </div>
                   </label>

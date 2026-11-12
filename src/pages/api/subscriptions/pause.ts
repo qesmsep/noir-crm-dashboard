@@ -72,8 +72,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .eq('account_id', account_id)
       .in('status', ['active', 'paused']);
 
-    // Log pause event
-    await supabase.from('subscription_events').insert({
+    // Log pause event — resume reads the billing date back from it
+    const { error: eventError } = await supabase.from('subscription_events').insert({
       account_id,
       event_type: 'pause',
       previous_mrr: Number(account.monthly_dues) || 0,
@@ -86,6 +86,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         next_billing_date: account.next_billing_date || null,
       },
     });
+    if (eventError) {
+      console.error(`Failed to log pause event for ${account_id} (billing date ${account.next_billing_date} not recorded):`, eventError);
+    }
 
     console.log(`⏸️  Subscription paused for account ${account_id}`);
 
