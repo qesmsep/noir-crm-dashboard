@@ -11,7 +11,7 @@
 --   guest_message_templates   built-in texts editable in Campaigns → Reservation guests:
 --                             day_of / time_changed / cancelled to guests, member_link to the host
 --   scheduled_guest_messages  queue sent by /api/cron/process-guest-messages
---   campaigns trigger 'reservation_guest_added'  the guest intro + follow-ups are
+--   campaigns trigger 'guest_registration'  the guest intro + follow-ups are
 --                             ordinary campaign messages ("The guest" recipient)
 --   scheduled_messages.reservation_guest_id  per-guest dedupe for that trigger
 --   reservations.guest_link_token / guest_link_expires_at  no-login add-guests link
@@ -167,20 +167,20 @@ CREATE TRIGGER trg_scheduled_guest_messages_updated_at BEFORE UPDATE ON public.s
   FOR EACH ROW EXECUTE FUNCTION public.reservation_guests_touch_updated_at();
 
 -- ----------------------------------------
--- Campaign trigger: Reservation Guest Added
+-- Campaign trigger: Guest Registration
 -- ----------------------------------------
 ALTER TABLE public.campaigns DROP CONSTRAINT IF EXISTS campaigns_trigger_type_check;
 ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_trigger_type_check
   CHECK (trigger_type = ANY (ARRAY[
     'member_signup'::text, 'member_birthday'::text, 'member_renewal'::text, 'reservation_time'::text,
     'reservation_created'::text, 'reservation'::text, 'recurring'::text, 'reservation_range'::text,
-    'private_event'::text, 'all_members'::text, 'reservation_guest_added'::text
+    'private_event'::text, 'all_members'::text, 'guest_registration'::text
   ]));
 
 ALTER TABLE public.scheduled_messages
   ADD COLUMN IF NOT EXISTS reservation_guest_id UUID NULL REFERENCES public.reservation_guests(id) ON DELETE SET NULL;
 COMMENT ON COLUMN public.scheduled_messages.reservation_guest_id IS
-  'Reservation guest this send was for (reservation_guest_added campaigns). Dedupe key with campaign_message_id.';
+  'Reservation guest this send was for (guest_registration campaigns). Dedupe key with campaign_message_id.';
 CREATE UNIQUE INDEX IF NOT EXISTS scheduled_messages_campaign_guest_once
   ON public.scheduled_messages (campaign_message_id, reservation_guest_id)
   WHERE reservation_guest_id IS NOT NULL AND status IN ('pending', 'sent');

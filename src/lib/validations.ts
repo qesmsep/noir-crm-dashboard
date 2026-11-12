@@ -217,7 +217,7 @@ export const campaignSchema = z.object({
     'reservation_range',
     'private_event',
     'all_members',
-    'reservation_guest_added',
+    'guest_registration',
   ]),
   active: z.boolean().default(true),
   description: z.string().max(500).optional(),

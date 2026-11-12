@@ -6,7 +6,7 @@
  *   Messages — built-in texts (day of, time changed, cancelled, and the host's
  *              "Member guest link"): edit, on/off, live preview, character count.
  *              The guest intro + follow-ups are campaigns with the trigger
- *              "Reservation Guest Added".
+ *              "Guest Registration".
  *   Guests   — one row per guest visit for manual follow-up: text a guest,
  *              mark followed up with a note, see sent history, export CSV.
  *
@@ -135,7 +135,7 @@ function MessagesTab() {
       <div className="rounded-2xl border border-border-cream-1 bg-bg-cream-1 p-4 text-sm text-text-primary">
         <p className="font-semibold">Intro and follow-up texts to guests are campaigns.</p>
         <p className="mt-1 text-text-muted">
-          Create a campaign with the trigger &ldquo;Reservation Guest Added&rdquo; and recipient &ldquo;The guest&rdquo;: a &ldquo;Send immediately&rdquo;
+          Create a campaign with the trigger &ldquo;Guest Registration&rdquo; and recipient &ldquo;The guest&rdquo;: a &ldquo;Send immediately&rdquo;
           message for the intro, then relative messages for follow-ups. Follow-ups stop only if the guest texts STOP.
         </p>
       </div>

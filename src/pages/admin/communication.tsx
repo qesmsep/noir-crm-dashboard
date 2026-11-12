@@ -286,7 +286,7 @@ export default function CommunicationPage() {
       'reservation_range': 'Reservation Range',
       'private_event': 'Private Event',
       'all_members': 'All Members',
-      'reservation_guest_added': 'Reservation Guest Added'
+      'guest_registration': 'Guest Registration'
     };
     return labels[triggerType] || triggerType;
   };

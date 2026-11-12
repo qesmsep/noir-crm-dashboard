@@ -51,7 +51,7 @@ const INTRO = {
   specific_phone: null,
   timing_type: 'immediate',
   is_active: true,
-  campaigns: { id: 'camp-g', trigger_type: 'reservation_guest_added', is_active: true, applies_to_all_locations: true, campaign_locations: [] },
+  campaigns: { id: 'camp-g', trigger_type: 'guest_registration', is_active: true, applies_to_all_locations: true, campaign_locations: [] },
 };
 
 function seed(extra: { reservation?: Record<string, unknown>; members?: Record<string, unknown>[]; templates?: Record<string, unknown>[]; intro?: boolean } = {}) {

@@ -1,5 +1,5 @@
 /**
- * Campaign trigger "Reservation Guest Added" (trigger_type 'reservation_guest_added').
+ * Campaign trigger "Guest Registration" (trigger_type 'guest_registration').
  *
  * The guest intro and any follow-ups are ordinary campaign messages built in
  * Campaigns, sent to "The guest" (recipient_type 'reservation_guest') or a
@@ -30,7 +30,7 @@ import {
   type GuestDeps,
 } from '@/lib/reservationGuests';
 
-export const GUEST_ADDED_TRIGGER = 'reservation_guest_added';
+export const GUEST_REGISTRATION_TRIGGER = 'guest_registration';
 export const SENT_BY_CAMPAIGN = 'system:campaign';
 const WINDOW_FUTURE_MINUTES = 5;
 const WINDOW_PAST_MINUTES = 60;
@@ -108,7 +108,7 @@ function resolve(deps: GuestDeps = {}) {
 
 export function messageAppliesToGuestLocation(message: GuestCampaignMessage, locationId: string | null): boolean {
   const c = message.campaigns;
-  if (!c || c.trigger_type !== GUEST_ADDED_TRIGGER || c.is_active === false) return false;
+  if (!c || c.trigger_type !== GUEST_REGISTRATION_TRIGGER || c.is_active === false) return false;
   if (c.applies_to_all_locations) return true;
   return !!locationId && (c.campaign_locations || []).some((cl) => cl.location_id === locationId);
 }
@@ -302,7 +302,7 @@ async function deliver(
 }
 
 async function loadGuestAddedMessages(db: Db, immediateOnly: boolean): Promise<GuestCampaignMessage[]> {
-  let q = db.from('campaign_messages').select(MESSAGE_SELECT).eq('is_active', true).eq('campaigns.trigger_type', GUEST_ADDED_TRIGGER);
+  let q = db.from('campaign_messages').select(MESSAGE_SELECT).eq('is_active', true).eq('campaigns.trigger_type', GUEST_REGISTRATION_TRIGGER);
   if (immediateOnly) q = q.eq('timing_type', 'immediate');
   const { data, error } = await q;
   if (error) {
@@ -314,7 +314,7 @@ async function loadGuestAddedMessages(db: Db, immediateOnly: boolean): Promise<G
 
 /**
  * Called as a guest is added: send every active "Send immediately"
- * Reservation Guest Added message for the guest's location. Never throws.
+ * Guest Registration message for the guest's location. Never throws.
  */
 export async function sendGuestAddedCampaignMessages(
   guestId: string,
@@ -348,7 +348,7 @@ export async function sendGuestAddedCampaignMessages(
 }
 
 /**
- * Cron: send one delayed Reservation Guest Added message to every guest whose
+ * Cron: send one delayed Guest Registration message to every guest whose
  * send time falls in the window now. Returns how many were sent.
  */
 export async function processGuestAddedCampaignMessage(message: GuestCampaignMessage, deps: GuestDeps = {}): Promise<number> {

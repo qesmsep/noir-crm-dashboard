@@ -7,7 +7,7 @@
  * non-member reservation phone) is a different thing and is never touched here.
  *
  * Texts:
- *   intro + follow-ups  Campaigns, trigger "Reservation Guest Added"
+ *   intro + follow-ups  Campaigns, trigger "Guest Registration"
  *                 (src/lib/guestCampaigns.ts). The immediate intro is skipped
  *                 when the reservation starts within 2 hours and day_of is on,
  *                 because day_of goes out right away and covers it.
@@ -455,7 +455,7 @@ export async function addGuests(
     created.push({ id: (row as { id: string }).id } as GuestRow);
   }
 
-  // Built-in day-of text, then the "Reservation Guest Added" campaign intro.
+  // Built-in day-of text, then the "Guest Registration" campaign intro.
   // (Imported lazily: guestCampaigns builds on this module.)
   const { sendGuestAddedCampaignMessages } = await import('@/lib/guestCampaigns');
   for (const g of created) {

@@ -8,7 +8,7 @@
 --   2. campaign_messages.recipient_type accepts 'member_only' ("Members'
 --      reservations") and 'guest_only' ("Non-member reservations") so a
 --      reservation message can target members or non-members only, and
---      'reservation_guest' ("The guest") for the Reservation Guest Added
+--      'reservation_guest' ("The guest") for the Guest Registration
 --      trigger (added in 20261112010000). Live constraint (checked 2026-11-12)
 --      included none of them.
 --   3. scheduled_messages.reservation_id: reservation_created sends are deduped

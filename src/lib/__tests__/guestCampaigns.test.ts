@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 /**
- * Campaign trigger "Reservation Guest Added": delayed follow-ups timed from
+ * Campaign trigger "Guest Registration": delayed follow-ups timed from
  * when the guest was added, once per guest, stop only on STOP, keep going
  * after the visit, skip cancelled reservations and removed guests. Plus the
  * staff "Text link to member" message.
@@ -29,7 +29,7 @@ import { textGuestLinkToMember } from '../memberGuestLink';
 
 const LOC = 'loc-noir';
 const ADDED = '2026-11-12T18:00:00.000Z'; // 12:00 PM Central
-const campaign = { id: 'camp-g', trigger_type: 'reservation_guest_added', is_active: true, applies_to_all_locations: false, campaign_locations: [{ location_id: LOC }] };
+const campaign = { id: 'camp-g', trigger_type: 'guest_registration', is_active: true, applies_to_all_locations: false, campaign_locations: [{ location_id: LOC }] };
 
 function msg(extra: Partial<GuestCampaignMessage>): GuestCampaignMessage {
   return {

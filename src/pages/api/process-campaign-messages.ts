@@ -10,7 +10,7 @@ import {
   type LocationInfo,
 } from '../../lib/reservationCampaigns';
 import { sendSMS } from '../../lib/sms';
-import { GUEST_ADDED_TRIGGER, processGuestAddedCampaignMessage } from '../../lib/guestCampaigns';
+import { GUEST_REGISTRATION_TRIGGER, processGuestAddedCampaignMessage } from '../../lib/guestCampaigns';
 
 // Constants for message timing windows
 const MESSAGE_SEND_WINDOW_FUTURE_MINUTES = 5; // Send messages within 5 minutes of target time
@@ -259,9 +259,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           continue;
         }
 
-        // Reservation Guest Added: recipients are reservation guests, timed from
+        // Guest Registration: recipients are reservation guests, timed from
         // when each guest was added. Handled in lib/guestCampaigns.
-        if (triggerType === GUEST_ADDED_TRIGGER) {
+        if (triggerType === GUEST_REGISTRATION_TRIGGER) {
           processedCount += await processGuestAddedCampaignMessage(message);
           continue;
         }

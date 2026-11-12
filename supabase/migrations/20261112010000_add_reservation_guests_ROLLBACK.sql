@@ -7,8 +7,8 @@
 
 DO $$
 BEGIN
-  IF EXISTS (SELECT 1 FROM public.campaigns WHERE trigger_type = 'reservation_guest_added') THEN
-    RAISE EXCEPTION 'campaigns still use trigger reservation_guest_added; change or delete them before rolling back';
+  IF EXISTS (SELECT 1 FROM public.campaigns WHERE trigger_type = 'guest_registration') THEN
+    RAISE EXCEPTION 'campaigns still use trigger guest_registration; change or delete them before rolling back';
   END IF;
 END $$;
 

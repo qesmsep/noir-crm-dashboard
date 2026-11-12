@@ -527,7 +527,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       .replace(/\{\{phone\}\}/g, '(555) 123-4567')
       .replace(/\{\{email\}\}/g, 'john.doe@example.com');
 
-    if (campaignTriggerType === 'reservation_guest_added') {
+    if (campaignTriggerType === 'guest_registration') {
       return formData.content
         .replace(/\{\{(guest_first_name|first_name)\}\}/g, 'Ava')
         .replace(/\{\{(guest_last_name|last_name)\}\}/g, 'Stone')
@@ -666,7 +666,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
 
-      case 'reservation_guest_added':
+      case 'guest_registration':
         return [
           { value: 'reservation_guest', label: `The guest${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number (e.g. a staff alert)' }
@@ -709,7 +709,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     if (campaignTriggerType === 'reservation_created') {
       return ['immediate', 'specific_time', 'recurring', 'relative'];
     }
-    if (campaignTriggerType === 'reservation_guest_added') {
+    if (campaignTriggerType === 'guest_registration') {
       return ['immediate', 'specific_time', 'relative'];
     }
 
@@ -734,11 +734,11 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     if (!campaignTriggerType) return false;
 
     // Only show relative option for triggers that have specific dates/times
-    return ['member_signup', 'member_birthday', 'reservation_time', 'reservation_created', 'reservation_guest_added', 'private_event'].includes(campaignTriggerType);
+    return ['member_signup', 'member_birthday', 'reservation_time', 'reservation_created', 'guest_registration', 'private_event'].includes(campaignTriggerType);
   };
 
   const getAvailablePlaceholders = () => {
-    if (campaignTriggerType === 'reservation_guest_added') {
+    if (campaignTriggerType === 'guest_registration') {
       return [
         { name: '{{guest_first_name}}', description: 'Guest first name' },
         { name: '{{guest_last_name}}', description: 'Guest last name (may be blank)' },
