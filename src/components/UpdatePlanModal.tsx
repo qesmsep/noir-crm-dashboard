@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useToast } from '@/hooks/useToast';
 import { X } from 'lucide-react';
 import styles from '../styles/UpdatePlanModal.module.css';
+import { getAuthHeaders } from '@/lib/client-auth';
 
 interface Plan {
   id: string;
@@ -102,7 +103,7 @@ export default function UpdatePlanModal({ accountId, currentPlanId, subscription
     try {
       const response = await fetch('/api/subscriptions/update-plan', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({
           account_id: accountId,
           new_plan_id: selectedPlanId,

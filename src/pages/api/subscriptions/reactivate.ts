@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { verifyAdmin } from '@/lib/admin-auth';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -20,6 +21,10 @@ const supabase = createClient(
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (!(await verifyAdmin(req))) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const { account_id } = req.body;
