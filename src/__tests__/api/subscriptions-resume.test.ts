@@ -37,6 +37,7 @@ jest.mock('@/lib/admin-auth', () => ({ verifyAdmin: (...a: any[]) => mockVerifyA
 
 const mockCharge = jest.fn();
 const mockLedger = jest.fn();
+const mockFindCharge = jest.fn();
 jest.mock('@/lib/billing', () => {
   const actual = jest.requireActual('@/lib/billing');
   return {
@@ -45,6 +46,7 @@ jest.mock('@/lib/billing', () => {
     logPaymentToLedger: (...a: any[]) => mockLedger(...a),
     getCreditCardFeePercentage: async () => 4,
     describeDefaultPaymentMethod: async () => ({ type: 'card', brand: 'mastercard', last4: '0461' }),
+    findAppChargeSince: (...a: any[]) => mockFindCharge(...a),
   };
 });
 
@@ -76,6 +78,7 @@ beforeEach(() => {
   mockVerifyAdmin.mockReset().mockResolvedValue(true);
   mockCharge.mockReset();
   mockLedger.mockReset().mockResolvedValue(undefined);
+  mockFindCharge.mockReset().mockResolvedValue(null);
   tableResults = {
     'accounts.select': { data: pausedAccount, error: null },
     // The pre-charge claim only sets last_billing_attempt and expects rows back
@@ -92,7 +95,7 @@ beforeEach(() => {
 describe('auth', () => {
   it('refuses non-admins and touches nothing', async () => {
     mockVerifyAdmin.mockResolvedValue(false);
-    const { req, res, status } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    const { req, res, status } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
     await handler(req, res);
     expect(status).toHaveBeenCalledWith(401);
     expect(mockCharge).not.toHaveBeenCalled();
@@ -150,7 +153,7 @@ describe('POST resume', () => {
 
   it('charge now: charges, then sets active with next billing one month out, and logs it', async () => {
     mockCharge.mockResolvedValue({ success: true, paymentIntent: { id: 'pi_1', amount: 15600, status: 'succeeded' } });
-    const { req, res, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    const { req, res, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
     await handler(req, res);
 
     expect(mockCharge).toHaveBeenCalledTimes(1);
@@ -164,7 +167,7 @@ describe('POST resume', () => {
 
   it('charge now claims the account before charging (compare-and-set on last_billing_attempt)', async () => {
     mockCharge.mockResolvedValue({ success: true, paymentIntent: { id: 'pi_1', amount: 15600, status: 'succeeded' } });
-    const { req, res } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    const { req, res } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
     await handler(req, res);
     const [claim, finalUpdate] = writes('accounts', 'update');
     expect(Object.keys(claim.payload)).toEqual(['last_billing_attempt']);
@@ -174,11 +177,37 @@ describe('POST resume', () => {
 
   it('charge now loses the claim (concurrent request): 409 and no charge', async () => {
     tableResults['accounts.update'] = { data: [], error: null };
-    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
     await handler(req, res);
     expect(status).toHaveBeenCalledWith(409);
     expect(json.mock.calls[0][0].error).toMatch(/no charge was made/);
     expect(mockCharge).not.toHaveBeenCalled();
+  });
+
+  it('charge now requires the amount the admin was shown', async () => {
+    const { req, res, status } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    await handler(req, res);
+    expect(status).toHaveBeenCalledWith(400);
+    expect(mockCharge).not.toHaveBeenCalled();
+    expect(writes('accounts', 'update')).toHaveLength(0);
+  });
+
+  it('refuses when Stripe shows an app charge since the pause, even if the event log missed it', async () => {
+    mockFindCharge.mockResolvedValue('pi_stripe');
+    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
+    await handler(req, res);
+    expect(status).toHaveBeenCalledWith(409);
+    expect(json.mock.calls[0][0]).toMatchObject({ payment_intent_id: 'pi_stripe' });
+    expect(mockCharge).not.toHaveBeenCalled();
+  });
+
+  it('does not charge if Stripe cannot be checked', async () => {
+    mockFindCharge.mockRejectedValue(new Error('stripe down'));
+    const { req, res, status } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
+    await handler(req, res);
+    expect(status).toHaveBeenCalledWith(503);
+    expect(mockCharge).not.toHaveBeenCalled();
+    expect(writes('accounts', 'update')).toHaveLength(0);
   });
 
   it('charge now refuses if the amount changed since the prompt opened', async () => {
@@ -202,7 +231,7 @@ describe('POST resume', () => {
       r.filters.some((f: any[]) => f[0] === 'event_type' && f[1] === 'payment_succeeded')
         ? { data: [{ metadata: { payment_intent_id: 'pi_9' } }], error: null }
         : { data: [], error: null };
-    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
     await handler(req, res);
     expect(status).toHaveBeenCalledWith(409);
     expect(json.mock.calls[0][0]).toMatchObject({ payment_intent_id: 'pi_9' });
@@ -212,7 +241,7 @@ describe('POST resume', () => {
 
   it('charge now, card declined: account stays paused, failure is logged, nothing else changes', async () => {
     mockCharge.mockResolvedValue({ success: false, error: { code: 'card_declined', message: 'Your card was declined.' } });
-    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
     await handler(req, res);
 
     expect(status).toHaveBeenCalledWith(402);
@@ -229,7 +258,7 @@ describe('POST resume', () => {
       'subscription_status' in r.payload
         ? { data: null, error: { message: 'boom' } }
         : { data: [{ account_id: 'acct-1' }], error: null };
-    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true } });
+    const { req, res, status, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
     await handler(req, res);
     expect(status).toHaveBeenCalledWith(500);
     expect(json.mock.calls[0][0]).toMatchObject({ payment_intent_id: 'pi_9' });

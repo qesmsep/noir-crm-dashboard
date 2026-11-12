@@ -66,6 +66,32 @@ export async function getDefaultPaymentMethod(stripe_customer_id: string): Promi
 }
 
 /**
+ * Stripe is the source of truth for "was this account already charged by the
+ * app since <time>": a succeeded or processing PaymentIntent created by
+ * chargeAccount (metadata.source = billing_cron) for this account. Manual
+ * dashboard charges don't carry that metadata and are ignored.
+ * Throws if Stripe can't be read — callers must not charge without an answer.
+ */
+export async function findAppChargeSince(
+  stripe_customer_id: string,
+  account_id: string,
+  sinceIso: string
+): Promise<string | null> {
+  const list = await stripe.paymentIntents.list({
+    customer: stripe_customer_id,
+    created: { gte: Math.floor(Date.parse(sinceIso) / 1000) },
+    limit: 100,
+  });
+  const hit = list.data.find(
+    (pi) =>
+      (pi.status === 'succeeded' || pi.status === 'processing') &&
+      pi.metadata?.account_id === account_id &&
+      pi.metadata?.source === 'billing_cron'
+  );
+  return hit?.id || null;
+}
+
+/**
  * Short description of the payment method chargeAccount would use, for display.
  * Returns null when there is none.
  */

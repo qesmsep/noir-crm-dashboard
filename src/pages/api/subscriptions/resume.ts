@@ -6,6 +6,7 @@ import {
   computeDuesCharge,
   getCreditCardFeePercentage,
   describeDefaultPaymentMethod,
+  findAppChargeSince,
   nextBillingDateAfterPayment,
   nextCycleDate,
 } from '@/lib/billing';
@@ -105,10 +106,13 @@ async function billingAnchor(account: any, today: string): Promise<{ date: strin
 }
 
 /**
- * A resume charge that succeeded while the account is still paused (the
- * "charged but not activated" path). Retrying would charge twice.
+ * A charge already made while the account is still paused (the "charged but
+ * not activated" path). Retrying would charge twice. Checks our event log and
+ * then Stripe itself, so it holds even if the event write also failed.
+ * Window: since the latest pause, or the last 24h when no pause was recorded.
  */
-async function unappliedResumeCharge(account_id: string): Promise<string | null> {
+async function unappliedResumeCharge(account: any): Promise<string | null> {
+  const account_id = account.account_id;
   const pause = await latestPause(account_id);
   let q = supabase
     .from('subscription_events')
@@ -118,7 +122,12 @@ async function unappliedResumeCharge(account_id: string): Promise<string | null>
     .eq('metadata->>context', 'resume_charge_now');
   if (pause?.created_at) q = q.gt('created_at', pause.created_at);
   const { data } = await q.order('created_at', { ascending: false }).limit(1);
-  return data?.[0]?.metadata?.payment_intent_id || null;
+  const logged = data?.[0]?.metadata?.payment_intent_id;
+  if (logged) return logged;
+
+  if (!account.stripe_customer_id) return null;
+  const since = pause?.created_at || new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+  return findAppChargeSince(account.stripe_customer_id, account_id, since);
 }
 
 async function preview(req: NextApiRequest, res: NextApiResponse) {
@@ -188,15 +197,26 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
     const warnings: string[] = [];
 
     if (charge_now) {
-      // Charge only what the admin was shown.
+      // Charge only what the admin was shown — the amount is required.
+      if (typeof expected_total !== 'number') {
+        return res.status(400).json({ error: 'expected_total is required to charge: reopen Resume and confirm the amount' });
+      }
       const { totalAmount } = computeDuesCharge(dues, !!account.credit_card_fee_enabled, await getCreditCardFeePercentage());
-      if (typeof expected_total === 'number' && Math.abs(expected_total - totalAmount) > 0.005) {
+      if (Math.abs(expected_total - totalAmount) > 0.005) {
         return res.status(409).json({
           error: `The amount changed to $${totalAmount.toFixed(2)} since this was opened. Reopen Resume and confirm — nothing was charged.`,
         });
       }
 
-      const priorCharge = await unappliedResumeCharge(account_id);
+      let priorCharge: string | null;
+      try {
+        priorCharge = await unappliedResumeCharge(account);
+      } catch (stripeError: any) {
+        console.error(`Could not check prior charges for ${account_id}:`, stripeError);
+        return res.status(503).json({
+          error: 'Could not confirm with Stripe that this member has not already been charged. Nothing was charged — try again shortly.',
+        });
+      }
       if (priorCharge) {
         return res.status(409).json({
           error: `Already charged for this resume (${priorCharge}) but the membership wasn't set active. Fix the account manually — not charging again.`,
