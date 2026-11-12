@@ -169,6 +169,7 @@ describe('POST resume', () => {
     mockCharge.mockResolvedValue({ success: true, paymentIntent: { id: 'pi_1', amount: 15600, status: 'succeeded' } });
     const { req, res } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
     await handler(req, res);
+    expect(mockCharge.mock.calls[0][1]).toEqual({ feePercentage: 4 }); // charges the verified fee
     const [claim, finalUpdate] = writes('accounts', 'update');
     expect(Object.keys(claim.payload)).toEqual(['last_billing_attempt']);
     expect(claim.filters).toContainEqual(['subscription_status', 'paused']);

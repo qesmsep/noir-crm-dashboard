@@ -159,14 +159,19 @@ export function computeDuesCharge(
  * Charge an account for their monthly dues
  * Returns { success: boolean, paymentIntent?: Stripe.PaymentIntent, error?: any }
  */
-export async function chargeAccount(account: any): Promise<{
+export async function chargeAccount(
+  account: any,
+  // Fee percentage the caller already showed and verified (resume); avoids a
+  // settings change between the check and the charge. Defaults to settings.
+  opts: { feePercentage?: number } = {}
+): Promise<{
   success: boolean;
   paymentIntent?: Stripe.PaymentIntent;
   error?: any;
 }> {
   try {
     // 1. Get settings for dynamic CC fee percentage (same source as the resume preview)
-    const feePercentage = await getCreditCardFeePercentage();
+    const feePercentage = opts.feePercentage ?? (await getCreditCardFeePercentage());
 
     // 2. Get amount to charge
     const amount = account.monthly_dues || 0;
@@ -728,7 +733,10 @@ export function nextBillingDateAfterPayment(
  * All dates are YYYY-MM-DD.
  */
 export function nextCycleDate(anchor: string, interval: string, today: string): string {
-  const [ay, am, ad] = anchor.slice(0, 10).split('-').map(Number);
+  // A malformed anchor falls back to today rather than writing "NaN-NaN-NaN".
+  const valid = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v);
+  const base = valid(anchor) ? anchor : today;
+  const [ay, am, ad] = base.slice(0, 10).split('-').map(Number);
   const stepMonths = interval === 'year' ? 12 : 1;
   const at = (k: number): string => {
     const total = (am - 1) + k * stepMonths;

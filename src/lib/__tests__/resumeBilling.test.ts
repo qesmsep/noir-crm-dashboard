@@ -27,6 +27,12 @@ describe('nextCycleDate', () => {
     expect(nextCycleDate('2026-12-05', 'month', '2026-12-20')).toBe('2027-01-05');
   });
 
+  it('falls back to today on a malformed anchor instead of writing NaN', () => {
+    expect(nextCycleDate('', 'month', '2026-11-12')).toBe('2026-12-12');
+    expect(nextCycleDate('not-a-date', 'month', '2026-11-12')).toBe('2026-12-12');
+    expect(nextCycleDate(null as any, 'month', '2026-11-12')).toBe('2026-12-12');
+  });
+
   it('accepts a timestamp anchor and an anchor already in the future', () => {
     expect(nextCycleDate('2026-08-15 00:00:00+00', 'month', '2026-11-12')).toBe('2026-11-15');
     expect(nextCycleDate('2026-12-01', 'month', '2026-11-12')).toBe('2026-12-01');

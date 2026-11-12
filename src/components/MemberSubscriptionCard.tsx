@@ -377,6 +377,9 @@ export default function MemberSubscriptionCard({
         title: 'Success',
         description: 'Subscription paused successfully',
       });
+      for (const warning of data.warnings || []) {
+        toast({ title: 'Needs attention', description: warning, variant: 'error' });
+      }
 
       fetchSubscriptionData();
     } catch (error: any) {

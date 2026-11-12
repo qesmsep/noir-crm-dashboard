@@ -201,7 +201,8 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
       if (typeof expected_total !== 'number') {
         return res.status(400).json({ error: 'expected_total is required to charge: reopen Resume and confirm the amount' });
       }
-      const { totalAmount } = computeDuesCharge(dues, !!account.credit_card_fee_enabled, await getCreditCardFeePercentage());
+      const feePercentage = await getCreditCardFeePercentage();
+      const { totalAmount } = computeDuesCharge(dues, !!account.credit_card_fee_enabled, feePercentage);
       if (Math.round(expected_total * 100) !== Math.round(totalAmount * 100)) {
         return res.status(409).json({
           error: `The amount changed to $${totalAmount.toFixed(2)} since this was opened. Reopen Resume and confirm — nothing was charged.`,
@@ -242,7 +243,7 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
         });
       }
 
-      const result = await chargeAccount(account);
+      const result = await chargeAccount(account, { feePercentage });
       if (!result.success) {
         const message = result.error?.message || 'Payment failed';
         await logEvent({

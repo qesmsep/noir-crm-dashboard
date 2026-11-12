@@ -101,6 +101,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: true,
       account: updatedAccount,
       message: 'Subscription paused successfully. Billing will not occur until resumed.',
+      warnings: eventError
+        ? ['Paused, but the billing date could not be saved — resume will estimate the billing day.']
+        : [],
     });
 
   } catch (error: any) {
