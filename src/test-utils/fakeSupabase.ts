@@ -22,8 +22,10 @@ export interface UniqueRule {
 export interface RelationRule {
   /** Table holding the related row. */
   table: string;
-  /** Column on this table pointing at related.id. */
+  /** Column on this table pointing at the related row. */
   fk: string;
+  /** Related table's key column (default 'id'). */
+  pk?: string;
 }
 
 export interface FakeDbOptions {
@@ -183,7 +185,7 @@ class Query implements PromiseLike<any> {
     const copy = out.map((r) => {
       const c: Row = { ...r };
       for (const [name, rule] of Object.entries(rels)) {
-        const hit = this.db.rows(rule.table).find((x) => x.id === r[rule.fk]);
+        const hit = this.db.rows(rule.table).find((x) => x[rule.pk || 'id'] === r[rule.fk]);
         c[name] = hit ? { ...hit } : null;
       }
       return c;
@@ -206,7 +208,7 @@ class Query implements PromiseLike<any> {
       return this.finish(
         table.filter((r) => {
           const joined: Row = { ...r };
-          for (const [name, rule] of Object.entries(rels)) joined[name] = this.db.rows(rule.table).find((x) => x.id === r[rule.fk]) || null;
+          for (const [name, rule] of Object.entries(rels)) joined[name] = this.db.rows(rule.table).find((x) => x[rule.pk || 'id'] === r[rule.fk]) || null;
           return this.matches(joined);
         }),
       );
