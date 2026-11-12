@@ -46,6 +46,8 @@ import { CalendarIcon, TimeIcon } from '@chakra-ui/icons';
 import { useRouter } from 'next/navigation';
 import { useMemberAuth } from '@/context/MemberAuthContext';
 import MemberNav from '@/components/member/MemberNav';
+import ReservationGuestsSheet from '@/components/guests/ReservationGuestsSheet';
+import { Button as UIButton } from '@/components/ui/button';
 
 export default function MemberReservationsPage() {
   const router = useRouter();
@@ -65,6 +67,9 @@ export default function MemberReservationsPage() {
   const [reservationToCancel, setReservationToCancel] = useState<any>(null);
   const [cancelling, setCancelling] = useState(false);
   const cancelRef = React.useRef(null);
+
+  // Reservation guests sheet
+  const [guestsReservationId, setGuestsReservationId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!loading && !member) {
@@ -102,6 +107,18 @@ export default function MemberReservationsPage() {
 
   const handleEditSubmit = async () => {
     if (!selectedReservation) return;
+
+    const guestCount = selectedReservation.guest_count || 0;
+    if (editFormData.party_size < guestCount + 1) {
+      toast({
+        title: 'Party size too small',
+        description: `You have ${guestCount} guest${guestCount === 1 ? '' : 's'} on this reservation, so the party size can't be lower than ${guestCount + 1}. Remove a guest first.`,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
 
     setSubmitting(true);
 
@@ -298,6 +315,17 @@ export default function MemberReservationsPage() {
             </Box>
           )}
         </VStack>
+
+        {!isPast && reservation.status === 'confirmed' && (
+          <UIButton
+            type="button"
+            variant="outline"
+            className="mt-4 h-11 w-full"
+            onClick={() => setGuestsReservationId(reservation.id)}
+          >
+            Guests{reservation.guest_count ? ` (${reservation.guest_count})` : ''}
+          </UIButton>
+        )}
 
         {!isPast && reservation.status === 'confirmed' && (
           <HStack mt={4} spacing={2}>
@@ -608,6 +636,14 @@ export default function MemberReservationsPage() {
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
+      <ReservationGuestsSheet
+        reservationId={guestsReservationId}
+        open={!!guestsReservationId}
+        onOpenChange={(open) => {
+          if (!open) setGuestsReservationId(null);
+        }}
+        onChanged={fetchReservations}
+      />
     </Box>
   );
 }

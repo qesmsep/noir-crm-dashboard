@@ -22,6 +22,7 @@ import {
 import type { LocationHours, WeeklyHours } from '@/types/hours';
 import { useReservationHold } from '@/hooks/useReservationHold';
 import HoldCountdown from '@/components/HoldCountdown';
+import PostBookingGuestsStep from '@/components/guests/PostBookingGuestsStep';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '');
 
@@ -278,6 +279,8 @@ export default function SimpleReservationRequestModal({
   const [date, setDate] = useState<Date | null>(null);
   const [time, setTime] = useState('');
   const [partySize, setPartySize] = useState('2');
+  // After a member booking: offer to add guests before closing.
+  const [guestStep, setGuestStep] = useState<{ reservationId: string; partySize: number } | null>(null);
   const [notes, setNotes] = useState('');
   const [isCreatingReservation, setIsCreatingReservation] = useState(false);
   const [blockedTimes, setBlockedTimes] = useState<any[]>([]);
@@ -1126,12 +1129,21 @@ export default function SimpleReservationRequestModal({
         onReservationCreated();
       }
 
+      // Member bookings (not admin override) get the add-guests step next;
+      // public and admin bookings close as before.
+      const bookedPartySize = parseInt(partySize);
+      const newReservationId: string | undefined = result.data?.id;
+
       // Reset form
       setDate(null);
       setTime('');
       setPartySize('2');
       setNotes('');
-      onClose();
+      if (memberId && !adminOverride && newReservationId && bookedPartySize > 1) {
+        setGuestStep({ reservationId: newReservationId, partySize: bookedPartySize });
+      } else {
+        onClose();
+      }
     } catch (error: any) {
       toast({
         title: 'Error',
@@ -1236,6 +1248,19 @@ export default function SimpleReservationRequestModal({
       : DateTime.fromISO(todayAtVenue).plus({ days: 30 }).startOf('day').toJSDate();
 
   if (!isOpen) return null;
+
+  if (guestStep) {
+    return (
+      <PostBookingGuestsStep
+        reservationId={guestStep.reservationId}
+        partySize={guestStep.partySize}
+        onDone={() => {
+          setGuestStep(null);
+          onClose();
+        }}
+      />
+    );
+  }
 
   return (
     <>

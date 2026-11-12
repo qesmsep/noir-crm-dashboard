@@ -29,8 +29,8 @@ export type AddedVia = 'portal' | 'guest_link' | 'staff';
 export const DEFAULT_DAY_OF_OFFSET_MINUTES = 120;
 /** If the reservation starts within this window, `added` is skipped. */
 export const ADDED_SKIP_WINDOW_MINUTES = 120;
-export const DEFAULT_TIMEZONE = 'America/Chicago';
-export const DEFAULT_ARRIVAL_INSTRUCTIONS = "Give your name at the door and we'll take it from there.";
+export { DEFAULT_TIMEZONE, DEFAULT_ARRIVAL_INSTRUCTIONS } from '@/lib/guestMessageRender';
+import { DEFAULT_TIMEZONE, renderGuestMessage } from '@/lib/guestMessageRender';
 export const SENT_BY_SYSTEM = 'system:guests';
 const MAX_NAME_LENGTH = 60;
 
@@ -181,29 +181,7 @@ export function planGuestMessages(args: {
   return plan;
 }
 
-export interface RenderContext {
-  guestFirstName: string;
-  hostFirstName: string;
-  locationName: string;
-  start: string;
-  timezone?: string | null;
-  arrivalInstructions?: string | null;
-}
-
-export function renderGuestMessage(body: string, ctx: RenderContext): string {
-  const tz = ctx.timezone || DEFAULT_TIMEZONE;
-  const start = DateTime.fromISO(ctx.start, { zone: 'utc' }).setZone(tz);
-  const arrival = (ctx.arrivalInstructions || '').trim() || DEFAULT_ARRIVAL_INSTRUCTIONS;
-  return body
-    .replace(/\{\{guest_first_name\}\}/g, ctx.guestFirstName)
-    .replace(/\{\{host_first_name\}\}/g, ctx.hostFirstName)
-    .replace(/\{\{location_name\}\}/g, ctx.locationName)
-    .replace(/\{\{date\}\}/g, start.isValid ? start.toFormat('cccc, LLLL d') : '')
-    .replace(/\{\{time\}\}/g, start.isValid ? start.toFormat('h:mm a') : '')
-    .replace(/\{\{arrival_instructions\}\}/g, arrival)
-    .replace(/[ \t]{2,}/g, ' ')
-    .trim();
-}
+export { renderGuestMessage, type RenderContext } from '@/lib/guestMessageRender';
 
 function cleanName(raw: unknown): string {
   return String(raw ?? '').replace(/\s+/g, ' ').trim();
