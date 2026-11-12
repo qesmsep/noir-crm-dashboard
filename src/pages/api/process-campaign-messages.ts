@@ -1,6 +1,16 @@
 import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../lib/supabase';
 import { DateTime } from 'luxon';
+import {
+  claimReservationSend,
+  finishReservationSend,
+  isCancelled,
+  renderReservationMessage,
+  reservationMatchesRecipientType,
+  type LocationInfo,
+} from '../../lib/reservationCampaigns';
+import { sendSMS } from '../../lib/sms';
+import { GUEST_REGISTRATION_TRIGGER, processGuestAddedCampaignMessage } from '../../lib/guestCampaigns';
 
 // Constants for message timing windows
 const MESSAGE_SEND_WINDOW_FUTURE_MINUTES = 5; // Send messages within 5 minutes of target time
@@ -164,6 +174,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           id,
           name,
           trigger_type,
+          is_active,
           applies_to_all_locations,
           selected_private_event_id,
           campaign_locations(
@@ -215,6 +226,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`📊 Found ${messages.length} active campaign messages to process`);
     let processedCount = 0;
 
+    // Per-reservation location name + timezone for reservation triggers, so
+    // each reservation renders in its own venue's timezone.
+    const locationsById: Map<string, LocationInfo> = new Map();
+    {
+      const { data: locationRows } = await supabaseAdmin.from('locations').select('id, name, timezone');
+      (locationRows || []).forEach((l: LocationInfo) => locationsById.set(l.id, l));
+    }
+
           for (const message of messages) {
         console.log('\n📝 ==========================================');
         console.log(`📝 Processing campaign message: ${message.name}`);
@@ -232,6 +251,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Get the campaign trigger type
         const triggerType = message.campaigns?.trigger_type || 'member_signup';
         console.log(`🎯 Campaign trigger type: ${triggerType}`);
+
+        // "Send immediately" messages are sent at booking time by
+        // sendReservationCreatedMessages (POST /api/reservations), never here.
+        if (message.timing_type === 'immediate') {
+          console.log('⏭️  Immediate message — sent at booking time, skipping in cron');
+          continue;
+        }
+
+        // Guest Registration: recipients are reservation guests, timed from
+        // when each guest was added. Handled in lib/guestCampaigns.
+        if (triggerType === GUEST_REGISTRATION_TRIGGER) {
+          processedCount += await processGuestAddedCampaignMessage(message);
+          continue;
+        }
+
+        // A reservation_created message belongs to its campaign: skip when the
+        // campaign itself is switched off.
+        if (triggerType === 'reservation_created' && message.campaigns?.is_active === false) {
+          console.log('⏭️  Campaign is inactive, skipping');
+          continue;
+        }
 
         // Determine timezone - default to CST, will be updated for location-specific campaigns
         let businessTimezone = defaultTimezone;
@@ -401,6 +441,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             end_time: reservation.end_time, // Store end_time for after messages
             party_size: reservation.party_size, // Store party_size for placeholders
             location_id: reservation.location_id, // Preserve location for filtering
+            reservation_start_time: reservation.start_time,
             created_at: reservation.start_time,
             updated_at: reservation.start_time
           };
@@ -417,9 +458,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             let reservationQuery = supabaseAdmin
           .from('reservations')
-          .select('phone, start_time, end_time, party_size, created_at, first_name, last_name, email, location_id')
+          .select('id, status, member_id, phone, start_time, end_time, party_size, created_at, first_name, last_name, email, location_id')
           .gte('created_at', searchStart) // Reservations created in last 24 hours
-          .lte('created_at', searchEnd); // Up to now
+          .lte('created_at', searchEnd) // Up to now
+          .or('status.is.null,status.neq.cancelled'); // Never confirm a cancelled booking
 
             // Apply location filter if campaign is location-specific
             if (campaignLocationIds && campaignLocationIds.length > 0) {
@@ -446,8 +488,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           last_name: r.last_name
             })));
 
+            // Recipient split for reservation triggers: members' vs non-member
+            // reservations (default "phone number on the reservation" = all).
+            const eligibleReservations = reservationData.filter(
+              r => !isCancelled(r.status) && reservationMatchesRecipientType(message.recipient_type, r)
+            );
+
             // Create virtual members from recently created reservations
-            const virtualMembers = reservationData.map(reservation => {
+            const virtualMembers = eligibleReservations.map(reservation => {
           // Convert phone number to international format using utility (guard against null)
           const formattedPhone = formatPhoneForStorage(reservation.phone || '');
 
@@ -458,11 +506,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             last_name: reservation.last_name || '', // Use real last name from reservation
             email: reservation.email || '', // Use real email from reservation
             phone: formattedPhone,
-            member_type: 'guest',
+            member_type: 'guest', // campaign-engine term for "reservation phone", not a reservation guest
             join_date: reservation.created_at, // Use created_at as trigger point
             end_time: reservation.end_time,
             party_size: reservation.party_size,
             location_id: reservation.location_id, // Preserve location for filtering
+            reservation_id: reservation.id,
+            reservation_member_id: reservation.member_id,
+            reservation_start_time: reservation.start_time,
             created_at: reservation.created_at,
             updated_at: reservation.created_at
           };
@@ -640,6 +691,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           let targetSendTime: DateTime;
           let triggerDate: DateTime;
 
+          // Reservation triggers use the reservation's own location timezone.
+          const isReservationTrigger = triggerType === 'reservation_time' || triggerType === 'reservation_created';
+          const memberLocation = isReservationTrigger && member.location_id ? locationsById.get(member.location_id) || null : null;
+          const memberTimezone = memberLocation?.timezone || businessTimezone;
+
           if (triggerType === 'member_signup') {
             triggerDate = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
             console.log(`📅 Member signup trigger date: ${triggerDate.toISO()}`);
@@ -662,11 +718,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Use start_time for 'before' messages and end_time for 'after' messages
             const isAfterMessage = message.relative_proximity === 'after';
             const triggerTime = isAfterMessage && reservationEndTime ? reservationEndTime : reservationStartTime;
-            triggerDate = DateTime.fromISO(triggerTime, { zone: 'utc' }).setZone(businessTimezone);
+            triggerDate = DateTime.fromISO(triggerTime, { zone: 'utc' }).setZone(memberTimezone);
             console.log(`Trigger date (business timezone): ${triggerDate.toISO()} (using ${isAfterMessage ? 'end_time' : 'start_time'})`);
           } else if (triggerType === 'reservation_created') {
             // Use reservation created_at as trigger date
-            triggerDate = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
+            triggerDate = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(memberTimezone);
             console.log(`Trigger date (business timezone): ${triggerDate.toISO()} (using created_at)`);
           } else if (triggerType === 'member_birthday') {
             // Use today as trigger date for birthdays
@@ -698,7 +754,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Use specific_date if provided, otherwise use trigger date
             let targetDate = triggerDate;
             if (message.specific_date) {
-              targetDate = DateTime.fromISO(message.specific_date, { zone: businessTimezone });
+              targetDate = DateTime.fromISO(message.specific_date, { zone: memberTimezone });
               console.log(`Using specific date: ${targetDate.toISO()}`);
             }
 
@@ -730,8 +786,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               });
             }
 
-            // Set the specific time on the relative date
-            targetSendTime = relativeDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
+            // Minute offsets count from the trigger time itself ("15 minutes
+            // after the booking"); the clock-time field is hidden for minutes in
+            // the editor. Larger units land on the configured clock time.
+            targetSendTime = unit === 'minute'
+              ? relativeDate.set({ second: 0, millisecond: 0 })
+              : relativeDate.set({ hour: hours, minute: minutes, second: 0, millisecond: 0 });
             console.log(`Relative send time: ${targetSendTime.toISO()} (trigger: ${triggerDate.toISO()})`);
           } else {
             console.error(`❌ ERROR: Unknown timing_type: ${message.timing_type} for message ${message.id} (${message.name})`);
@@ -806,25 +866,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           messageContent = messageContent.replace(/\{\{phone\}\}/g, member.phone || '');
           messageContent = messageContent.replace(/\{\{email\}\}/g, member.email || '');
           
-          // Add reservation-specific placeholders for reservation_time and reservation_created triggers
-          if (triggerType === 'reservation_time' || triggerType === 'reservation_created') {
-            // Format reservation time and date
-            if (member.join_date) {
-              const reservationDateTime = DateTime.fromISO(member.join_date, { zone: 'utc' }).setZone(businessTimezone);
-
-              // {{reservation_time}} - Time only (e.g., "7:00 PM")
-              const formattedTime = reservationDateTime.toFormat('h:mm a');
-              messageContent = messageContent.replace(/\{\{reservation_time\}\}/g, formattedTime);
-
-              // {{reservation_date}} - Date only (e.g., "March 15, 2024")
-              const formattedDate = reservationDateTime.toFormat('MMMM d, yyyy');
-              messageContent = messageContent.replace(/\{\{reservation_date\}\}/g, formattedDate);
-            }
-
-            // {{party_size}} - Number of guests
-            if (member.party_size) {
-              messageContent = messageContent.replace(/\{\{party_size\}\}/g, member.party_size.toString());
-            }
+          // Reservation placeholders ({{reservation_date}}, {{reservation_time}},
+          // {{party_size}}, {{location_name}} ...) in the reservation's own
+          // location timezone. For reservation_created the date/time is the
+          // reservation start, not the moment it was booked.
+          if (isReservationTrigger) {
+            messageContent = renderReservationMessage(
+              message.content,
+              {
+                first_name: member.first_name,
+                last_name: member.last_name,
+                email: member.email,
+                phone: member.phone,
+                party_size: member.party_size,
+                start_time: member.reservation_start_time || member.join_date,
+              },
+              { name: memberLocation?.name || null, timezone: memberTimezone },
+            );
           }
 
           // Add private event placeholders for private_event trigger
@@ -965,6 +1023,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
           // Format phone number for OpenPhone using utility
           const formattedPhone = formatPhoneForStorage(recipientPhone);
+
+          // reservation_created: one send per (message, reservation), claimed
+          // before sending so a second booking by the same phone still gets its
+          // own message and overlapping runs / the inline send can't double up.
+          if (triggerType === 'reservation_created' && member.reservation_id) {
+            const scheduledTime = targetSendTime.toISO()!;
+            const claim = await claimReservationSend(supabaseAdmin, {
+              campaignMessageId: message.id,
+              reservationId: member.reservation_id,
+              memberId: member.reservation_member_id || null,
+              phone: formattedPhone,
+              content: messageContent,
+              scheduledTime,
+            });
+            if (claim.kind === 'duplicate') {
+              console.log(`⏭️  Already sent for reservation ${member.reservation_id}`);
+              continue;
+            }
+            if (claim.kind === 'error') {
+              console.error('❌ Could not record reservation send:', claim.error);
+              continue;
+            }
+            const smsResult = await sendSMS({ to: formattedPhone, content: messageContent });
+            await finishReservationSend(
+              supabaseAdmin,
+              claim.rowId,
+              { ok: smsResult.success, error: smsResult.error },
+              { campaignMessageId: message.id, memberId: member.reservation_member_id || null, phone: formattedPhone, content: messageContent, scheduledTime },
+              now,
+            );
+            if (smsResult.success) processedCount++;
+            continue;
+          }
 
           // Check if message already sent
           // For recurring triggers (birthday, renewal), only check if sent TODAY

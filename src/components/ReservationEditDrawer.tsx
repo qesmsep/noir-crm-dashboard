@@ -30,6 +30,7 @@ import { CloseIcon, DeleteIcon } from '@chakra-ui/icons';
 import { formatDateTime, utcToLocalInput, localInputToUTC } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
+import StaffReservationGuests from './guests/StaffReservationGuests';
 
 // Helper: Format a local datetime string with timezone offset
 function toOffsetISOString(dateString: string) {
@@ -715,6 +716,16 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
                   </Button>
                 </VStack>
 
+
+                {/* Reservation guests (people the member brings) */}
+                <Box width="100%">
+                  <StaffReservationGuests
+                    reservationId={reservationId}
+                    partySize={reservation.party_size || 1}
+                    canAdd={reservation.status !== 'cancelled' && new Date(reservation.end_time || reservation.start_time) > new Date()}
+                    hasHostPhone={!!reservation.phone}
+                  />
+                </Box>
                
                 <Box bg="gray.50" p={3} borderRadius="md" borderWidth="1px" borderColor="gray.200">
                   

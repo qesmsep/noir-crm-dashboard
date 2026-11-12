@@ -46,9 +46,9 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'recurring' | 'relative';
+  timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   specific_time?: string;
   specific_date?: string;
   recurring_type?: 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -300,6 +300,7 @@ export default function CampaignEditPage() {
   };
 
   const formatTiming = (template: CampaignTemplate) => {
+    if (template.timing_type === 'immediate') return 'Immediately';
     if (template.timing_type === 'specific_time') {
       // Convert 24-hour format to 12-hour format with AM/PM
       const time = template.specific_time || '10:00';
@@ -361,6 +362,12 @@ export default function CampaignEditPage() {
         return (campaign?.trigger_type === 'reservation' || campaign?.trigger_type === 'reservation_time' || campaign?.trigger_type === 'reservation_created') ? 'Phone number on reservation' : 'Primary Member';
       case 'all_members':
         return 'All Members';
+      case 'reservation_guest':
+        return 'The guest';
+      case 'member_only':
+        return "Members' reservations";
+      case 'guest_only':
+        return 'Non-member reservations';
       case 'specific_phone':
         return template.specific_phone || 'Custom Phone Number';
       default:
@@ -620,6 +627,7 @@ export default function CampaignEditPage() {
                           <option value="recurring">Recurring</option>
                           <option value="reservation">Reservation</option>
                           <option value="reservation_created">Reservation Created</option>
+                          <option value="guest_registration">Guest Registration</option>
                           <option value="reservation_range">Reservation Range</option>
                           <option value="reservation_time">Reservation Time</option>
                         </Select>

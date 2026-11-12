@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/useToast';
 import { ChevronRight } from 'lucide-react';
 import { formatDateTime } from '../utils/dateUtils';
 import { supabase } from '../lib/supabase';
+import { fetchGuestNames, guestNamesLabel } from '../lib/guestNames';
 import styles from '../styles/ReservationsMobile.module.css';
 
 interface DayReservationsDrawerProps {
@@ -48,6 +49,8 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
   onDateChange,
 }) => {
   const [reservations, setReservations] = useState<any[]>([]);
+  // Reservation guests' first names, so the door can greet them by name.
+  const [guestNames, setGuestNames] = useState<Record<string, string[]>>({});
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -88,6 +91,7 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
       }
 
       setReservations(data || []);
+      fetchGuestNames((data || []).map((r: any) => r.id)).then(setGuestNames);
     } catch (error) {
       console.error('Error fetching day reservations:', error);
       toast({
@@ -358,6 +362,12 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
                               {reservation.party_size} {reservation.party_size === 1 ? 'Guest' : 'Guests'}
                             </span>
                           </div>
+                          {guestNames[reservation.id]?.length ? (
+                            <div className={styles.mobileInfoItem}>
+                              <span className={styles.mobileInfoIcon}>🤝</span>
+                              <span className={styles.mobileInfoText}>with {guestNamesLabel(guestNames[reservation.id])}</span>
+                            </div>
+                          ) : null}
                           
                           <div className={styles.mobileEventTypeContainer}>
                             <span className={styles.mobileEventIcon}>
@@ -451,6 +461,11 @@ const DayReservationsDrawer: React.FC<DayReservationsDrawerProps> = ({
                             <span className="text-sm text-[#666] font-montserrat">
                               Party of {reservation.party_size}
                             </span>
+                            {guestNames[reservation.id]?.length ? (
+                              <span className="text-sm text-[#353535] font-montserrat">
+                                with {guestNamesLabel(guestNames[reservation.id])}
+                              </span>
+                            ) : null}
                             <Badge variant="outline" className="text-xs font-montserrat">
                               {(reservation.source && reservation.source !== '') ? reservation.source : 'unknown'}
                             </Badge>

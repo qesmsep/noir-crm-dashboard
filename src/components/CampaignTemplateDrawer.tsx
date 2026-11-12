@@ -37,9 +37,9 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'recurring' | 'relative';
+  timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   // Specific time fields
   specific_time?: string; // HH:MM format
   specific_date?: string; // YYYY-MM-DD format
@@ -116,9 +116,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     name: '',
     description: '',
     content: '',
-    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members',
+    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest',
     specific_phone: '',
-    timing_type: 'specific_time' as 'specific_time' | 'recurring' | 'relative',
+    timing_type: 'specific_time' as 'specific_time' | 'recurring' | 'relative' | 'immediate',
     specific_time: '10:00',
     specific_date: '',
     recurring_type: undefined as 'daily' | 'weekly' | 'monthly' | 'yearly' | undefined,
@@ -527,10 +527,24 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       .replace(/\{\{phone\}\}/g, '(555) 123-4567')
       .replace(/\{\{email\}\}/g, 'john.doe@example.com');
 
+    if (campaignTriggerType === 'guest_registration') {
+      return formData.content
+        .replace(/\{\{(guest_first_name|first_name)\}\}/g, 'Ava')
+        .replace(/\{\{(guest_last_name|last_name)\}\}/g, 'Stone')
+        .replace(/\{\{host_first_name\}\}/g, 'Tim')
+        .replace(/\{\{location_name\}\}/g, 'Noir KC')
+        .replace(/\{\{reservation_date\}\}/g, 'Friday, March 15')
+        .replace(/\{\{reservation_time\}\}/g, '8:00 PM')
+        .replace(/\{\{party_size\}\}/g, '4')
+        .replace(/\{\{arrival_instructions\}\}/g, "Give your name at the door and we'll take it from there.");
+    }
+
     // Add reservation-specific placeholders if this is a reservation campaign
     if (campaignTriggerType === 'reservation' || campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
       previewContent = previewContent
         .replace(/\{\{reservation_time\}\}/g, '7:30 PM')
+        .replace(/\{\{reservation_date\}\}/g, 'March 15, 2026')
+        .replace(/\{\{location_name\}\}/g, 'Noir KC')
         .replace(/\{\{party_size\}\}/g, '4');
     }
 
@@ -555,7 +569,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   };
 
   const formatTimingDisplay = () => {
-    if (formData.timing_type === 'specific_time') {
+    if (formData.timing_type === 'immediate') {
+      return 'Send immediately';
+    } else if (formData.timing_type === 'specific_time') {
       return `Send at ${formData.specific_time} on ${formData.specific_date || 'trigger date'}`;
     } else if (formData.timing_type === 'recurring') {
       let display = `Send ${formData.recurring_type} at ${formData.recurring_time || '10:00'}`;
@@ -637,7 +653,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       case 'reservation_time':
       case 'reservation_created':
         return [
-          { value: 'member', label: `Phone number on reservation${locationHint}` },
+          { value: 'member', label: `Phone number on the reservation${locationHint}` },
+          { value: 'member_only', label: `Members' reservations${locationHint}` },
+          { value: 'guest_only', label: `Non-member reservations${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
 
@@ -646,6 +664,12 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           { value: 'member', label: `Member${locationHint}` },
           { value: 'all_members', label: `All Members${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
+        ];
+
+      case 'guest_registration':
+        return [
+          { value: 'reservation_guest', label: `The guest${locationHint}` },
+          { value: 'specific_phone', label: 'Custom phone number (e.g. a staff alert)' }
         ];
 
       case 'reservation_range':
@@ -680,6 +704,15 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   const getTimingOptions = () => {
     if (!campaignTriggerType) return ['specific_time', 'recurring', 'relative'];
 
+    // "Send immediately" = at the moment of the trigger. It only means
+    // something for event triggers sent at booking time.
+    if (campaignTriggerType === 'reservation_created') {
+      return ['immediate', 'specific_time', 'recurring', 'relative'];
+    }
+    if (campaignTriggerType === 'guest_registration') {
+      return ['immediate', 'specific_time', 'relative'];
+    }
+
     switch (campaignTriggerType) {
       case 'recurring':
         return ['specific_time', 'recurring', 'relative'];
@@ -701,10 +734,22 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     if (!campaignTriggerType) return false;
 
     // Only show relative option for triggers that have specific dates/times
-    return ['member_signup', 'member_birthday', 'reservation_time', 'reservation_created', 'private_event'].includes(campaignTriggerType);
+    return ['member_signup', 'member_birthday', 'reservation_time', 'reservation_created', 'guest_registration', 'private_event'].includes(campaignTriggerType);
   };
 
   const getAvailablePlaceholders = () => {
+    if (campaignTriggerType === 'guest_registration') {
+      return [
+        { name: '{{guest_first_name}}', description: 'Guest first name' },
+        { name: '{{guest_last_name}}', description: 'Guest last name (may be blank)' },
+        { name: '{{host_first_name}}', description: 'Member who added them' },
+        { name: '{{location_name}}', description: 'Reservation location' },
+        { name: '{{reservation_date}}', description: 'e.g. Friday, March 15' },
+        { name: '{{reservation_time}}', description: 'e.g. 8:00 PM' },
+        { name: '{{party_size}}', description: 'Reservation party size' },
+        { name: '{{arrival_instructions}}', description: 'How guests get in (Settings → location)' },
+      ];
+    }
     const placeholders = [
       { name: '{{first_name}}', description: 'Member first name' },
       { name: '{{last_name}}', description: 'Member last name' },
@@ -713,6 +758,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       { name: '{{email}}', description: 'Member email address' },
       { name: '{{reservation_time}}', description: 'Reservation date and time' },
       { name: '{{reservation_date}}', description: 'Reservation date only' },
+      { name: '{{party_size}}', description: 'Reservation party size' },
+      { name: '{{location_name}}', description: 'Reservation location name' },
       { name: '{{event_name}}', description: 'Private event name' },
       { name: '{{event_date}}', description: 'Private event date' },
       { name: '{{event_time}}', description: 'Private event time' },
@@ -729,6 +776,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   };
 
   const timingTypeOptions = [
+    { value: 'immediate', label: 'Send immediately' },
     { value: 'specific_time', label: 'Send at specific time' },
     { value: 'recurring', label: 'Send on recurring schedule' },
     ...(shouldShowRelativeOption()

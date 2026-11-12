@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
 import { parse } from 'cookie';
 import { z } from 'zod';
+import { onReservationCancelled } from '@/lib/reservationGuests';
 
 const cancelSchema = z.object({
   reservation_id: z.string().uuid(),
@@ -82,6 +83,9 @@ export default async function handler(
       console.error('Error cancelling reservation:', cancelError);
       return res.status(500).json({ error: 'Failed to cancel reservation', details: cancelError.message });
     }
+
+    // Reservation guests: cancel pending texts; tell guests already texted.
+    await onReservationCancelled(validatedData.reservation_id);
 
     // TODO: Send cancellation SMS notification (optional)
     // You can add OpenPhone SMS notification here if desired

@@ -9,6 +9,7 @@ import { useSettings } from '../context/SettingsContext';
 import { useAsyncEffect } from '../hooks/useAsyncEffect';
 import { DateTime } from 'luxon';
 import { reservationFetchWindow } from '../utils/bookingDays';
+import { fetchGuestNames, guestNamesLabel } from '../lib/guestNames';
 import { Box, useToast } from '@chakra-ui/react';
 import styles from '../styles/ReservationsTimeline.module.css';
 
@@ -714,6 +715,9 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         });
       }
 
+      // Reservation guests' first names for the door ("with Ava, Bo").
+      const guestNames = await fetchGuestNames(rawReservations.map((r: any) => String(r.id)));
+
       // Map reservations to events. Exclude untabled private-event RSVPs: they
       // are represented by the summary bar on the private-event row, and drawing
       // them as normal reservations would stack them onto whichever table sorts
@@ -745,7 +749,7 @@ const ReservationsTimeline: React.FC<ReservationsTimelineProps> = ({
         
         const event = {
           id: String(r.id),
-          title: `${heart}${displayName} | Party Size: ${r.party_size}${emoji ? ' ' + emoji : ''}`,
+          title: `${heart}${displayName} | Party Size: ${r.party_size}${guestNames[String(r.id)]?.length ? ` | with ${guestNamesLabel(guestNames[String(r.id)])}` : ''}${emoji ? ' ' + emoji : ''}`,
           extendedProps: {
             created_at: r.created_at ? formatDateTime(new Date(r.created_at), settings.timezone, {
               month: 'short',

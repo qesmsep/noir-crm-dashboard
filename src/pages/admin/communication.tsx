@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import CampaignDrawer from '../../components/CampaignDrawer';
 import CampaignTemplateDrawer from '../../components/CampaignTemplateDrawer';
+import ReservationGuestsSection from '../../components/guests/ReservationGuestsSection';
 import { sortCampaignTemplates } from '../../utils/campaignSorting';
 import styles from '../../styles/Communication.module.css';
 import { Campaign as BaseCampaign, CampaignLocation } from '../../types';
@@ -28,9 +29,9 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'recurring' | 'relative';
+  timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   specific_time?: string;
   specific_date?: string;
   recurring_type?: 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -233,6 +234,7 @@ export default function CommunicationPage() {
   };
 
   const formatTimingDisplay = (template: CampaignTemplate) => {
+    if (template.timing_type === 'immediate') return 'Send immediately';
     if (template.timing_type === 'specific_time') {
       return `Send at ${template.specific_time} on ${template.specific_date || 'trigger date'}`;
     } else if (template.timing_type === 'recurring') {
@@ -259,6 +261,12 @@ export default function CommunicationPage() {
         return (selectedCampaign?.trigger_type === 'reservation_time' || selectedCampaign?.trigger_type === 'reservation_created') ? 'Phone number on reservation' : 'Primary Member';
       case 'all_members':
         return 'All Members';
+      case 'reservation_guest':
+        return 'The guest';
+      case 'member_only':
+        return "Members' reservations";
+      case 'guest_only':
+        return 'Non-member reservations';
       case 'specific_phone':
         return template.specific_phone || 'Custom Phone Number';
       default:
@@ -277,7 +285,8 @@ export default function CommunicationPage() {
       'recurring': 'Recurring',
       'reservation_range': 'Reservation Range',
       'private_event': 'Private Event',
-      'all_members': 'All Members'
+      'all_members': 'All Members',
+      'guest_registration': 'Guest Registration'
     };
     return labels[triggerType] || triggerType;
   };
@@ -484,6 +493,8 @@ export default function CommunicationPage() {
             )}
           </>
         )}
+
+        {!loading && <ReservationGuestsSection />}
 
         <CampaignDrawer
           isOpen={isCampaignDrawerOpen}

@@ -18,6 +18,10 @@
       "schedule": "*/1 * * * *"
     },
     {
+      "path": "/api/cron/process-guest-messages",
+      "schedule": "*/1 * * * *"
+    },
+    {
       "path": "/api/cron/monthly-billing",
       "schedule": "0 14 * * *"
     },
@@ -36,6 +40,9 @@
     },
     "src/pages/api/process-intake-messages.ts": {
       "maxDuration": 30
+    },
+    "src/pages/api/cron/process-guest-messages.ts": {
+      "maxDuration": 60
     },
     "src/pages/api/cron/monthly-billing.ts": {
       "maxDuration": 60

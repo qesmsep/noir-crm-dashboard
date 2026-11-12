@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
+import { onReservationCancelled } from '@/lib/reservationGuests';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
@@ -48,6 +49,9 @@ export async function POST(request: Request, { params }: any) {
         refund_type: 'admin_cancelled',
       },
     });
+
+    // Deleting cascades the guest queue away, so tell already-texted guests now.
+    await onReservationCancelled(reservationId, { sendNow: true });
 
     // Delete the reservation
     const { error: deleteError } = await supabase

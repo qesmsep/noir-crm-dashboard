@@ -8,7 +8,7 @@ export interface CampaignTemplate {
   content: string;
   recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'recurring' | 'relative';
+  timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   specific_time?: string;
   specific_date?: string;
   recurring_type?: 'daily' | 'weekly' | 'monthly' | 'yearly';

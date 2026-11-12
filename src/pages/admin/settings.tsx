@@ -7,6 +7,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { useSettings } from '../../context/SettingsContext';
 import LedgerNotificationSettingsCard from '../../components/LedgerNotificationSettingsCard';
 import LocationSettingsTab from '../../components/LocationSettingsTab';
+import GuestArrivalInstructionsCard from '../../components/guests/GuestArrivalInstructionsCard';
 
 interface Settings {
   id: string;
@@ -370,6 +371,7 @@ export default function Settings() {
           if (activeTab !== location.slug) return null;
           const current = locationSettings[location.slug] || DEFAULT_LOCATION_SETTINGS;
           return (
+            <React.Fragment key={location.slug}>
             <LocationSettingsTab
               key={location.slug}
               locationSlug={location.slug}
@@ -396,6 +398,8 @@ export default function Settings() {
               message={locationMessage[location.slug] || null}
               onSave={() => handleLocationSave(location.slug)}
             />
+            <GuestArrivalInstructionsCard locationId={location.id} locationName={location.name} />
+            </React.Fragment>
           );
         })}
       </div>

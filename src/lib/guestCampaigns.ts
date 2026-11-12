@@ -1,0 +1,403 @@
+/**
+ * Campaign trigger "Guest Registration" (trigger_type 'guest_registration').
+ *
+ * The guest intro and any follow-ups are ordinary campaign messages built in
+ * Campaigns, sent to "The guest" (recipient_type 'reservation_guest') or a
+ * custom phone. The trigger moment is when the guest was attached to the
+ * reservation (reservation_guests.created_at).
+ *
+ *   Send immediately  → sent by sendGuestAddedCampaignMessages() as the guest is
+ *                       added (skipped when the reservation starts within 2 hours
+ *                       and the built-in day-of text is on — it covers it)
+ *   Relative / time   → sent by the campaign cron via processGuestAddedCampaignMessage()
+ *
+ * Every send re-checks: guest still on the reservation, reservation not
+ * cancelled, and (for the guest) not opted out and not a member. Follow-ups
+ * keep going after the visit and stop only on STOP. One send per
+ * (message, guest), claimed before sending.
+ */
+import { DateTime } from 'luxon';
+import { supabaseAdmin } from '@/lib/supabase';
+import { sendSMS } from '@/lib/sms';
+import { toE164 } from '@/lib/phone';
+import {
+  activeKindsFrom,
+  DEFAULT_ARRIVAL_INSTRUCTIONS,
+  DEFAULT_TIMEZONE,
+  findMemberIdByPhone,
+  introCoveredByDayOf,
+  loadTemplates,
+  type GuestDeps,
+} from '@/lib/reservationGuests';
+
+export const GUEST_REGISTRATION_TRIGGER = 'guest_registration';
+export const SENT_BY_CAMPAIGN = 'system:campaign';
+const WINDOW_FUTURE_MINUTES = 5;
+const WINDOW_PAST_MINUTES = 60;
+
+type Db = typeof supabaseAdmin;
+
+export interface GuestCampaignMessage {
+  id: string;
+  name?: string;
+  content: string;
+  recipient_type: string;
+  specific_phone?: string | null;
+  timing_type: string;
+  is_active?: boolean | null;
+  specific_time?: string | null;
+  specific_date?: string | null;
+  relative_time?: string | null;
+  relative_quantity?: number | null;
+  relative_unit?: string | null;
+  relative_proximity?: string | null;
+  campaigns?: {
+    id: string;
+    trigger_type: string;
+    is_active?: boolean | null;
+    applies_to_all_locations?: boolean | null;
+    campaign_locations?: Array<{ location_id: string | null }> | null;
+  } | null;
+}
+
+interface GuestCampaignGuest {
+  id: string;
+  reservation_id: string;
+  location_id: string | null;
+  status: string;
+  first_name_snapshot: string | null;
+  matched_member_id: string | null;
+  notified_at: string | null;
+  created_at: string;
+  guest_contacts?: { id: string; phone: string; first_name: string; last_name: string | null; sms_opted_out_at: string | null } | null;
+}
+
+interface GuestCampaignReservation {
+  id: string;
+  status: string | null;
+  start_time: string;
+  party_size: number | null;
+  first_name: string | null;
+  member_id: string | null;
+  location_id: string | null;
+}
+
+interface LocationRow {
+  id: string;
+  name: string | null;
+  timezone: string | null;
+  guest_arrival_instructions?: string | null;
+}
+
+const GUEST_SELECT =
+  'id, reservation_id, location_id, status, first_name_snapshot, matched_member_id, notified_at, created_at, guest_contacts(id, phone, first_name, last_name, sms_opted_out_at)';
+const RESERVATION_SELECT = 'id, status, start_time, party_size, first_name, member_id, location_id';
+const MESSAGE_SELECT = `
+  id, name, content, recipient_type, specific_phone, timing_type, is_active,
+  specific_time, specific_date, relative_time, relative_quantity, relative_unit, relative_proximity,
+  campaigns!inner ( id, trigger_type, is_active, applies_to_all_locations, campaign_locations ( location_id ) )
+`;
+
+function resolve(deps: GuestDeps = {}) {
+  return { db: deps.db ?? supabaseAdmin, send: deps.send ?? sendSMS, now: (deps.now ?? (() => DateTime.utc()))() };
+}
+
+// ---------------------------------------------------------------------------
+// Pure helpers
+// ---------------------------------------------------------------------------
+
+export function messageAppliesToGuestLocation(message: GuestCampaignMessage, locationId: string | null): boolean {
+  const c = message.campaigns;
+  if (!c || c.trigger_type !== GUEST_REGISTRATION_TRIGGER || c.is_active === false) return false;
+  if (c.applies_to_all_locations) return true;
+  return !!locationId && (c.campaign_locations || []).some((cl) => cl.location_id === locationId);
+}
+
+/**
+ * When this message goes out for a guest added at `addedAt`, in the venue
+ * timezone. Minute offsets count from the moment the guest was added; larger
+ * units land on the message's clock time (same as other campaigns).
+ */
+export function guestAddedSendTime(message: GuestCampaignMessage, addedAt: DateTime, timezone: string): DateTime | null {
+  const trigger = addedAt.setZone(timezone);
+  if (message.timing_type === 'immediate') return trigger;
+  if (message.timing_type === 'relative') {
+    const q = message.relative_quantity || 0;
+    const unit = message.relative_unit || 'day';
+    const sign = message.relative_proximity === 'before' ? -1 : 1;
+    const luxonUnit = ({ minute: 'minutes', hour: 'hours', day: 'days', week: 'weeks', month: 'months', year: 'years' } as const)[
+      unit as 'minute'
+    ] || 'days';
+    const moved = q > 0 ? trigger.plus({ [luxonUnit]: sign * q }) : trigger;
+    if (unit === 'minute') return moved.set({ second: 0, millisecond: 0 });
+    const [h, m] = (message.relative_time || '10:00').split(':').map(Number);
+    return moved.set({ hour: h || 0, minute: m || 0, second: 0, millisecond: 0 });
+  }
+  if (message.timing_type === 'specific_time') {
+    const [h, m] = (message.specific_time || '10:00').split(':').map(Number);
+    const day = message.specific_date ? DateTime.fromISO(message.specific_date, { zone: timezone }) : trigger;
+    return day.set({ hour: h || 0, minute: m || 0, second: 0, millisecond: 0 });
+  }
+  return null;
+}
+
+/** How far back to look for guests whose send time could be due now. */
+export function lookbackMinutes(message: GuestCampaignMessage): number {
+  const cap = 400 * 24 * 60;
+  if (message.timing_type === 'relative') {
+    const q = message.relative_quantity || 0;
+    const per = ({ minute: 1, hour: 60, day: 1440, week: 10080, month: 44640, year: 527040 } as Record<string, number>)[message.relative_unit || 'day'] || 1440;
+    return Math.min(cap, q * per + 1440 + WINDOW_PAST_MINUTES + 1);
+  }
+  if (message.timing_type === 'specific_time' && message.specific_date) return 30 * 1440;
+  return 2 * 1440;
+}
+
+export function renderGuestCampaignMessage(
+  content: string,
+  ctx: {
+    guestFirstName: string;
+    guestLastName: string | null;
+    hostFirstName: string;
+    locationName: string;
+    start: string;
+    partySize: number | null;
+    timezone: string;
+    arrivalInstructions?: string | null;
+  },
+): string {
+  const start = DateTime.fromISO(ctx.start, { zone: 'utc' }).setZone(ctx.timezone);
+  const arrival = (ctx.arrivalInstructions || '').trim() || DEFAULT_ARRIVAL_INSTRUCTIONS;
+  return content
+    .replace(/\{\{(guest_first_name|first_name)\}\}/g, ctx.guestFirstName)
+    .replace(/\{\{(guest_last_name|last_name)\}\}/g, ctx.guestLastName || '')
+    .replace(/\{\{host_first_name\}\}/g, ctx.hostFirstName)
+    .replace(/\{\{location_name\}\}/g, ctx.locationName)
+    .replace(/\{\{reservation_date\}\}/g, start.isValid ? start.toFormat('cccc, LLLL d') : '')
+    .replace(/\{\{reservation_time\}\}/g, start.isValid ? start.toFormat('h:mm a') : '')
+    .replace(/\{\{party_size\}\}/g, ctx.partySize != null ? String(ctx.partySize) : '')
+    .replace(/\{\{arrival_instructions\}\}/g, arrival)
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
+
+// ---------------------------------------------------------------------------
+// Sending
+// ---------------------------------------------------------------------------
+
+interface Context {
+  guest: GuestCampaignGuest;
+  reservation: GuestCampaignReservation;
+  location: LocationRow | null;
+  host: string;
+}
+
+async function loadContext(db: Db, guestId: string): Promise<Context | null> {
+  const { data: guest } = await db.from('reservation_guests').select(GUEST_SELECT).eq('id', guestId).maybeSingle();
+  if (!guest) return null;
+  const g = guest as unknown as GuestCampaignGuest;
+  const { data: res } = await db.from('reservations').select(RESERVATION_SELECT).eq('id', g.reservation_id).maybeSingle();
+  if (!res) return null;
+  const reservation = res as GuestCampaignReservation;
+  const locationId = reservation.location_id || g.location_id;
+  const { data: loc } = locationId
+    ? await db.from('locations').select('id, name, timezone, guest_arrival_instructions').eq('id', locationId).maybeSingle()
+    : { data: null };
+  let host = (reservation.first_name || '').trim().split(' ')[0];
+  if (!host && reservation.member_id) {
+    const { data: m } = await db.from('members').select('first_name').eq('member_id', reservation.member_id).maybeSingle();
+    host = ((m as { first_name?: string } | null)?.first_name || '').trim();
+  }
+  return { guest: g, reservation, location: (loc as LocationRow) || null, host: host || 'your host' };
+}
+
+export type GuestCampaignOutcome = 'sent' | 'duplicate' | 'failed' | `skipped:${string}`;
+
+/** Re-check, render, claim, send and log one guest-added campaign message. */
+async function deliver(
+  db: Db,
+  deps: GuestDeps,
+  message: GuestCampaignMessage,
+  ctx: Context,
+  scheduledTime: DateTime,
+): Promise<GuestCampaignOutcome> {
+  const { send, now } = resolve(deps);
+  const { guest, reservation, location } = ctx;
+  const contact = guest.guest_contacts;
+  if (guest.status !== 'active') return 'skipped:guest_removed';
+  if (reservation.status === 'cancelled') return 'skipped:reservation_cancelled';
+  if (!contact) return 'skipped:no_contact';
+
+  const toGuest = message.recipient_type === 'reservation_guest';
+  let phone: string | null;
+  if (toGuest) {
+    if (contact.sms_opted_out_at) return 'skipped:opted_out';
+    if (guest.matched_member_id) return 'skipped:matched_member';
+    const memberNow = await findMemberIdByPhone(db, contact.phone);
+    if (memberNow) {
+      await db.from('reservation_guests').update({ matched_member_id: memberNow }).eq('id', guest.id);
+      return 'skipped:matched_member';
+    }
+    phone = contact.phone;
+  } else if (message.recipient_type === 'specific_phone') {
+    phone = toE164(message.specific_phone);
+  } else {
+    return 'skipped:unsupported_recipient';
+  }
+  if (!phone) return 'skipped:no_phone';
+
+  const content = renderGuestCampaignMessage(message.content, {
+    guestFirstName: guest.first_name_snapshot || contact.first_name,
+    guestLastName: contact.last_name,
+    hostFirstName: ctx.host,
+    locationName: location?.name || 'Noir',
+    start: reservation.start_time,
+    partySize: reservation.party_size,
+    timezone: location?.timezone || DEFAULT_TIMEZONE,
+    arrivalInstructions: location?.guest_arrival_instructions,
+  });
+
+  const { data: claimed, error: claimError } = await db
+    .from('scheduled_messages')
+    .insert({
+      campaign_message_id: message.id,
+      reservation_guest_id: guest.id,
+      member_id: null,
+      phone_number: phone,
+      message_content: content,
+      scheduled_time: scheduledTime.toISO(),
+      status: 'pending',
+    })
+    .select('id')
+    .single();
+  if (claimError?.code === '23505') return 'duplicate';
+  if (claimError || !claimed) {
+    console.error('[guest campaigns] could not record send', claimError?.message);
+    return 'failed';
+  }
+  const rowId = (claimed as { id: string }).id;
+
+  const result = await send({ to: phone, content });
+  await db
+    .from('scheduled_messages')
+    .update(result.success ? { status: 'sent', sent_time: now.toISO() } : { status: 'failed', error_message: result.error || 'Send failed' })
+    .eq('id', rowId);
+
+  if (toGuest) {
+    await db.from('guest_messages').insert({
+      phone,
+      content,
+      reservation_id: reservation.id,
+      sent_by: SENT_BY_CAMPAIGN,
+      status: result.success ? 'sent' : 'failed',
+      error_message: result.success ? null : result.error || 'Send failed',
+      openphone_message_id: result.messageId ?? null,
+      timestamp: now.toISO(),
+    });
+    if (result.success && !guest.notified_at) {
+      await db.from('reservation_guests').update({ notified_at: now.toISO() }).eq('id', guest.id).is('notified_at', null);
+    }
+  }
+  return result.success ? 'sent' : 'failed';
+}
+
+async function loadGuestAddedMessages(db: Db, immediateOnly: boolean): Promise<GuestCampaignMessage[]> {
+  let q = db.from('campaign_messages').select(MESSAGE_SELECT).eq('is_active', true).eq('campaigns.trigger_type', GUEST_REGISTRATION_TRIGGER);
+  if (immediateOnly) q = q.eq('timing_type', 'immediate');
+  const { data, error } = await q;
+  if (error) {
+    console.error('[guest campaigns] could not load messages', error.message);
+    return [];
+  }
+  return (data || []) as unknown as GuestCampaignMessage[];
+}
+
+/**
+ * Called as a guest is added: send every active "Send immediately"
+ * Guest Registration message for the guest's location. Never throws.
+ */
+export async function sendGuestAddedCampaignMessages(
+  guestId: string,
+  deps: GuestDeps = {},
+): Promise<{ outcomes: GuestCampaignOutcome[]; reason?: string }> {
+  const { db, now } = resolve(deps);
+  try {
+    const ctx = await loadContext(db, guestId);
+    if (!ctx) return { outcomes: [], reason: 'guest_not_found' };
+    const messages = (await loadGuestAddedMessages(db, true)).filter((m) =>
+      messageAppliesToGuestLocation(m, ctx.reservation.location_id || ctx.guest.location_id),
+    );
+    if (messages.length === 0) return { outcomes: [], reason: 'no_matching_message' };
+
+    const templates = await loadTemplates(db);
+    if (introCoveredByDayOf({ start: ctx.reservation.start_time, now, dayOfActive: activeKindsFrom(templates).has('day_of') })) {
+      // The day-of text goes out right now; skip the guest intro, still send staff alerts.
+      const staffOnly = messages.filter((m) => m.recipient_type !== 'reservation_guest');
+      const outcomes: GuestCampaignOutcome[] = [];
+      for (const m of staffOnly) outcomes.push(await deliver(db, deps, m, ctx, now));
+      return { outcomes, reason: 'intro_covered_by_day_of' };
+    }
+
+    const outcomes: GuestCampaignOutcome[] = [];
+    for (const m of messages) outcomes.push(await deliver(db, deps, m, ctx, now));
+    return { outcomes };
+  } catch (err) {
+    console.error('[guest campaigns] immediate send failed', guestId, err);
+    return { outcomes: [], reason: 'error' };
+  }
+}
+
+/**
+ * Cron: send one delayed Guest Registration message to every guest whose
+ * send time falls in the window now. Returns how many were sent.
+ */
+export async function processGuestAddedCampaignMessage(message: GuestCampaignMessage, deps: GuestDeps = {}): Promise<number> {
+  const { db, now } = resolve(deps);
+  if (message.timing_type === 'immediate') return 0; // sent as the guest is added
+  if (message.campaigns?.is_active === false) return 0;
+
+  const since = now.minus({ minutes: lookbackMinutes(message) }).toUTC().toISO()!;
+  const { data: guests, error } = await db
+    .from('reservation_guests')
+    .select('id, location_id, created_at')
+    .eq('status', 'active')
+    .gte('created_at', since)
+    .order('created_at', { ascending: true })
+    .limit(1000);
+  if (error) {
+    console.error('[guest campaigns] could not load guests', error.message);
+    return 0;
+  }
+
+  const tzCache = new Map<string, string>();
+  let sent = 0;
+  for (const row of (guests || []) as Array<{ id: string; location_id: string | null; created_at: string }>) {
+    if (!messageAppliesToGuestLocation(message, row.location_id)) continue;
+    const locKey = row.location_id || '';
+    if (!tzCache.has(locKey)) {
+      const { data: loc } = row.location_id
+        ? await db.from('locations').select('timezone').eq('id', row.location_id).maybeSingle()
+        : { data: null };
+      tzCache.set(locKey, (loc as { timezone?: string } | null)?.timezone || DEFAULT_TIMEZONE);
+    }
+    const target = guestAddedSendTime(message, DateTime.fromISO(row.created_at, { zone: 'utc' }), tzCache.get(locKey)!);
+    if (!target) continue;
+    const diff = target.diff(now, 'minutes').minutes;
+    if (diff > WINDOW_FUTURE_MINUTES || diff < -WINDOW_PAST_MINUTES) continue;
+
+    // Cheap pre-check before loading everything; the claim is the real guard.
+    const { data: already } = await db
+      .from('scheduled_messages')
+      .select('id')
+      .eq('campaign_message_id', message.id)
+      .eq('reservation_guest_id', row.id)
+      .in('status', ['pending', 'sent'])
+      .limit(1);
+    if (already && (already as unknown[]).length > 0) continue;
+
+    const ctx = await loadContext(db, row.id);
+    if (!ctx) continue;
+    if ((await deliver(db, deps, message, ctx, target)) === 'sent') sent++;
+  }
+  return sent;
+}
