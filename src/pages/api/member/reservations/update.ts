@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { parse } from 'cookie';
 import { z } from 'zod';
 import { isCapacityError } from '@/lib/capacity';
+import { countActiveGuests } from '@/lib/reservationGuests';
 
 const updateSchema = z.object({
   reservation_id: z.string().uuid(),
@@ -79,6 +80,14 @@ export default async function handler(
     };
 
     if (validatedData.party_size !== undefined) {
+      // Party size can't drop below the guests already on the reservation + the host.
+      const guestCount = await countActiveGuests(validatedData.reservation_id);
+      if (validatedData.party_size < guestCount + 1) {
+        return res.status(400).json({
+          error: `You have ${guestCount} guest${guestCount === 1 ? '' : 's'} on this reservation, so the party size can't be lower than ${guestCount + 1}. Remove a guest first.`,
+          code: 'BELOW_GUEST_COUNT',
+        });
+      }
       updateData.party_size = validatedData.party_size;
     }
 

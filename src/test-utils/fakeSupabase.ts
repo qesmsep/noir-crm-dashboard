@@ -19,7 +19,16 @@ export interface UniqueRule {
   where?: (row: Row) => boolean;
 }
 
+export interface RelationRule {
+  /** Table holding the related row. */
+  table: string;
+  /** Column on this table pointing at related.id. */
+  fk: string;
+}
+
 export interface FakeDbOptions {
+  /** Many-to-one embeds to attach on select, e.g. reservation_guests.guest_contacts. */
+  relations?: Record<string, Record<string, RelationRule>>;
   unique?: Record<string, UniqueRule[]>;
   /** Columns that "don't exist" yet: inserting/updating them errors like PostgREST. */
   missingColumns?: Record<string, string[]>;
@@ -170,7 +179,15 @@ class Query implements PromiseLike<any> {
       out = [...out].sort((a, b) => (get(a, col) > get(b, col) ? 1 : get(a, col) < get(b, col) ? -1 : 0) * (asc ? 1 : -1));
     }
     if (this.limitN != null) out = out.slice(0, this.limitN);
-    const copy = out.map((r) => ({ ...r }));
+    const rels = this.db.opts.relations?.[this.table] || {};
+    const copy = out.map((r) => {
+      const c: Row = { ...r };
+      for (const [name, rule] of Object.entries(rels)) {
+        const hit = this.db.rows(rule.table).find((x) => x.id === r[rule.fk]);
+        c[name] = hit ? { ...hit } : null;
+      }
+      return c;
+    });
     if (this.singleMode === 'single') {
       if (copy.length !== 1) return { data: null, error: { code: 'PGRST116', message: 'not exactly one row' } };
       return { data: copy[0], error: null };
@@ -183,7 +200,17 @@ class Query implements PromiseLike<any> {
     const table = this.db.rows(this.table);
     this.db.calls.push({ table: this.table, op: this.op, payload: this.payload });
 
-    if (this.op === 'select') return this.finish(table.filter((r) => this.matches(r)));
+    if (this.op === 'select') {
+      const rels = this.db.opts.relations?.[this.table] || {};
+      if (Object.keys(rels).length === 0) return this.finish(table.filter((r) => this.matches(r)));
+      return this.finish(
+        table.filter((r) => {
+          const joined: Row = { ...r };
+          for (const [name, rule] of Object.entries(rels)) joined[name] = this.db.rows(rule.table).find((x) => x.id === r[rule.fk]) || null;
+          return this.matches(joined);
+        }),
+      );
+    }
 
     if (this.op === 'insert' || this.op === 'upsert') {
       const items: Row[] = Array.isArray(this.payload) ? this.payload : [this.payload];

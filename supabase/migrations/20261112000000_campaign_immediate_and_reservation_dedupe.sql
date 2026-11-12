@@ -17,7 +17,7 @@
 --
 -- Tables Affected: campaign_messages, scheduled_messages
 -- Breaking Changes: NO (constraints only widen; new column is nullable)
--- Apply order: 1 of 3
+-- Apply order: 1 of 2
 -- ========================================
 
 -- STEP 1: timing_type
