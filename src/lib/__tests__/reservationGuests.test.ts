@@ -23,6 +23,7 @@ import {
   classifyOptKeyword,
   GuestServiceError,
   handleGuestOptKeyword,
+  introCoveredByDayOf,
   listGuests,
   onReservationCancelled,
   onReservationRescheduled,
@@ -42,7 +43,18 @@ const NOW = DateTime.fromISO('2026-11-12T18:00:00.000Z', { zone: 'utc' });
 let clock = NOW;
 const deps = () => ({ now: () => clock });
 
-function seed(extra: { reservation?: Record<string, unknown>; members?: Record<string, unknown>[]; templates?: Record<string, unknown>[] } = {}) {
+const INTRO = {
+  id: 'msg-intro',
+  name: 'Guest intro',
+  content: 'Hi {{guest_first_name}}, {{host_first_name}} put you on their reservation at {{location_name}} on {{reservation_date}} at {{reservation_time}}. Reply STOP to opt out.',
+  recipient_type: 'reservation_guest',
+  specific_phone: null,
+  timing_type: 'immediate',
+  is_active: true,
+  campaigns: { id: 'camp-g', trigger_type: 'reservation_guest_added', is_active: true, applies_to_all_locations: true, campaign_locations: [] },
+};
+
+function seed(extra: { reservation?: Record<string, unknown>; members?: Record<string, unknown>[]; templates?: Record<string, unknown>[]; intro?: boolean } = {}) {
   db = new FakeDb(
     {
       reservations: [
@@ -65,7 +77,6 @@ function seed(extra: { reservation?: Record<string, unknown>; members?: Record<s
       ],
       locations: [{ id: LOC, name: 'Noir KC', timezone: 'America/Chicago', guest_arrival_instructions: 'Use the alley door and say Noir.' }],
       guest_message_templates: extra.templates ?? [
-        { kind: 'added', body: 'Hi {{guest_first_name}}, {{host_first_name}} added you at {{location_name}} on {{date}} at {{time}}. {{arrival_instructions}} Reply STOP to opt out.', is_active: true, send_offset_minutes: null },
         { kind: 'day_of', body: 'Tonight {{time}} with {{host_first_name}}. Reply STOP to opt out.', is_active: true, send_offset_minutes: 120 },
         { kind: 'time_changed', body: 'Moved to {{date}} at {{time}}. Reply STOP to opt out.', is_active: true, send_offset_minutes: null },
         { kind: 'cancelled', body: '{{host_first_name}} cancelled. Reply STOP to opt out.', is_active: true, send_offset_minutes: null },
@@ -74,6 +85,8 @@ function seed(extra: { reservation?: Record<string, unknown>; members?: Record<s
       reservation_guests: [],
       scheduled_guest_messages: [],
       guest_messages: [],
+      campaign_messages: extra.intro ? [INTRO] : [],
+      scheduled_messages: [],
     },
     {
       relations: { reservation_guests: { guest_contacts: { table: 'guest_contacts', fk: 'guest_contact_id' } } },
@@ -81,6 +94,7 @@ function seed(extra: { reservation?: Record<string, unknown>; members?: Record<s
         guest_contacts: [{ columns: ['phone'] }],
         reservation_guests: [{ columns: ['reservation_id', 'guest_contact_id'], where: (r) => r.status === 'active' }],
         scheduled_guest_messages: [{ columns: ['reservation_guest_id', 'kind'], where: (r) => r.status === 'pending' }],
+        scheduled_messages: [{ columns: ['campaign_message_id', 'reservation_guest_id'], where: (r) => r.reservation_guest_id != null && (r.status === 'pending' || r.status === 'sent') }],
       },
     },
   );
@@ -179,22 +193,22 @@ describe('addGuests rules', () => {
 
 describe('scheduling math (venue timezone)', () => {
   const tz = 'America/Chicago';
-  it('a week out: added now, day_of two hours before start', () => {
+  it('a week out: day_of two hours before start', () => {
     const plan = planGuestMessages({ start: START, now: NOW, timezone: tz });
-    expect(plan.map((p) => [p.kind, p.scheduledFor.toUTC().toISO()])).toEqual([
-      ['added', NOW.toISO()],
-      ['day_of', '2026-11-20T00:00:00.000Z'],
-    ]);
+    expect(plan.map((p) => [p.kind, p.scheduledFor.toUTC().toISO()])).toEqual([['day_of', '2026-11-20T00:00:00.000Z']]);
   });
 
-  it('starts within 2 hours: day_of now, no added', () => {
+  it('starts within 2 hours: day_of now, and the campaign intro is covered by it', () => {
     const now = DateTime.fromISO('2026-11-20T00:30:00.000Z', { zone: 'utc' });
     const plan = planGuestMessages({ start: START, now, timezone: tz });
     expect(plan.map((p) => p.kind)).toEqual(['day_of']);
     expect(plan[0].scheduledFor.toUTC().toISO()).toBe(now.toISO());
+    expect(introCoveredByDayOf({ start: START, now, dayOfActive: true })).toBe(true);
+    expect(introCoveredByDayOf({ start: START, now, dayOfActive: false })).toBe(false);
+    expect(introCoveredByDayOf({ start: START, now: NOW, dayOfActive: true })).toBe(false);
   });
 
-  it('custom 60-minute offset, start in 90 minutes: day_of at start−60, no added', () => {
+  it('custom 60-minute offset, start in 90 minutes: day_of at start−60', () => {
     const now = DateTime.fromISO('2026-11-20T00:30:00.000Z', { zone: 'utc' });
     const plan = planGuestMessages({ start: START, now, timezone: tz, dayOfOffsetMinutes: 60 });
     expect(plan.map((p) => [p.kind, p.scheduledFor.toUTC().toISO()])).toEqual([['day_of', '2026-11-20T01:00:00.000Z']]);
@@ -202,15 +216,12 @@ describe('scheduling math (venue timezone)', () => {
 
   it('across a DST change the offset is still exact minutes before the venue start', () => {
     // 2027-03-14 is DST start in Chicago; reservation 2027-03-14 3:30 AM CDT
-    const start = '2027-03-14T08:30:00.000Z';
-    const plan = planGuestMessages({ start, now: DateTime.fromISO('2027-03-10T12:00:00Z'), timezone: tz });
-    expect(plan[1].scheduledFor.toUTC().toISO()).toBe('2027-03-14T06:30:00.000Z');
+    const plan = planGuestMessages({ start: '2027-03-14T08:30:00.000Z', now: DateTime.fromISO('2027-03-10T12:00:00Z'), timezone: tz });
+    expect(plan[0].scheduledFor.toUTC().toISO()).toBe('2027-03-14T06:30:00.000Z');
   });
 
-  it('day_of switched off: added is still sent', () => {
-    const now = DateTime.fromISO('2026-11-20T00:30:00.000Z', { zone: 'utc' });
-    const plan = planGuestMessages({ start: START, now, timezone: tz, activeKinds: new Set(['added', 'time_changed', 'cancelled']) });
-    expect(plan.map((p) => p.kind)).toEqual(['added']);
+  it('day_of switched off: nothing built-in', () => {
+    expect(planGuestMessages({ start: START, now: NOW, timezone: tz, activeKinds: new Set(['time_changed', 'cancelled']) })).toEqual([]);
   });
 
   it('past start: nothing', () => {
@@ -232,37 +243,72 @@ describe('render', () => {
   });
 });
 
-describe('sending cron re-checks', () => {
-  async function addAva() {
-    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal', actorMemberId: 'm-host' }, deps());
-  }
-
-  it('sends the added text, logs it to guest_messages and sets notified_at', async () => {
-    await addAva();
-    const out = await processDueGuestMessages({}, deps());
-    expect(out).toMatchObject({ claimed: 1, sent: 1 });
+describe('guest added → campaign intro', () => {
+  it('sends the intro at once, logs it and sets notified_at; host is linked', async () => {
+    seed({ intro: true });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'guest_link' }, deps());
     expect(mockSend).toHaveBeenCalledWith({
       to: '+19135550101',
-      content: 'Hi Ava, Tim added you at Noir KC on Thursday, November 19 at 8:00 PM. Use the alley door and say Noir. Reply STOP to opt out.',
+      content: 'Hi Ava, Tim put you on their reservation at Noir KC on Thursday, November 19 at 8:00 PM. Reply STOP to opt out.',
     });
-    expect(db.rows('guest_messages')[0]).toMatchObject({ reservation_id: 'r-1', sent_by: 'system:guests', status: 'sent', openphone_message_id: 'op-9' });
-    expect(db.rows('reservation_guests')[0].notified_at).toBeTruthy();
-    // day_of still pending for later
-    expect(db.rows('scheduled_guest_messages').map((m) => [m.kind, m.status])).toEqual([
-      ['added', 'sent'],
-      ['day_of', 'pending'],
-    ]);
+    const g = db.rows('reservation_guests')[0];
+    expect(g.host_member_id).toBe('m-host'); // connected to the member even via the link
+    expect(g.notified_at).toBeTruthy();
+    expect(db.rows('guest_messages')[0]).toMatchObject({ reservation_id: 'r-1', sent_by: 'system:campaign', status: 'sent' });
+    expect(db.rows('scheduled_messages')[0]).toMatchObject({ campaign_message_id: 'msg-intro', reservation_guest_id: g.id, status: 'sent' });
   });
 
-  it('a second run does not resend', async () => {
-    await addAva();
+  it('no intro campaign: nothing sent at add, day_of still queued', async () => {
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(db.rows('scheduled_guest_messages').map((m) => m.kind)).toEqual(['day_of']);
+  });
+
+  it('within 2 hours of start: intro skipped, day_of goes now', async () => {
+    seed({ intro: true });
+    clock = DateTime.fromISO('2026-11-20T00:30:00.000Z', { zone: 'utc' });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    expect(db.rows('scheduled_messages')).toHaveLength(0);
+    await processDueGuestMessages({}, deps());
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend.mock.calls[0][0].content).toMatch(/^Tonight 8:00 PM with Tim/);
+  });
+
+  it('guest who is already a member gets no intro', async () => {
+    seed({ intro: true });
+    await addGuests('r-1', [{ first_name: 'Jo', phone: '8165550177' }], { via: 'portal' }, deps());
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+});
+
+describe('sending cron re-checks (day_of)', () => {
+  const DAY_OF = DateTime.fromISO('2026-11-20T00:00:30.000Z', { zone: 'utc' });
+  async function addAvaThenWait() {
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal', actorMemberId: 'm-host' }, deps());
+    clock = DAY_OF;
+  }
+
+  it('sends day_of with arrival instructions, logs it and sets notified_at', async () => {
+    await addAvaThenWait();
+    const out = await processDueGuestMessages({}, deps());
+    expect(out).toMatchObject({ claimed: 1, sent: 1 });
+    expect(mockSend).toHaveBeenCalledWith({ to: '+19135550101', content: 'Tonight 8:00 PM with Tim. Reply STOP to opt out.' });
+    expect(db.rows('guest_messages')[0]).toMatchObject({ reservation_id: 'r-1', sent_by: 'system:guests', status: 'sent', openphone_message_id: 'op-9' });
+    expect(db.rows('reservation_guests')[0].notified_at).toBeTruthy();
+  });
+
+  it('nothing before it is due; a second run does not resend', async () => {
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    await processDueGuestMessages({}, deps());
+    expect(mockSend).not.toHaveBeenCalled();
+    clock = DAY_OF;
     await processDueGuestMessages({}, deps());
     await processDueGuestMessages({}, deps());
     expect(mockSend).toHaveBeenCalledTimes(1);
   });
 
   it('skips when the reservation was cancelled', async () => {
-    await addAva();
+    await addAvaThenWait();
     db.rows('reservations')[0].status = 'cancelled';
     const out = await processDueGuestMessages({}, deps());
     expect(out.skipped).toBe(1);
@@ -271,7 +317,7 @@ describe('sending cron re-checks', () => {
   });
 
   it('skips when the contact opted out after scheduling', async () => {
-    await addAva();
+    await addAvaThenWait();
     db.rows('guest_contacts')[0].sms_opted_out_at = NOW.toISO();
     await processDueGuestMessages({}, deps());
     expect(db.rows('scheduled_guest_messages')[0]).toMatchObject({ status: 'skipped', skip_reason: 'opted_out' });
@@ -279,7 +325,7 @@ describe('sending cron re-checks', () => {
   });
 
   it('skips a guest who became a member since being added', async () => {
-    await addAva();
+    await addAvaThenWait();
     db.rows('members').push({ member_id: 'm-new', phone: '+19135550101', status: 'active' });
     await processDueGuestMessages({}, deps());
     expect(db.rows('scheduled_guest_messages')[0]).toMatchObject({ status: 'skipped', skip_reason: 'matched_member' });
@@ -288,7 +334,7 @@ describe('sending cron re-checks', () => {
   });
 
   it('records a failed send without retrying', async () => {
-    await addAva();
+    await addAvaThenWait();
     mockSend.mockResolvedValueOnce({ success: false, error: 'bad number' });
     await processDueGuestMessages({}, deps());
     expect(db.rows('scheduled_guest_messages')[0]).toMatchObject({ status: 'failed', error_message: 'bad number' });
@@ -299,8 +345,8 @@ describe('sending cron re-checks', () => {
 
 describe('reschedule and cancel', () => {
   it('reschedule: notified guests get time_changed now and a moved day_of', async () => {
-    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
-    await processDueGuestMessages({}, deps()); // added sent
+    seed({ intro: true });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps()); // intro → notified
     db.rows('reservations')[0].start_time = '2026-11-21T02:00:00.000Z';
     db.rows('reservations')[0].end_time = '2026-11-21T04:00:00.000Z';
     await onReservationRescheduled('r-1', deps());
@@ -315,25 +361,22 @@ describe('reschedule and cancel', () => {
   });
 
   it('reschedule: not-yet-texted guests just get a fresh plan', async () => {
-    clock = DateTime.fromISO('2026-11-12T18:00:00Z');
     await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
     db.rows('reservations')[0].start_time = '2026-11-12T19:00:00.000Z'; // now within 2h
     db.rows('reservations')[0].end_time = '2026-11-12T21:00:00.000Z';
     await onReservationRescheduled('r-1', deps());
     const pending = db.rows('scheduled_guest_messages').filter((m) => m.status === 'pending');
-    expect(pending.map((m) => m.kind)).toEqual(['day_of']);
+    expect(pending.map((m) => [m.kind, m.scheduled_for])).toEqual([['day_of', NOW.toUTC().toISO()]]);
   });
 
   it('cancel: pending cancelled; only notified guests get the cancelled text', async () => {
-    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
-    await processDueGuestMessages({}, deps()); // Ava notified
-    await addGuests('r-1', [{ first_name: 'Bo', phone: '9135550102' }], { via: 'portal' }, deps()); // not notified
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }, { first_name: 'Bo', phone: '9135550102' }], { via: 'portal' }, deps());
+    db.rows('reservation_guests').find((g) => g.first_name_snapshot === 'Ava')!.notified_at = NOW.toISO();
     db.rows('reservations')[0].status = 'cancelled';
     await onReservationCancelled('r-1', {}, deps());
     const pending = db.rows('scheduled_guest_messages').filter((m) => m.status === 'pending');
     expect(pending).toHaveLength(1);
     expect(pending[0].kind).toBe('cancelled');
-    mockSend.mockClear();
     await processDueGuestMessages({}, deps());
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend.mock.calls[0][0]).toEqual({ to: '+19135550101', content: 'Tim cancelled. Reply STOP to opt out.' });
@@ -341,8 +384,7 @@ describe('reschedule and cancel', () => {
 
   it('cancel with sendNow (reservation about to be deleted) texts inline', async () => {
     await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
-    await processDueGuestMessages({}, deps());
-    mockSend.mockClear();
+    db.rows('reservation_guests')[0].notified_at = NOW.toISO();
     await onReservationCancelled('r-1', { sendNow: true }, deps());
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(db.rows('scheduled_guest_messages').filter((m) => m.status === 'pending')).toHaveLength(0);

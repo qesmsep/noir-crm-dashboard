@@ -1,12 +1,13 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseAdmin } from '@/lib/supabase';
-import { GUEST_KINDS } from '@/lib/reservationGuests';
+import { TEMPLATE_KINDS } from '@/lib/reservationGuests';
 import { getAdmin } from '@/lib/guestApi';
 
 /**
  * GET /api/admin/reservation-guests/templates
  * PUT /api/admin/reservation-guests/templates  { kind, body?, is_active?, send_offset_minutes? }
- * The four reservation-guest texts, edited on Campaigns → Reservation guests.
+ * Built-in reservation-guest texts (day of, time changed, cancelled) and the
+ * host's "Member guest link" text, edited on Campaigns → Reservation guests.
  * Auth: admin Bearer token.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -21,12 +22,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .from('guest_message_templates')
       .select('kind, body, is_active, send_offset_minutes, updated_at');
     if (error) return res.status(500).json({ error: 'Guest texts need the reservation-guests migration applied.' });
-    const order = new Map(GUEST_KINDS.map((k, i) => [k, i]));
+    const order = new Map<string, number>(TEMPLATE_KINDS.map((k, i) => [k, i]));
     return res.status(200).json({ templates: (data || []).sort((a, b) => (order.get(a.kind) ?? 9) - (order.get(b.kind) ?? 9)) });
   }
 
   const { kind, body, is_active, send_offset_minutes } = req.body || {};
-  if (!GUEST_KINDS.includes(kind)) return res.status(400).json({ error: 'Unknown message kind.' });
+  if (!(TEMPLATE_KINDS as readonly string[]).includes(kind)) return res.status(400).json({ error: 'Unknown message kind.' });
   const patch: Record<string, unknown> = {};
   if (body !== undefined) {
     const text = String(body).trim();

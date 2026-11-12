@@ -7,8 +7,10 @@
 --      for reservation_created that is the moment of booking).
 --   2. campaign_messages.recipient_type accepts 'member_only' ("Members'
 --      reservations") and 'guest_only' ("Non-member reservations") so a
---      reservation message can target members or non-members only.
---      Live constraint (checked 2026-11-12) did not include them.
+--      reservation message can target members or non-members only, and
+--      'reservation_guest' ("The guest") for the Reservation Guest Added
+--      trigger (added in 20261112010000). Live constraint (checked 2026-11-12)
+--      included none of them.
 --   3. scheduled_messages.reservation_id: reservation_created sends are deduped
 --      per reservation instead of per phone forever. A partial unique index on
 --      pending/sent rows lets the sender claim a slot atomically, so the inline
@@ -31,7 +33,7 @@ ALTER TABLE public.campaign_messages ADD CONSTRAINT campaign_messages_recipient_
   CHECK (recipient_type = ANY (ARRAY[
     'member'::text, 'all_members'::text, 'specific_phone'::text, 'both_members'::text,
     'reservation_phones'::text, 'private_event_rsvps'::text, 'all_primary_members'::text,
-    'member_only'::text, 'guest_only'::text
+    'member_only'::text, 'guest_only'::text, 'reservation_guest'::text
   ]));
 
 -- STEP 3: scheduled_messages.reservation_id

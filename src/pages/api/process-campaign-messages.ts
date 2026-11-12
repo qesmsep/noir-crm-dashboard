@@ -10,6 +10,7 @@ import {
   type LocationInfo,
 } from '../../lib/reservationCampaigns';
 import { sendSMS } from '../../lib/sms';
+import { GUEST_ADDED_TRIGGER, processGuestAddedCampaignMessage } from '../../lib/guestCampaigns';
 
 // Constants for message timing windows
 const MESSAGE_SEND_WINDOW_FUTURE_MINUTES = 5; // Send messages within 5 minutes of target time
@@ -255,6 +256,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // sendReservationCreatedMessages (POST /api/reservations), never here.
         if (message.timing_type === 'immediate') {
           console.log('⏭️  Immediate message — sent at booking time, skipping in cron');
+          continue;
+        }
+
+        // Reservation Guest Added: recipients are reservation guests, timed from
+        // when each guest was added. Handled in lib/guestCampaigns.
+        if (triggerType === GUEST_ADDED_TRIGGER) {
+          processedCount += await processGuestAddedCampaignMessage(message);
           continue;
         }
 

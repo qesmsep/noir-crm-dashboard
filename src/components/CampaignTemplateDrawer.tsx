@@ -37,7 +37,7 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest';
   specific_phone?: string;
   timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   // Specific time fields
@@ -116,7 +116,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     name: '',
     description: '',
     content: '',
-    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only',
+    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest',
     specific_phone: '',
     timing_type: 'specific_time' as 'specific_time' | 'recurring' | 'relative' | 'immediate',
     specific_time: '10:00',
@@ -527,6 +527,18 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       .replace(/\{\{phone\}\}/g, '(555) 123-4567')
       .replace(/\{\{email\}\}/g, 'john.doe@example.com');
 
+    if (campaignTriggerType === 'reservation_guest_added') {
+      return formData.content
+        .replace(/\{\{(guest_first_name|first_name)\}\}/g, 'Ava')
+        .replace(/\{\{(guest_last_name|last_name)\}\}/g, 'Stone')
+        .replace(/\{\{host_first_name\}\}/g, 'Tim')
+        .replace(/\{\{location_name\}\}/g, 'Noir KC')
+        .replace(/\{\{reservation_date\}\}/g, 'Friday, March 15')
+        .replace(/\{\{reservation_time\}\}/g, '8:00 PM')
+        .replace(/\{\{party_size\}\}/g, '4')
+        .replace(/\{\{arrival_instructions\}\}/g, "Give your name at the door and we'll take it from there.");
+    }
+
     // Add reservation-specific placeholders if this is a reservation campaign
     if (campaignTriggerType === 'reservation' || campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
       previewContent = previewContent
@@ -654,6 +666,12 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
 
+      case 'reservation_guest_added':
+        return [
+          { value: 'reservation_guest', label: `The guest${locationHint}` },
+          { value: 'specific_phone', label: 'Custom phone number (e.g. a staff alert)' }
+        ];
+
       case 'reservation_range':
         return [
           { value: 'reservation_phones', label: `Phone numbers on Reservations within time period${locationHint}` },
@@ -691,6 +709,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     if (campaignTriggerType === 'reservation_created') {
       return ['immediate', 'specific_time', 'recurring', 'relative'];
     }
+    if (campaignTriggerType === 'reservation_guest_added') {
+      return ['immediate', 'specific_time', 'relative'];
+    }
 
     switch (campaignTriggerType) {
       case 'recurring':
@@ -713,10 +734,22 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     if (!campaignTriggerType) return false;
 
     // Only show relative option for triggers that have specific dates/times
-    return ['member_signup', 'member_birthday', 'reservation_time', 'reservation_created', 'private_event'].includes(campaignTriggerType);
+    return ['member_signup', 'member_birthday', 'reservation_time', 'reservation_created', 'reservation_guest_added', 'private_event'].includes(campaignTriggerType);
   };
 
   const getAvailablePlaceholders = () => {
+    if (campaignTriggerType === 'reservation_guest_added') {
+      return [
+        { name: '{{guest_first_name}}', description: 'Guest first name' },
+        { name: '{{guest_last_name}}', description: 'Guest last name (may be blank)' },
+        { name: '{{host_first_name}}', description: 'Member who added them' },
+        { name: '{{location_name}}', description: 'Reservation location' },
+        { name: '{{reservation_date}}', description: 'e.g. Friday, March 15' },
+        { name: '{{reservation_time}}', description: 'e.g. 8:00 PM' },
+        { name: '{{party_size}}', description: 'Reservation party size' },
+        { name: '{{arrival_instructions}}', description: 'How guests get in (Settings → location)' },
+      ];
+    }
     const placeholders = [
       { name: '{{first_name}}', description: 'Member first name' },
       { name: '{{last_name}}', description: 'Member last name' },

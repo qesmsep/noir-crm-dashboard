@@ -217,6 +217,7 @@ export const campaignSchema = z.object({
     'reservation_range',
     'private_event',
     'all_members',
+    'reservation_guest_added',
   ]),
   active: z.boolean().default(true),
   description: z.string().max(500).optional(),
@@ -235,6 +236,7 @@ export const campaignMessageSchema = z.object({
   recipient_type: z.enum([
     'member_only',
     'guest_only',
+    'reservation_guest',
     'both_members',
     'specific_number',
     'reservation_phones',

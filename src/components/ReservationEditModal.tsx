@@ -5,6 +5,7 @@ import { formatDateTime, utcToLocalInput, localInputToUTC } from '../utils/dateU
 import { supabase } from '../lib/supabase';
 import { useSettings } from '../context/SettingsContext';
 import { Trash2, X } from 'lucide-react';
+import StaffReservationGuests from './guests/StaffReservationGuests';
 
 const eventTypes = [
   { value: 'birthday', label: '🎂 Birthday' },
@@ -794,6 +795,16 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                   fontFamily: 'inherit',
                 }}
               />
+
+              {/* Reservation guests: add / edit / check in, guest link, text link to member */}
+              <div style={{ borderTop: '1px solid #D1D5DB', paddingTop: '1.25rem' }}>
+                <StaffReservationGuests
+                  reservationId={reservationId}
+                  partySize={reservation.party_size || formData.party_size || 1}
+                  canAdd={reservation.status !== 'cancelled' && new Date(reservation.end_time || reservation.start_time) > new Date()}
+                  hasHostPhone={!!reservation.phone}
+                />
+              </div>
 
               {/* Send Message Section */}
               <div style={{ borderTop: '1px solid #D1D5DB', paddingTop: '1.25rem' }}>

@@ -3,7 +3,10 @@
 /**
  * Campaigns → Reservation guests. Everything about texts to people members
  * bring lives here:
- *   Messages — the four guest texts: edit, on/off, live preview, character count.
+ *   Messages — built-in texts (day of, time changed, cancelled, and the host's
+ *              "Member guest link"): edit, on/off, live preview, character count.
+ *              The guest intro + follow-ups are campaigns with the trigger
+ *              "Reservation Guest Added".
  *   Guests   — one row per guest visit for manual follow-up: text a guest,
  *              mark followed up with a note, see sent history, export CSV.
  *
@@ -24,9 +27,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/useToast';
 import { adminRequestHeaders } from '@/lib/adminRequestHeaders';
-import { renderGuestMessage } from '@/lib/guestMessageRender';
+import { renderGuestMessage, renderMemberLinkMessage } from '@/lib/guestMessageRender';
 
-type Kind = 'added' | 'day_of' | 'time_changed' | 'cancelled';
+type Kind = 'day_of' | 'time_changed' | 'cancelled' | 'member_link';
 
 interface Template {
   kind: Kind;
@@ -62,10 +65,13 @@ interface SentMessage {
 }
 
 const KIND_LABELS: Record<Kind, { title: string; when: string }> = {
-  added: { title: 'Added', when: 'When a member adds them (skipped if the reservation is within 2 hours).' },
-  day_of: { title: 'Day of', when: 'Before the reservation, at the time set below.' },
+  day_of: { title: 'Day of', when: 'To each guest before the reservation, at the time set below.' },
   time_changed: { title: 'Time changed', when: 'To guests already texted, when the reservation moves.' },
   cancelled: { title: 'Cancelled', when: 'To guests already texted, when the reservation is cancelled.' },
+  member_link: {
+    title: 'Member guest link',
+    when: 'To the member, when staff tap "Text link to member" on a reservation. Placeholders: {{member_first_name}} {{location_name}} {{date}} {{time}} {{guest_link}}.',
+  },
 };
 
 const TZ = 'America/Chicago';
@@ -126,22 +132,39 @@ function MessagesTab() {
 
   return (
     <div className="flex flex-col gap-4">
+      <div className="rounded-2xl border border-border-cream-1 bg-bg-cream-1 p-4 text-sm text-text-primary">
+        <p className="font-semibold">Intro and follow-up texts to guests are campaigns.</p>
+        <p className="mt-1 text-text-muted">
+          Create a campaign with the trigger &ldquo;Reservation Guest Added&rdquo; and recipient &ldquo;The guest&rdquo;: a &ldquo;Send immediately&rdquo;
+          message for the intro, then relative messages for follow-ups. Follow-ups stop only if the guest texts STOP.
+        </p>
+      </div>
       <p className="text-sm text-text-muted">
-        Placeholders: {'{{guest_first_name}} {{host_first_name}} {{location_name}} {{date}} {{time}} {{arrival_instructions}}'}. End every text with
-        &ldquo;Reply STOP to opt out.&rdquo;
+        Guest placeholders: {'{{guest_first_name}} {{host_first_name}} {{location_name}} {{date}} {{time}} {{arrival_instructions}}'}. End every guest
+        text with &ldquo;Reply STOP to opt out.&rdquo;
       </p>
       {templates.map((t) => {
         const d = drafts[t.kind] || t;
-        const preview = renderGuestMessage(d.body, {
-          guestFirstName: 'Ava',
-          hostFirstName: 'Tim',
-          locationName: 'Noir KC',
-          start: previewStart,
-          timezone: TZ,
-          arrivalInstructions: null,
-        });
+        const preview =
+          t.kind === 'member_link'
+            ? renderMemberLinkMessage(d.body, {
+                memberFirstName: 'Tim',
+                locationName: 'Noir KC',
+                start: previewStart,
+                timezone: TZ,
+                guestLink: 'https://noir.example/r/abc123/guests',
+              })
+            : renderGuestMessage(d.body, {
+                guestFirstName: 'Ava',
+                hostFirstName: 'Tim',
+                locationName: 'Noir KC',
+                start: previewStart,
+                timezone: TZ,
+                arrivalInstructions: null,
+              });
         const changed = d.body !== t.body || d.is_active !== t.is_active || d.send_offset_minutes !== t.send_offset_minutes;
-        const missingStop = !/reply stop to opt out/i.test(d.body);
+        const missingStop = t.kind !== 'member_link' && !/reply stop to opt out/i.test(d.body);
+        const missingLink = t.kind === 'member_link' && !d.body.includes('{{guest_link}}');
         return (
           <div key={t.kind} className="flex flex-col gap-3 rounded-2xl border border-border-cream-1 bg-white p-4">
             <div className="flex items-start justify-between gap-3">
@@ -173,6 +196,7 @@ function MessagesTab() {
               <span className={preview.length > 300 ? 'text-error-red' : ''}>{preview.length} characters as sent (preview)</span>
             </div>
             {missingStop && <p className="text-xs text-error-red">Add &ldquo;Reply STOP to opt out.&rdquo;</p>}
+            {missingLink && <p className="text-xs text-error-red">Include {'{{guest_link}}'} or the member gets no link.</p>}
             {t.kind === 'day_of' && (
               <div className="flex flex-col gap-1">
                 <Label htmlFor="tpl-day-of-offset">Minutes before the reservation</Label>

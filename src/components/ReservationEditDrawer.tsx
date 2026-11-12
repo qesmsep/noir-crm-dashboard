@@ -723,6 +723,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
                     reservationId={reservationId}
                     partySize={reservation.party_size || 1}
                     canAdd={reservation.status !== 'cancelled' && new Date(reservation.end_time || reservation.start_time) > new Date()}
+                    hasHostPhone={!!reservation.phone}
                   />
                 </Box>
                

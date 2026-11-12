@@ -46,7 +46,7 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest';
   specific_phone?: string;
   timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   specific_time?: string;
@@ -362,6 +362,8 @@ export default function CampaignEditPage() {
         return (campaign?.trigger_type === 'reservation' || campaign?.trigger_type === 'reservation_time' || campaign?.trigger_type === 'reservation_created') ? 'Phone number on reservation' : 'Primary Member';
       case 'all_members':
         return 'All Members';
+      case 'reservation_guest':
+        return 'The guest';
       case 'member_only':
         return "Members' reservations";
       case 'guest_only':
@@ -625,6 +627,7 @@ export default function CampaignEditPage() {
                           <option value="recurring">Recurring</option>
                           <option value="reservation">Reservation</option>
                           <option value="reservation_created">Reservation Created</option>
+                          <option value="reservation_guest_added">Reservation Guest Added</option>
                           <option value="reservation_range">Reservation Range</option>
                           <option value="reservation_time">Reservation Time</option>
                         </Select>

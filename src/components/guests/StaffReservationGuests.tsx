@@ -2,11 +2,14 @@
 
 /**
  * Staff view of a reservation's guests (inside ReservationEditDrawer): names,
- * member / opted-out badges, per-guest check-in, add / edit / remove, and the
- * no-login guest link with a Copy button.
+ * member / opted-out badges, per-guest check-in, add / edit / remove, the
+ * no-login guest link with a Copy button, and "Text link to member" (sends the
+ * "Member guest link" message from Campaigns → Reservation guests).
+ *
+ * Used by ReservationEditModal (timeline) and ReservationEditDrawer (calendar).
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import { Copy, Link2, Pencil, Trash2 } from 'lucide-react';
+import { Copy, Link2, MessageSquare, Pencil, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,9 +36,11 @@ interface Props {
   partySize: number;
   /** Cancelled or past reservations can't take new guests. */
   canAdd: boolean;
+  /** The reservation has a phone to text the guest link to. */
+  hasHostPhone?: boolean;
 }
 
-export default function StaffReservationGuests({ reservationId, partySize, canAdd }: Props) {
+export default function StaffReservationGuests({ reservationId, partySize, canAdd, hasHostPhone = true }: Props) {
   const { toast } = useToast();
   const [guests, setGuests] = useState<StaffGuest[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +50,7 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
   const [busy, setBusy] = useState<string | null>(null);
   const [link, setLink] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
+  const [texting, setTexting] = useState(false);
 
   const base = `/api/admin/reservations/${reservationId}/guests`;
 
@@ -109,6 +115,21 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
       toast({ title: 'Error', description: e instanceof Error ? e.message : 'Could not create the link.', variant: 'error' });
     } finally {
       setLinkLoading(false);
+    }
+  };
+
+  const textLinkToMember = async () => {
+    setTexting(true);
+    try {
+      const response = await fetch(`/api/admin/reservations/${reservationId}/guest-link-text`, { method: 'POST', headers: await adminRequestHeaders() });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not send the link.');
+      setLink(data.url);
+      toast({ title: 'Link texted to the member', variant: 'success' });
+    } catch (e) {
+      toast({ title: 'Not sent', description: e instanceof Error ? e.message : 'Could not send the link.', variant: 'error' });
+    } finally {
+      setTexting(false);
     }
   };
 
@@ -232,7 +253,13 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
 
       {canAdd && (
         <div className="flex flex-col gap-2 border-t border-border-cream-1 pt-3">
-          <p className="text-xs text-text-muted">Guest link: the member can add guests without logging in.</p>
+          <p className="text-xs text-text-muted">
+            Guest link: the member adds guests without logging in. If they text you names instead, add them above.
+          </p>
+          <Button className="h-11 w-full" onClick={textLinkToMember} disabled={texting || !hasHostPhone}>
+            <MessageSquare className="mr-2 h-4 w-4" aria-hidden />
+            {texting ? 'Sending…' : hasHostPhone ? 'Text link to member' : 'No phone on reservation'}
+          </Button>
           {link ? (
             <div className="flex gap-2">
               <Input readOnly value={link} className="h-11 flex-1 text-xs" aria-label="Guest link" onFocus={(e) => e.currentTarget.select()} />

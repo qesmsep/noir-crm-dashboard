@@ -29,7 +29,7 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest';
   specific_phone?: string;
   timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   specific_time?: string;
@@ -261,6 +261,8 @@ export default function CommunicationPage() {
         return (selectedCampaign?.trigger_type === 'reservation_time' || selectedCampaign?.trigger_type === 'reservation_created') ? 'Phone number on reservation' : 'Primary Member';
       case 'all_members':
         return 'All Members';
+      case 'reservation_guest':
+        return 'The guest';
       case 'member_only':
         return "Members' reservations";
       case 'guest_only':
@@ -283,7 +285,8 @@ export default function CommunicationPage() {
       'recurring': 'Recurring',
       'reservation_range': 'Reservation Range',
       'private_event': 'Private Event',
-      'all_members': 'All Members'
+      'all_members': 'All Members',
+      'reservation_guest_added': 'Reservation Guest Added'
     };
     return labels[triggerType] || triggerType;
   };

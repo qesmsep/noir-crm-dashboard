@@ -5,6 +5,24 @@
 -- and the guest message queue. guest_messages (the send log) is kept.
 -- ========================================
 
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM public.campaigns WHERE trigger_type = 'reservation_guest_added') THEN
+    RAISE EXCEPTION 'campaigns still use trigger reservation_guest_added; change or delete them before rolling back';
+  END IF;
+END $$;
+
+DROP INDEX IF EXISTS public.scheduled_messages_campaign_guest_once;
+ALTER TABLE public.scheduled_messages DROP COLUMN IF EXISTS reservation_guest_id;
+
+ALTER TABLE public.campaigns DROP CONSTRAINT IF EXISTS campaigns_trigger_type_check;
+ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_trigger_type_check
+  CHECK (trigger_type = ANY (ARRAY[
+    'member_signup'::text, 'member_birthday'::text, 'member_renewal'::text, 'reservation_time'::text,
+    'reservation_created'::text, 'reservation'::text, 'recurring'::text, 'reservation_range'::text,
+    'private_event'::text, 'all_members'::text
+  ]));
+
 DROP TABLE IF EXISTS public.scheduled_guest_messages;
 DROP TABLE IF EXISTS public.guest_message_templates;
 DROP TABLE IF EXISTS public.reservation_guests;

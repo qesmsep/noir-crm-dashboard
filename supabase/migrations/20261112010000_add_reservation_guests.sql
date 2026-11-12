@@ -8,13 +8,17 @@
 --
 --   guest_contacts            one row per person, keyed by E.164 phone
 --   reservation_guests        a guest on one reservation
---   guest_message_templates   the four guest texts (editable in Campaigns)
+--   guest_message_templates   built-in texts editable in Campaigns → Reservation guests:
+--                             day_of / time_changed / cancelled to guests, member_link to the host
 --   scheduled_guest_messages  queue sent by /api/cron/process-guest-messages
+--   campaigns trigger 'reservation_guest_added'  the guest intro + follow-ups are
+--                             ordinary campaign messages ("The guest" recipient)
+--   scheduled_messages.reservation_guest_id  per-guest dedupe for that trigger
 --   reservations.guest_link_token / guest_link_expires_at  no-login add-guests link
 --   locations.guest_arrival_instructions  how guests get in, per venue
 --
 -- Tables Affected: new tables above; reservations, locations (nullable columns)
--- Breaking Changes: NO
+-- Breaking Changes: NO (campaigns.trigger_type constraint only widens)
 -- Apply order: 2 of 2 (after 20261112000000_campaign_immediate_and_reservation_dedupe.sql)
 -- RLS: enabled on every new table. No anon policies. Every policy names its role.
 -- ========================================
@@ -57,6 +61,7 @@ CREATE TABLE IF NOT EXISTS public.reservation_guests (
   guest_contact_id UUID NOT NULL REFERENCES public.guest_contacts(id) ON DELETE RESTRICT,
   location_id UUID NULL REFERENCES public.locations(id) ON DELETE SET NULL,
   added_by_member_id UUID NULL REFERENCES public.members(member_id) ON DELETE SET NULL,
+  host_member_id UUID NULL REFERENCES public.members(member_id) ON DELETE SET NULL,
   added_via TEXT NOT NULL CHECK (added_via IN ('portal', 'guest_link', 'staff')),
   first_name_snapshot TEXT NULL,
   matched_member_id UUID NULL REFERENCES public.members(member_id) ON DELETE SET NULL,
@@ -70,6 +75,7 @@ CREATE TABLE IF NOT EXISTS public.reservation_guests (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 COMMENT ON TABLE public.reservation_guests IS 'A guest a member brings on one reservation.';
+COMMENT ON COLUMN public.reservation_guests.host_member_id IS 'The member whose reservation this is (reservations.member_id at the time), however the guest was added.';
 COMMENT ON COLUMN public.reservation_guests.matched_member_id IS 'Guest is already a member (matched by last 10 phone digits). Matched members get no guest texts.';
 
 CREATE UNIQUE INDEX IF NOT EXISTS reservation_guests_one_active_per_contact
@@ -77,6 +83,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS reservation_guests_one_active_per_contact
 CREATE INDEX IF NOT EXISTS idx_reservation_guests_reservation ON public.reservation_guests (reservation_id);
 CREATE INDEX IF NOT EXISTS idx_reservation_guests_contact ON public.reservation_guests (guest_contact_id);
 CREATE INDEX IF NOT EXISTS idx_reservation_guests_location_created ON public.reservation_guests (location_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_reservation_guests_host ON public.reservation_guests (host_member_id);
+CREATE INDEX IF NOT EXISTS idx_reservation_guests_created ON public.reservation_guests (created_at);
 
 DROP TRIGGER IF EXISTS trg_reservation_guests_updated_at ON public.reservation_guests;
 CREATE TRIGGER trg_reservation_guests_updated_at BEFORE UPDATE ON public.reservation_guests
@@ -101,7 +109,7 @@ COMMENT ON COLUMN public.locations.guest_arrival_instructions IS
 -- ----------------------------------------
 CREATE TABLE IF NOT EXISTS public.guest_message_templates (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  kind TEXT NOT NULL UNIQUE CHECK (kind IN ('added', 'day_of', 'time_changed', 'cancelled')),
+  kind TEXT NOT NULL UNIQUE CHECK (kind IN ('day_of', 'time_changed', 'cancelled', 'member_link')),
   body TEXT NOT NULL CHECK (length(btrim(body)) > 0),
   is_active BOOLEAN NOT NULL DEFAULT true,
   send_offset_minutes INTEGER NULL CHECK (send_offset_minutes IS NULL OR send_offset_minutes BETWEEN 0 AND 1440),
@@ -115,9 +123,6 @@ CREATE TRIGGER trg_guest_message_templates_updated_at BEFORE UPDATE ON public.gu
   FOR EACH ROW EXECUTE FUNCTION public.reservation_guests_touch_updated_at();
 
 INSERT INTO public.guest_message_templates (kind, body, send_offset_minutes) VALUES
-  ('added',
-   'Hi {{guest_first_name}}, {{host_first_name}} added you to their reservation at {{location_name}} on {{date}} at {{time}}. {{arrival_instructions}} Reply STOP to opt out.',
-   NULL),
   ('day_of',
    'Hi {{guest_first_name}}, see you tonight at {{time}} at {{location_name}} with {{host_first_name}}. {{arrival_instructions}} Reply STOP to opt out.',
    120),
@@ -126,6 +131,9 @@ INSERT INTO public.guest_message_templates (kind, body, send_offset_minutes) VAL
    NULL),
   ('cancelled',
    'Hi {{guest_first_name}}, {{host_first_name}}''s reservation at {{location_name}} on {{date}} at {{time}} has been cancelled. Reply STOP to opt out.',
+   NULL),
+  ('member_link',
+   'Hi {{member_first_name}}, add your guests for {{location_name}} on {{date}} at {{time}} here and we''ll text them how to get in: {{guest_link}}',
    NULL)
 ON CONFLICT (kind) DO NOTHING;
 
@@ -135,7 +143,7 @@ ON CONFLICT (kind) DO NOTHING;
 CREATE TABLE IF NOT EXISTS public.scheduled_guest_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   reservation_guest_id UUID NOT NULL REFERENCES public.reservation_guests(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK (kind IN ('added', 'day_of', 'time_changed', 'cancelled')),
+  kind TEXT NOT NULL CHECK (kind IN ('day_of', 'time_changed', 'cancelled')),
   scheduled_for TIMESTAMPTZ NOT NULL,
   status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'sending', 'sent', 'failed', 'cancelled', 'skipped')),
   skip_reason TEXT NULL,
@@ -157,6 +165,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS scheduled_guest_messages_one_pending_kind
 DROP TRIGGER IF EXISTS trg_scheduled_guest_messages_updated_at ON public.scheduled_guest_messages;
 CREATE TRIGGER trg_scheduled_guest_messages_updated_at BEFORE UPDATE ON public.scheduled_guest_messages
   FOR EACH ROW EXECUTE FUNCTION public.reservation_guests_touch_updated_at();
+
+-- ----------------------------------------
+-- Campaign trigger: Reservation Guest Added
+-- ----------------------------------------
+ALTER TABLE public.campaigns DROP CONSTRAINT IF EXISTS campaigns_trigger_type_check;
+ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_trigger_type_check
+  CHECK (trigger_type = ANY (ARRAY[
+    'member_signup'::text, 'member_birthday'::text, 'member_renewal'::text, 'reservation_time'::text,
+    'reservation_created'::text, 'reservation'::text, 'recurring'::text, 'reservation_range'::text,
+    'private_event'::text, 'all_members'::text, 'reservation_guest_added'::text
+  ]));
+
+ALTER TABLE public.scheduled_messages
+  ADD COLUMN IF NOT EXISTS reservation_guest_id UUID NULL REFERENCES public.reservation_guests(id) ON DELETE SET NULL;
+COMMENT ON COLUMN public.scheduled_messages.reservation_guest_id IS
+  'Reservation guest this send was for (reservation_guest_added campaigns). Dedupe key with campaign_message_id.';
+CREATE UNIQUE INDEX IF NOT EXISTS scheduled_messages_campaign_guest_once
+  ON public.scheduled_messages (campaign_message_id, reservation_guest_id)
+  WHERE reservation_guest_id IS NOT NULL AND status IN ('pending', 'sent');
 
 -- guest_messages is the send log for these texts; make per-reservation history cheap.
 CREATE INDEX IF NOT EXISTS idx_guest_messages_reservation_id ON public.guest_messages (reservation_id);

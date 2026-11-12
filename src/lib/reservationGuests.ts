@@ -7,28 +7,34 @@
  * non-member reservation phone) is a different thing and is never touched here.
  *
  * Texts:
- *   added         when a guest is added (skipped if the reservation starts
- *                 within 2 hours — day_of covers it)
+ *   intro + follow-ups  Campaigns, trigger "Reservation Guest Added"
+ *                 (src/lib/guestCampaigns.ts). The immediate intro is skipped
+ *                 when the reservation starts within 2 hours and day_of is on,
+ *                 because day_of goes out right away and covers it.
  *   day_of        start − send_offset_minutes (default 120), venue timezone;
  *                 if that time has passed but the start hasn't, sent now
- *                 instead of `added` — never both
  *   time_changed  to guests already texted, when the reservation moves
  *   cancelled     to guests already texted, when the reservation is cancelled
- * Nothing is ever scheduled for an opted-out contact or a guest who is already
- * a member. No thank-you / follow-up texts are automated.
+ *   member_link   to the host, from the staff "Text link to member" button
+ * Nothing is ever sent to an opted-out contact or a guest who is already a
+ * member.
  */
 import { DateTime } from 'luxon';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { last10, maskPhone, toE164, formatPhoneDisplay } from '@/lib/phone';
 
-export const GUEST_KINDS = ['added', 'day_of', 'time_changed', 'cancelled'] as const;
+/** Built-in texts queued to guests. */
+export const GUEST_KINDS = ['day_of', 'time_changed', 'cancelled'] as const;
 export type GuestMessageKind = (typeof GUEST_KINDS)[number];
+/** Every editable built-in template, including the host's guest-link text. */
+export const TEMPLATE_KINDS = ['day_of', 'time_changed', 'cancelled', 'member_link'] as const;
+export type TemplateKind = (typeof TEMPLATE_KINDS)[number];
 export type AddedVia = 'portal' | 'guest_link' | 'staff';
 
 export const DEFAULT_DAY_OF_OFFSET_MINUTES = 120;
-/** If the reservation starts within this window, `added` is skipped. */
-export const ADDED_SKIP_WINDOW_MINUTES = 120;
+/** If the reservation starts within this window (and day_of is on), the immediate campaign intro is skipped. */
+export const INTRO_SKIP_WINDOW_MINUTES = 120;
 export { DEFAULT_TIMEZONE, DEFAULT_ARRIVAL_INSTRUCTIONS } from '@/lib/guestMessageRender';
 import { DEFAULT_TIMEZONE, renderGuestMessage } from '@/lib/guestMessageRender';
 export const SENT_BY_SYSTEM = 'system:guests';
@@ -109,8 +115,8 @@ interface GuestRow {
   guest_contacts?: ContactRow | null;
 }
 
-interface TemplateRow {
-  kind: GuestMessageKind;
+export interface TemplateRow {
+  kind: TemplateKind;
   body: string;
   is_active: boolean;
   send_offset_minutes: number | null;
@@ -144,13 +150,8 @@ export interface PlannedMessage {
 }
 
 /**
- * When a new guest's texts go out. Computed in the venue timezone.
- *
- * - `added` now, unless the reservation starts within 2 hours.
- * - `day_of` at start − offset; if that moment has passed (and the start
- *   hasn't), now — and then no `added`.
- * - If the day_of template is switched off, `added` is sent regardless of the
- *   2-hour window so the guest still hears something.
+ * When a new guest's built-in texts go out: `day_of` at start − offset in the
+ * venue timezone, or now if that moment has passed (and the start hasn't).
  */
 export function planGuestMessages(args: {
   start: string;
@@ -163,22 +164,21 @@ export function planGuestMessages(args: {
   const now = args.now.setZone(tz);
   const start = DateTime.fromISO(args.start, { zone: 'utc' }).setZone(tz);
   const active = args.activeKinds ?? new Set<GuestMessageKind>(GUEST_KINDS);
-  if (!start.isValid || start <= now) return [];
+  if (!start.isValid || start <= now || !active.has('day_of')) return [];
+  const dayOfAt = start.minus({ minutes: args.dayOfOffsetMinutes ?? DEFAULT_DAY_OF_OFFSET_MINUTES });
+  return [{ kind: 'day_of', scheduledFor: dayOfAt <= now ? now : dayOfAt }];
+}
 
-  const offset = args.dayOfOffsetMinutes ?? DEFAULT_DAY_OF_OFFSET_MINUTES;
-  const dayOfAt = start.minus({ minutes: offset });
-  const dayOfActive = active.has('day_of');
-  const dayOfDue = dayOfAt <= now;
-  const withinSkipWindow = start.diff(now, 'minutes').minutes <= ADDED_SKIP_WINDOW_MINUTES;
-
-  const plan: PlannedMessage[] = [];
-  if (dayOfActive) {
-    if (!dayOfDue && !withinSkipWindow && active.has('added')) plan.push({ kind: 'added', scheduledFor: now });
-    plan.push({ kind: 'day_of', scheduledFor: dayOfDue ? now : dayOfAt });
-  } else if (active.has('added')) {
-    plan.push({ kind: 'added', scheduledFor: now });
-  }
-  return plan;
+/**
+ * True when the immediate campaign intro should be skipped: the reservation
+ * starts within 2 hours and the day-of text is on (it goes out right away).
+ */
+export function introCoveredByDayOf(args: { start: string; now: DateTime; dayOfActive: boolean }): boolean {
+  if (!args.dayOfActive) return false;
+  const start = DateTime.fromISO(args.start, { zone: 'utc' });
+  if (!start.isValid) return false;
+  const minutes = start.diff(args.now, 'minutes').minutes;
+  return minutes > 0 && minutes <= INTRO_SKIP_WINDOW_MINUTES;
 }
 
 export { renderGuestMessage, type RenderContext } from '@/lib/guestMessageRender';
@@ -247,14 +247,14 @@ async function loadActiveGuests(db: Db, reservationId: string): Promise<GuestRow
   return (data || []) as unknown as GuestRow[];
 }
 
-async function loadTemplates(db: Db): Promise<Map<GuestMessageKind, TemplateRow>> {
+export async function loadTemplates(db: Db): Promise<Map<TemplateKind, TemplateRow>> {
   const { data } = await db.from('guest_message_templates').select('kind, body, is_active, send_offset_minutes');
-  const map = new Map<GuestMessageKind, TemplateRow>();
+  const map = new Map<TemplateKind, TemplateRow>();
   ((data || []) as TemplateRow[]).forEach((t) => map.set(t.kind, t));
   return map;
 }
 
-function activeKindsFrom(templates: Map<GuestMessageKind, TemplateRow>): Set<GuestMessageKind> {
+export function activeKindsFrom(templates: Map<TemplateKind, TemplateRow>): Set<GuestMessageKind> {
   // A missing template row counts as active so the seeded defaults apply even
   // if someone deleted a row; the sender skips it with a reason.
   return new Set(GUEST_KINDS.filter((k) => templates.get(k)?.is_active !== false));
@@ -442,6 +442,7 @@ export async function addGuests(
         guest_contact_id: contact.id,
         location_id: reservation.location_id,
         added_by_member_id: opts.actorMemberId ?? null,
+        host_member_id: reservation.member_id,
         added_via: opts.via,
         first_name_snapshot: g.first_name,
         matched_member_id: matched,
@@ -454,8 +455,12 @@ export async function addGuests(
     created.push({ id: (row as { id: string }).id } as GuestRow);
   }
 
+  // Built-in day-of text, then the "Reservation Guest Added" campaign intro.
+  // (Imported lazily: guestCampaigns builds on this module.)
+  const { sendGuestAddedCampaignMessages } = await import('@/lib/guestCampaigns');
   for (const g of created) {
     await scheduleGuestMessages(g.id, deps);
+    await sendGuestAddedCampaignMessages(g.id, deps);
   }
 
   return listGuests(reservation.id, 'staff', deps);
@@ -629,7 +634,7 @@ export async function onReservationRescheduled(reservationId: string, deps: Gues
         for (const p of plan) await insertPending(db, g.id, p.kind, p.scheduledFor);
         continue;
       }
-      await cancelPendingForGuests(db, [g.id], ['day_of', 'time_changed', 'added'], 'rescheduled');
+      await cancelPendingForGuests(db, [g.id], ['day_of', 'time_changed'], 'rescheduled');
       if (active.has('time_changed')) await insertPending(db, g.id, 'time_changed', now);
       if (active.has('day_of') && dayOfAt > now) await insertPending(db, g.id, 'day_of', dayOfAt);
     }

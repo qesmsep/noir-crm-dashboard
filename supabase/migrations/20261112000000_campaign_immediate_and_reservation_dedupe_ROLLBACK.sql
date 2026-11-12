@@ -10,8 +10,8 @@ BEGIN
   IF EXISTS (SELECT 1 FROM public.campaign_messages WHERE timing_type = 'immediate') THEN
     RAISE EXCEPTION 'campaign_messages still use timing_type = immediate; change them before rolling back';
   END IF;
-  IF EXISTS (SELECT 1 FROM public.campaign_messages WHERE recipient_type IN ('member_only', 'guest_only')) THEN
-    RAISE EXCEPTION 'campaign_messages still use recipient_type member_only/guest_only; change them before rolling back';
+  IF EXISTS (SELECT 1 FROM public.campaign_messages WHERE recipient_type IN ('member_only', 'guest_only', 'reservation_guest')) THEN
+    RAISE EXCEPTION 'campaign_messages still use recipient_type member_only/guest_only/reservation_guest; change them before rolling back';
   END IF;
 END $$;
 

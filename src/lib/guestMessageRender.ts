@@ -31,3 +31,24 @@ export function renderGuestMessage(body: string, ctx: RenderContext): string {
     .trim();
 }
 
+
+export interface MemberLinkContext {
+  memberFirstName: string;
+  locationName: string;
+  start: string;
+  timezone?: string | null;
+  guestLink: string;
+}
+
+/** The "Member guest link" text to the host. */
+export function renderMemberLinkMessage(body: string, ctx: MemberLinkContext): string {
+  const start = DateTime.fromISO(ctx.start, { zone: 'utc' }).setZone(ctx.timezone || DEFAULT_TIMEZONE);
+  return body
+    .replace(/\{\{member_first_name\}\}/g, ctx.memberFirstName)
+    .replace(/\{\{location_name\}\}/g, ctx.locationName)
+    .replace(/\{\{date\}\}/g, start.isValid ? start.toFormat('cccc, LLLL d') : '')
+    .replace(/\{\{time\}\}/g, start.isValid ? start.toFormat('h:mm a') : '')
+    .replace(/\{\{guest_link\}\}/g, ctx.guestLink)
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
+}
