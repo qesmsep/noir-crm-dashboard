@@ -287,6 +287,25 @@ describe('POST resume', () => {
     }));
   });
 
+  it('charge now with a bank payment still clearing: account goes to processing, not active', async () => {
+    mockCharge.mockResolvedValue({ success: true, paymentIntent: { id: 'pi_ach', amount: 15600, status: 'processing' } });
+    const { req, res, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 156 } });
+    await handler(req, res);
+    expect(writes('accounts', 'update')[1].payload.subscription_status).toBe('processing');
+    expect(json.mock.calls[0][0].message).toMatch(/bank payment processing/);
+  });
+
+  it('charge now with $0 dues: resumes without charging anything', async () => {
+    tableResults['accounts.select'] = { data: { ...pausedAccount, monthly_dues: '0' }, error: null };
+    mockCharge.mockResolvedValue({ success: true }); // chargeAccount: nothing to charge
+    const { req, res, json } = call('POST', { body: { account_id: 'acct-1', charge_now: true, expected_total: 0 } });
+    await handler(req, res);
+    expect(mockLedger).not.toHaveBeenCalled();
+    expect(writes('accounts', 'update')[1].payload.subscription_status).toBe('active');
+    expect(json.mock.calls[0][0]).toMatchObject({ success: true, charged: false });
+    expect(json.mock.calls[0][0].message).toMatch(/No dues to charge/);
+  });
+
   it('next billing date: no charge, active now, first charge on their billing day', async () => {
     const { req, res, json } = call('POST', { body: { account_id: 'acct-1', charge_now: false } });
     await handler(req, res);

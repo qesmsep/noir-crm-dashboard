@@ -219,7 +219,7 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
       }
       if (priorCharge) {
         return res.status(409).json({
-          error: `Already charged for this resume (${priorCharge}) but the membership wasn't set active. Fix the account manually — not charging again.`,
+          error: `This member was already charged (${priorCharge}) since the membership was paused. Not charging again — check that payment, then resume with "next billing date" if it covers them.`,
           payment_intent_id: priorCharge,
         });
       }
@@ -262,8 +262,11 @@ async function resume(req: NextApiRequest, res: NextApiResponse) {
       nextBillingDate = nextCycleDate((await billingAnchor(account, today)).date, interval, today);
     }
 
+    // A bank (ACH) payment comes back 'processing' and settles days later. Same
+    // convention as retry-payment: the account sits in 'processing' and the
+    // charge.succeeded webhook (achPaymentRecovery) flips it to active.
     const accountUpdate: Record<string, any> = {
-      subscription_status: 'active',
+      subscription_status: paymentIntent?.status === 'processing' ? 'processing' : 'active',
       next_billing_date: nextBillingDate,
     };
     if (paymentIntent) {
