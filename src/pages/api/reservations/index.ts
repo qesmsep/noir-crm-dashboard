@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../../lib/supabase';
 import { DateTime } from 'luxon';
+import { sendReservationCreatedMessages } from '../../../lib/reservationCampaigns';
 import { isPastDay, venueToday, VENUE_DEFAULT_TIMEZONE } from '../../../utils/bookingDays';
 import { verifyAdmin } from '../../../lib/admin-auth';
 import {
@@ -1005,112 +1006,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 console.error('Error sending admin notification:', e);
               }
               
-              // Send confirmation SMS to customer
-              try {
-                console.log('Attempting to send confirmation SMS...');
-                console.log('Phone check:', finalData.phone);
-                console.log('OpenPhone API Key check:', !!process.env.OPENPHONE_API_KEY);
-                console.log('OpenPhone Phone ID check:', !!process.env.OPENPHONE_PHONE_NUMBER_ID);
-                
-                if (finalData.phone && process.env.OPENPHONE_API_KEY && process.env.OPENPHONE_PHONE_NUMBER_ID) {
-                  const { data: settings } = await client.from('settings').select('timezone').single();
-                  const timezone = settings?.timezone || 'America/Chicago';
-                  const reservationDate = DateTime.fromISO(finalData.start_time, { zone: 'utc' }).setZone(timezone);
-                  const formattedDate = reservationDate.toLocaleString({
-                    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-                  });
-                  const formattedTime = reservationDate.toFormat('h:mm a');
-                  
-                  // Get customer name - check reservation first, then try to fetch from member by phone
-                  let customerName = finalData.first_name || null;
-                  if (!customerName && finalData.phone) {
-                    console.log('Fetching member name by phone:', finalData.phone);
-                    
-                    // Normalize phone number for matching (remove all non-digits, then try different formats)
-                    const phoneDigits = finalData.phone.replace(/\D/g, '');
-                    const phoneVariants = [
-                      finalData.phone, // Original format
-                      phoneDigits.length === 10 ? '+1' + phoneDigits : '+' + phoneDigits, // With +1 prefix
-                      phoneDigits.length === 11 && phoneDigits.startsWith('1') ? '+' + phoneDigits : phoneDigits, // With + prefix
-                      phoneDigits.slice(-10), // Last 10 digits
-                      phoneDigits // Digits only
-                    ];
-                    
-                    // Try each variant until we find a match
-                    for (const phoneVariant of phoneVariants) {
-                      const { data: memberData, error: memberError } = await client
-                        .from('members')
-                        .select('first_name')
-                        .eq('phone', phoneVariant)
-                        .limit(1)
-                        .maybeSingle();
-                      
-                      if (!memberError && memberData?.first_name) {
-                        customerName = memberData.first_name;
-                        console.log(`Found member name (${phoneVariant}):`, customerName);
-                        break;
-                      }
-                    }
-                    
-                    if (!customerName) {
-                      console.log('No member found with any phone variant');
-                    }
-                  }
-                  // Fallback to Guest only if we truly can't find a name
-                  if (!customerName) {
-                    customerName = 'Guest';
-                    console.log('No name found, using Guest');
-                  }
-                  
-                  let formattedPhone = finalData.phone;
-                  if (!formattedPhone.startsWith('+')) {
-                    const digits = formattedPhone.replace(/\D/g, '');
-                    formattedPhone = digits.length === 10 ? '+1' + digits : '+' + digits;
-                  }
-
-                  // Fetch location name for confirmation message
-                  let locationName = 'Noir KC'; // default
-                  if (finalData.location_id) {
-                    const { data: locData } = await client
-                      .from('locations')
-                      .select('name')
-                      .eq('id', finalData.location_id)
-                      .single();
-                    if (locData) locationName = locData.name;
-                  }
-
-                  const confirmationMessage = `Hi ${customerName}! Your reservation for ${finalData.party_size} guests on ${formattedDate} at ${formattedTime} at ${locationName} is confirmed. See you then!`;
-                  
-                  console.log('Sending confirmation SMS to:', formattedPhone);
-                  console.log('Message:', confirmationMessage);
-                  
-                  const smsResponse = await fetch('https://api.openphone.com/v1/messages', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': process.env.OPENPHONE_API_KEY,
-                      'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                      to: [formattedPhone],
-                      from: process.env.OPENPHONE_PHONE_NUMBER_ID,
-                      content: confirmationMessage
-                    })
-                  });
-                  
-                  if (!smsResponse.ok) {
-                    const errorText = await smsResponse.text();
-                    console.error('Failed to send confirmation SMS:', smsResponse.status, errorText);
-                  } else {
-                    const smsResult = await smsResponse.json();
-                    console.log('Confirmation SMS sent successfully to customer:', smsResult.id);
-                  }
-                } else {
-                  console.log('Skipping confirmation SMS - missing phone or OpenPhone credentials');
-                }
-              } catch (e) {
-                console.error('Error sending confirmation SMS:', e);
-              }
+              // Confirmation text: sent by the "Reservation confirmation" campaign
+              // (reservation_created, Send immediately). Never fails the booking.
+              await sendReservationCreatedMessages(finalData.id);
             }
             
             await releaseRedeemedHold(client, holdId);
@@ -1181,128 +1079,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             // Don't fail the reservation if notification fails
           }
           
-          // Send confirmation SMS to customer (non-blocking)
-          try {
-            console.log('Attempting to send confirmation SMS (main path)...');
-            console.log('Phone check:', data.phone);
-            console.log('OpenPhone API Key check:', !!process.env.OPENPHONE_API_KEY);
-            console.log('OpenPhone Phone ID check:', !!process.env.OPENPHONE_PHONE_NUMBER_ID);
-            
-            if (data.phone && process.env.OPENPHONE_API_KEY && process.env.OPENPHONE_PHONE_NUMBER_ID) {
-              // Get timezone from settings
-              const { data: settings } = await client
-                .from('settings')
-                .select('timezone')
-                .single();
-              
-              const timezone = settings?.timezone || 'America/Chicago';
-              
-              // Format date and time
-              const reservationDate = DateTime.fromISO(data.start_time, { zone: 'utc' }).setZone(timezone);
-              const formattedDate = reservationDate.toLocaleString({
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              });
-              const formattedTime = reservationDate.toFormat('h:mm a');
-              
-              // Get customer name - try to get from reservation or fetch member by phone
-              let customerName = data.first_name || null;
-              if (!customerName && data.phone) {
-                console.log('Fetching member name by phone:', data.phone);
-                
-                // Normalize phone number for matching (remove all non-digits, then try different formats)
-                const phoneDigits = data.phone.replace(/\D/g, '');
-                const phoneVariants = [
-                  data.phone, // Original format
-                  phoneDigits.length === 10 ? '+1' + phoneDigits : '+' + phoneDigits, // With +1 prefix
-                  phoneDigits.length === 11 && phoneDigits.startsWith('1') ? '+' + phoneDigits : phoneDigits, // With + prefix
-                  phoneDigits.slice(-10), // Last 10 digits
-                  phoneDigits // Digits only
-                ];
-                
-                // Try each variant until we find a match
-                for (const phoneVariant of phoneVariants) {
-                  const { data: memberData, error: memberError } = await client
-                    .from('members')
-                    .select('first_name')
-                    .eq('phone', phoneVariant)
-                    .limit(1)
-                    .maybeSingle();
-                  
-                  if (!memberError && memberData?.first_name) {
-                    customerName = memberData.first_name;
-                    console.log(`Found member name (${phoneVariant}):`, customerName);
-                    break;
-                  }
-                }
-                
-                if (!customerName) {
-                  console.log('No member found with any phone variant');
-                }
-              }
-              // Fallback to Guest only if we truly can't find a name
-              if (!customerName) {
-                customerName = 'Guest';
-                console.log('No name found, using Guest');
-              }
-              
-              // Format phone number
-              let formattedPhone = data.phone;
-              if (!formattedPhone.startsWith('+')) {
-                const digits = formattedPhone.replace(/\D/g, '');
-                if (digits.length === 10) {
-                  formattedPhone = '+1' + digits;
-                } else if (digits.length === 11 && digits.startsWith('1')) {
-                  formattedPhone = '+' + digits;
-                }
-              }
-
-              // Fetch location name for confirmation message
-              let locationName = 'Noir KC'; // default
-              if (data.location_id) {
-                const { data: locData } = await client
-                  .from('locations')
-                  .select('name')
-                  .eq('id', data.location_id)
-                  .single();
-                if (locData) locationName = locData.name;
-              }
-
-              const confirmationMessage = `Hi ${customerName}! Your reservation for ${data.party_size} guests on ${formattedDate} at ${formattedTime} at ${locationName} is confirmed. See you then!`;
-              
-              console.log('Sending confirmation SMS to:', formattedPhone);
-              console.log('Message:', confirmationMessage);
-              
-              const smsResponse = await fetch('https://api.openphone.com/v1/messages', {
-                method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': process.env.OPENPHONE_API_KEY,
-                  'Accept': 'application/json'
-                },
-                body: JSON.stringify({
-                  to: [formattedPhone],
-                  from: process.env.OPENPHONE_PHONE_NUMBER_ID,
-                  content: confirmationMessage
-                })
-              });
-              
-              if (!smsResponse.ok) {
-                const errorText = await smsResponse.text();
-                console.error('Failed to send confirmation SMS:', smsResponse.status, errorText);
-              } else {
-                const smsResult = await smsResponse.json();
-                console.log('Confirmation SMS sent successfully to customer:', smsResult.id);
-              }
-            } else {
-              console.log('Skipping confirmation SMS - missing phone or OpenPhone credentials');
-            }
-          } catch (smsError) {
-            console.error('Error sending confirmation SMS:', smsError);
-            // Don't fail the reservation if SMS fails
-          }
+          // Confirmation text: sent by the "Reservation confirmation" campaign
+          // (reservation_created, Send immediately). No fallback text in code —
+          // with no matching active message it logs a warning and sends nothing.
+          await sendReservationCreatedMessages(data.id);
         }
       } else {
         console.error('WARNING: Reservation insert returned no ID. Data:', JSON.stringify(data, null, 2));

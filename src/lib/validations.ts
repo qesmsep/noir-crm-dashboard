@@ -241,6 +241,7 @@ export const campaignMessageSchema = z.object({
     'private_event_rsvps',
     'all_primary_members',
   ]),
+  timing_type: z.enum(['specific_time', 'recurring', 'relative', 'immediate']).optional(),
   send_time_offset: z.number().int().optional(),
   send_time_offset_unit: z.enum(['minutes', 'hours', 'days']).optional(),
   active: z.boolean().default(true),

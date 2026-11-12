@@ -37,9 +37,9 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'recurring' | 'relative';
+  timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   // Specific time fields
   specific_time?: string; // HH:MM format
   specific_date?: string; // YYYY-MM-DD format
@@ -116,9 +116,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     name: '',
     description: '',
     content: '',
-    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members',
+    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only',
     specific_phone: '',
-    timing_type: 'specific_time' as 'specific_time' | 'recurring' | 'relative',
+    timing_type: 'specific_time' as 'specific_time' | 'recurring' | 'relative' | 'immediate',
     specific_time: '10:00',
     specific_date: '',
     recurring_type: undefined as 'daily' | 'weekly' | 'monthly' | 'yearly' | undefined,
@@ -531,6 +531,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     if (campaignTriggerType === 'reservation' || campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
       previewContent = previewContent
         .replace(/\{\{reservation_time\}\}/g, '7:30 PM')
+        .replace(/\{\{reservation_date\}\}/g, 'March 15, 2026')
+        .replace(/\{\{location_name\}\}/g, 'Noir KC')
         .replace(/\{\{party_size\}\}/g, '4');
     }
 
@@ -555,7 +557,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   };
 
   const formatTimingDisplay = () => {
-    if (formData.timing_type === 'specific_time') {
+    if (formData.timing_type === 'immediate') {
+      return 'Send immediately';
+    } else if (formData.timing_type === 'specific_time') {
       return `Send at ${formData.specific_time} on ${formData.specific_date || 'trigger date'}`;
     } else if (formData.timing_type === 'recurring') {
       let display = `Send ${formData.recurring_type} at ${formData.recurring_time || '10:00'}`;
@@ -637,7 +641,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       case 'reservation_time':
       case 'reservation_created':
         return [
-          { value: 'member', label: `Phone number on reservation${locationHint}` },
+          { value: 'member', label: `Phone number on the reservation${locationHint}` },
+          { value: 'member_only', label: `Members' reservations${locationHint}` },
+          { value: 'guest_only', label: `Non-member reservations${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
 
@@ -680,6 +686,12 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   const getTimingOptions = () => {
     if (!campaignTriggerType) return ['specific_time', 'recurring', 'relative'];
 
+    // "Send immediately" = at the moment of the trigger. It only means
+    // something for event triggers sent at booking time.
+    if (campaignTriggerType === 'reservation_created') {
+      return ['immediate', 'specific_time', 'recurring', 'relative'];
+    }
+
     switch (campaignTriggerType) {
       case 'recurring':
         return ['specific_time', 'recurring', 'relative'];
@@ -713,6 +725,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       { name: '{{email}}', description: 'Member email address' },
       { name: '{{reservation_time}}', description: 'Reservation date and time' },
       { name: '{{reservation_date}}', description: 'Reservation date only' },
+      { name: '{{party_size}}', description: 'Reservation party size' },
+      { name: '{{location_name}}', description: 'Reservation location name' },
       { name: '{{event_name}}', description: 'Private event name' },
       { name: '{{event_date}}', description: 'Private event date' },
       { name: '{{event_time}}', description: 'Private event time' },
@@ -729,6 +743,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   };
 
   const timingTypeOptions = [
+    { value: 'immediate', label: 'Send immediately' },
     { value: 'specific_time', label: 'Send at specific time' },
     { value: 'recurring', label: 'Send on recurring schedule' },
     ...(shouldShowRelativeOption()

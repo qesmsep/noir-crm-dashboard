@@ -169,6 +169,9 @@ export type CampaignTriggerType =
   | 'private_event'
   | 'all_members';
 
+/** When a campaign message is sent. 'immediate' = at the trigger (reservation_created: at booking). */
+export type CampaignTimingType = 'specific_time' | 'recurring' | 'relative' | 'immediate';
+
 export type CampaignRecipientType =
   | 'member_only'
   | 'guest_only'
