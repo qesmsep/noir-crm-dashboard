@@ -31,6 +31,7 @@ import {
   processDueGuestMessages,
   removeGuest,
   renderGuestMessage,
+  stopGuestTexts,
   updateGuest,
 } from '../reservationGuests';
 
@@ -153,6 +154,49 @@ describe('addGuests rules', () => {
     await expectError(p, 'over_party_size');
     await p.catch((e: GuestServiceError) => expect(e.message).toMatch(/Raise the party size/));
     expect(db.rows('reservations')[0].party_size).toBe(3); // never changed automatically
+  });
+
+  it('growParty raises the party size to fit new guests', async () => {
+    await addGuests(
+      'r-1',
+      [
+        { first_name: 'A', phone: '9135550101' },
+        { first_name: 'B', phone: '9135550102' },
+        { first_name: 'C', phone: '9135550103' },
+      ],
+      { via: 'guest_link', growParty: true },
+      deps(),
+    );
+    expect(db.rows('reservations')[0].party_size).toBe(4);
+    expect(db.rows('reservation_guests').filter((g) => g.status === 'active')).toHaveLength(3);
+  });
+
+  it('growParty refuses when the location is at capacity and adds no one', async () => {
+    const realFrom = db.from.bind(db);
+    jest.spyOn(db, 'from').mockImplementation(((table: string) => {
+      const q = realFrom(table);
+      if (table !== 'reservations') return q;
+      return new Proxy(q, {
+        get(target, prop) {
+          if (prop === 'update') return () => ({ eq: async () => ({ data: null, error: { message: 'CAPACITY_EXCEEDED: over cap' } }) });
+          const v = (target as any)[prop];
+          return typeof v === 'function' ? v.bind(target) : v;
+        },
+      });
+    }) as any);
+    const p = addGuests(
+      'r-1',
+      [
+        { first_name: 'A', phone: '9135550101' },
+        { first_name: 'B', phone: '9135550102' },
+        { first_name: 'C', phone: '9135550103' },
+      ],
+      { via: 'guest_link', growParty: true },
+      deps(),
+    );
+    await expectError(p, 'capacity_exceeded');
+    expect(db.rows('reservations')[0].party_size).toBe(3);
+    expect(db.rows('reservation_guests')).toHaveLength(0);
   });
 
   it('a removed guest frees a slot', async () => {
@@ -416,6 +460,20 @@ describe('opt-out keywords', () => {
     expect(db.rows('scheduled_guest_messages').every((m) => m.status === 'cancelled')).toBe(true);
     expect(await handleGuestOptKeyword('9135550101', 'START', deps())).toBe('opted_in');
     expect(db.rows('guest_contacts')[0].sms_opted_out_at).toBeNull();
+  });
+
+  it('staff Stop texts opts the phone out and cancels pending, like STOP', async () => {
+    const [guest] = await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    await stopGuestTexts('r-1', guest.id, deps());
+    expect(db.rows('guest_contacts')[0].sms_opted_out_at).toBeTruthy();
+    expect(db.rows('scheduled_guest_messages').every((m) => m.status === 'cancelled')).toBe(true);
+    expect((await listGuests('r-1', 'staff', deps()))[0].opted_out).toBe(true);
+  });
+
+  it('staff Stop texts rejects a guest from another reservation', async () => {
+    const [guest] = await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    await expect(stopGuestTexts('r-other', guest.id, deps())).rejects.toMatchObject({ code: 'guest_not_found' });
+    expect(db.rows('guest_contacts')[0].sms_opted_out_at).toBeFalsy();
   });
 
   it('unknown numbers and non-keywords are left alone', async () => {

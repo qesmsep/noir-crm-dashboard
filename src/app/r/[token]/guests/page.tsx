@@ -2,11 +2,11 @@
 
 /**
  * No-login "add your guests" page, for members who reply to a text. Shows the
- * location, date, time and host's first name only — never other guests' phones
- * or any member data.
+ * location, date, time, host's first name and who's already on the list (first
+ * name and last initial) — never guests' phones or any member data.
  */
 import React, { use, useEffect, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, UserRound } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import AddGuestsForm, { toSubmitResult } from '@/components/guests/AddGuestsForm';
 
@@ -16,6 +16,9 @@ interface Summary {
   time: string;
   host_first_name: string;
   spots_left: number;
+  guests?: string[];
+  party_size?: number;
+  max_more?: number;
 }
 
 export default function GuestLinkPage({ params }: { params: Promise<{ token: string }> }) {
@@ -86,11 +89,29 @@ export default function GuestLinkPage({ params }: { params: Promise<{ token: str
                 <h2 className="text-lg font-semibold text-text-primary">Who&apos;s coming?</h2>
                 <p className="text-sm text-text-muted">We&apos;ll text them how to get in and greet them by name.</p>
               </div>
+              {summary.guests && summary.guests.length > 0 && (
+                <div className="rounded-2xl border border-border-cream-1 bg-white p-4">
+                  <p className="text-sm font-medium text-text-primary">On the list</p>
+                  <ul className="mt-2 flex flex-col gap-2">
+                    {summary.guests.map((name, i) => (
+                      <li key={`${name}-${i}`} className="flex items-center gap-2 text-base text-text-primary">
+                        <UserRound className="h-4 w-4 shrink-0 text-text-muted" aria-hidden />
+                        {name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {summary.spots_left === 0 && (summary.max_more ?? 0) > 0 && (
+                <p className="text-sm text-text-muted">
+                  Your reservation is for {summary.party_size}. Adding someone raises it, as long as we have room.
+                </p>
+              )}
               <AddGuestsForm
                 key={formKey}
                 idPrefix="link-guest"
                 allowContacts
-                maxGuests={summary.spots_left}
+                maxGuests={summary.max_more ?? summary.spots_left}
                 submitLabel="Send"
                 onSubmit={async (guests) => {
                   const response = await fetch(`/api/guest-link/${encodeURIComponent(token)}`, {

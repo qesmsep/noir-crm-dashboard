@@ -1,12 +1,13 @@
 /**
  * The no-login "add your guests" link (/r/[token]/guests).
  *
- * Shows only location, date, time and the host's first name. Never exposes
- * existing guests' phones or any member data.
+ * Shows location, date, time, the host's first name and the guests already on
+ * the reservation (first name and last initial only). Never exposes guests'
+ * phones or any member data.
  */
 import { DateTime } from 'luxon';
 import { supabaseAdmin } from '@/lib/supabase';
-import { isReservationClosed, DEFAULT_TIMEZONE } from '@/lib/reservationGuests';
+import { isReservationClosed, DEFAULT_TIMEZONE, MAX_PARTY_SIZE } from '@/lib/reservationGuests';
 import { isValidTokenShape, newGuestLinkToken, tokenExpired } from '@/lib/guestApi';
 
 type Db = typeof supabaseAdmin;
@@ -18,6 +19,19 @@ export interface GuestLinkSummary {
   host_first_name: string;
   /** How many more guests fit (party size − 1 − current guests). */
   spots_left: number;
+  /** Current party size, host included. */
+  party_size: number;
+  /** Most guests this page can still add, raising the party size if needed (capacity is checked on save). */
+  max_more: number;
+  /** Guests already on the reservation: first name and last initial only, in the order added. */
+  guests: string[];
+}
+
+/** "Tim W." from first name + optional last name. Never more than the last initial. */
+export function guestDisplayName(first: string | null | undefined, last: string | null | undefined): string {
+  const f = (first || '').trim();
+  const initial = (last || '').trim().charAt(0).toUpperCase();
+  return initial ? `${f} ${initial}.` : f;
 }
 
 export type GuestLinkLookup =
@@ -45,12 +59,22 @@ export async function lookupGuestLink(token: unknown, deps: { db?: Db; now?: Dat
     !r.first_name && r.member_id
       ? db.from('members').select('first_name').eq('member_id', r.member_id).maybeSingle()
       : Promise.resolve({ data: null }),
-    db.from('reservation_guests').select('id').eq('reservation_id', r.id).eq('status', 'active'),
+    db
+      .from('reservation_guests')
+      .select('id, first_name_snapshot, created_at, guest_contacts(first_name, last_name)')
+      .eq('reservation_id', r.id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: true }),
   ]);
 
   const tz = (loc as { timezone?: string } | null)?.timezone || DEFAULT_TIMEZONE;
   const start = DateTime.fromISO(r.start_time, { zone: 'utc' }).setZone(tz);
   const host = (r.first_name || (member as { first_name?: string } | null)?.first_name || '').trim();
+  type GuestNameRow = { first_name_snapshot: string | null; guest_contacts?: { first_name?: string | null; last_name?: string | null } | null };
+  const guestRows = ((guests as GuestNameRow[] | null) || []);
+  const guestNames = guestRows
+    .map((g) => guestDisplayName(g.first_name_snapshot || g.guest_contacts?.first_name, g.guest_contacts?.last_name))
+    .filter(Boolean);
   return {
     ok: true,
     reservationId: r.id,
@@ -60,7 +84,10 @@ export async function lookupGuestLink(token: unknown, deps: { db?: Db; now?: Dat
       date: start.toFormat('cccc, LLLL d'),
       time: start.toFormat('h:mm a'),
       host_first_name: host.split(' ')[0] || 'Your host',
-      spots_left: Math.max(0, (r.party_size || 1) - 1 - ((guests as unknown[]) || []).length),
+      spots_left: Math.max(0, (r.party_size || 1) - 1 - guestRows.length),
+      guests: guestNames,
+      party_size: r.party_size || 1,
+      max_more: Math.max(0, MAX_PARTY_SIZE - 1 - guestRows.length),
     },
   };
 }

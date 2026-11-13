@@ -7,6 +7,8 @@ import { sendGuestError } from '@/lib/guestApi';
 /**
  * GET  /api/guest-link/[token]  — location, date, time, host first name, spots left
  * POST /api/guest-link/[token]  — add guests { guests: [{first_name, last_name?, phone}] }
+ *        If they don't fit, the party size is raised to fit, as long as the
+ *        location has room at that time (capacity trigger) and it stays ≤ 20.
  *
  * Auth: the token itself (≥32 random bytes, unexpired, reservation active).
  * Rate-limited per IP and per link; total adds through one link are capped
@@ -43,14 +45,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const guests = Array.isArray(req.body?.guests) ? req.body.guests : [];
     const used = await guestLinkAddsUsed(link.reservationId);
-    if (used + guests.length > guestLinkAddCap(link.partySize)) {
+    // The cap follows the party size these guests would make, since adding can raise it.
+    const currentGuests = link.partySize - 1 - link.summary.spots_left;
+    const sizeAfter = Math.max(link.partySize, currentGuests + guests.length + 1);
+    if (used + guests.length > guestLinkAddCap(sizeAfter)) {
       return res.status(429).json({
         error: "This link can't add any more guests. Reply to our text with their names and numbers and we'll add them.",
         code: 'GUEST_LINK_CAP',
       });
     }
     // addGuests returns the staff view; none of it is sent back from here.
-    await addGuests(link.reservationId, guests, { via: 'guest_link' });
+    await addGuests(link.reservationId, guests, { via: 'guest_link', growParty: true });
     const after = await lookupGuestLink(req.query.token);
     return res.status(201).json({ added: guests.length, reservation: after.ok ? after.summary : link.summary });
   } catch (err) {

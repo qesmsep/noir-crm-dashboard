@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { listGuests, removeGuest, setGuestCheckedIn, updateGuest } from '@/lib/reservationGuests';
+import { listGuests, removeGuest, setGuestCheckedIn, stopGuestTexts, updateGuest } from '@/lib/reservationGuests';
 import { getAdmin, sendGuestError } from '@/lib/guestApi';
 
 /**
- * PATCH  /api/admin/reservations/[id]/guests/[guestId]  { first_name?, last_name?, checked_in? }
+ * PATCH  /api/admin/reservations/[id]/guests/[guestId]  { first_name?, last_name?, checked_in?, stop_texts? }
+ *        stop_texts: true stops every guest text to this guest's phone (like STOP).
  * DELETE /api/admin/reservations/[id]/guests/[guestId]
  * Auth: admin Bearer token.
  */
@@ -20,7 +21,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'DELETE') {
       await removeGuest(reservationId, guestId);
     } else {
-      const { first_name, last_name, checked_in } = req.body || {};
+      const { first_name, last_name, checked_in, stop_texts } = req.body || {};
+      if (stop_texts === true) await stopGuestTexts(reservationId, guestId);
       if (typeof checked_in === 'boolean') await setGuestCheckedIn(reservationId, guestId, checked_in);
       if (first_name !== undefined || last_name !== undefined) {
         await updateGuest(reservationId, guestId, { first_name, last_name }, { via: 'staff' });

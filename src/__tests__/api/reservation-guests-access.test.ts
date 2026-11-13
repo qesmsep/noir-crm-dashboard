@@ -25,7 +25,7 @@ jest.mock('@/lib/admin-auth', () => ({ resolveAdmin: jest.fn().mockResolvedValue
 
 import guestsHandler from '../../pages/api/member/reservations/[id]/guests/index';
 import guestLinkHandler from '../../pages/api/guest-link/[token]';
-import { lookupGuestLink } from '../../lib/guestLink';
+import { guestDisplayName, lookupGuestLink } from '../../lib/guestLink';
 import { memberOwnsReservation, tokenExpired, newGuestLinkToken } from '../../lib/guestApi';
 
 const R_MINE = '11111111-1111-4111-8111-111111111111';
@@ -141,12 +141,20 @@ describe('guest link tokens', () => {
     expect(tokenExpired(DateTime.utc().plus({ minutes: 1 }).toISO())).toBe(false);
   });
 
-  it('valid token shows only location, date, time, host first name', async () => {
+  it('valid token shows only location, date, time, host first name and guest names', async () => {
     const link = await lookupGuestLink(TOKEN);
     expect(link.ok).toBe(true);
     if (!link.ok) return;
-    expect(Object.keys(link.summary).sort()).toEqual(['date', 'host_first_name', 'location_name', 'spots_left', 'time']);
+    expect(Object.keys(link.summary).sort()).toEqual(['date', 'guests', 'host_first_name', 'location_name', 'max_more', 'party_size', 'spots_left', 'time']);
     expect(link.summary).toMatchObject({ location_name: 'Noir KC', host_first_name: 'Tim', spots_left: 2 });
+  });
+
+  it('guest names are first name and last initial only', async () => {
+    const link = await lookupGuestLink(TOKEN);
+    if (!link.ok) throw new Error('link not ok');
+    expect(link.summary.guests).toEqual(['Ava S.']);
+    expect(guestDisplayName('Bo', null)).toBe('Bo');
+    expect(guestDisplayName('Cy', ' lee')).toBe('Cy L.');
   });
 
   it('refuses malformed, unknown, expired and cancelled', async () => {

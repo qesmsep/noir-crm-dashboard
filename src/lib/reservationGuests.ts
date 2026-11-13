@@ -37,10 +37,14 @@ export const DEFAULT_DAY_OF_OFFSET_MINUTES = 120;
 export const INTRO_SKIP_WINDOW_MINUTES = 120;
 export { DEFAULT_TIMEZONE, DEFAULT_ARRIVAL_INSTRUCTIONS } from '@/lib/guestMessageRender';
 import { DEFAULT_TIMEZONE, renderGuestMessage } from '@/lib/guestMessageRender';
+import { isCapacityError } from '@/lib/capacity';
 export const SENT_BY_SYSTEM = 'system:guests';
 const MAX_NAME_LENGTH = 60;
 
 type Db = typeof supabaseAdmin;
+
+/** Same ceiling as reservation booking (validations.ts). */
+export const MAX_PARTY_SIZE = 20;
 type SendFn = typeof sendSMS;
 
 export interface GuestDeps {
@@ -382,7 +386,7 @@ export async function listGuests(reservationId: string, audience: 'member' | 'st
 export async function addGuests(
   reservationId: string,
   guests: GuestInput[],
-  opts: { via: AddedVia; actorMemberId?: string | null },
+  opts: { via: AddedVia; actorMemberId?: string | null; growParty?: boolean },
   deps: GuestDeps = {},
 ): Promise<GuestViewForStaff[]> {
   const { db, now } = resolve(deps);
@@ -430,7 +434,28 @@ export async function addGuests(
   }
 
   const cap = Math.max(0, (reservation.party_size || 1) - 1);
-  if (existing.length + clean.length > cap) {
+  let grewFrom: number | null = null;
+  if (existing.length + clean.length > cap && opts.growParty) {
+    // Raise the party size to fit. The location capacity trigger decides
+    // whether there's room at that time.
+    const newSize = existing.length + clean.length + 1;
+    if (newSize > MAX_PARTY_SIZE) {
+      throw new GuestServiceError('over_max_party', `A reservation can be for up to ${MAX_PARTY_SIZE} people. Contact us for a larger group.`, 400);
+    }
+    const { error: growError } = await db.from('reservations').update({ party_size: newSize }).eq('id', reservation.id);
+    if (growError) {
+      if (isCapacityError(growError)) {
+        throw new GuestServiceError(
+          'capacity_exceeded',
+          "We don't have room to add more people at that time. Reply to our text and we'll see what we can do.",
+          409,
+        );
+      }
+      throw new GuestServiceError('save_failed', 'Could not update the party size.', 500);
+    }
+    grewFrom = reservation.party_size || 1;
+    reservation.party_size = newSize;
+  } else if (existing.length + clean.length > cap) {
     const room = Math.max(0, cap - existing.length);
     throw new GuestServiceError(
       'over_party_size',
@@ -461,7 +486,12 @@ export async function addGuests(
       .select('id')
       .single();
     if (error?.code === '23505') continue; // added concurrently — already on the reservation
-    if (error || !row) throw new GuestServiceError('save_failed', 'Could not save guest.', 500);
+    if (error || !row) {
+      if (grewFrom !== null && created.length === 0) {
+        await db.from('reservations').update({ party_size: grewFrom }).eq('id', reservation.id);
+      }
+      throw new GuestServiceError('save_failed', 'Could not save guest.', 500);
+    }
     created.push({ id: (row as { id: string }).id } as GuestRow);
   }
 
@@ -712,6 +742,37 @@ export function classifyOptKeyword(text: string | null | undefined): 'opt_out' |
 }
 
 /**
+ * Opt a guest contact out of every guest text: mark the phone opted out and
+ * cancel anything already queued for any reservation that phone is on.
+ * Campaign texts re-check the opt-out at send time, so they stop too.
+ */
+async function optOutContact(db: Db, contactId: string, now: DateTime): Promise<void> {
+  const { error } = await db.from('guest_contacts').update({ sms_opted_out_at: now.toISO() }).eq('id', contactId);
+  if (error) throw new GuestServiceError('save_failed', 'Could not stop texts.', 500);
+  const { data: guestRows } = await db.from('reservation_guests').select('id').eq('guest_contact_id', contactId);
+  await cancelPendingForGuests(db, ((guestRows || []) as Array<{ id: string }>).map((r) => r.id), undefined, 'opted_out');
+}
+
+/**
+ * Staff "Stop texts" switch: stops every queued and future guest text to this
+ * guest's phone, the same as the guest texting STOP. One way only: staff can't
+ * turn texts back on, because a guest's own STOP must not be overridden. The
+ * guest can resume by texting START.
+ */
+export async function stopGuestTexts(reservationId: string, guestId: string, deps: GuestDeps = {}): Promise<void> {
+  const { db, now } = resolve(deps);
+  const { data, error } = await db
+    .from('reservation_guests')
+    .select('id, guest_contact_id')
+    .eq('id', guestId)
+    .eq('reservation_id', reservationId)
+    .maybeSingle();
+  if (error) throw new GuestServiceError('save_failed', 'Could not stop texts.', 500);
+  if (!data) throw new GuestServiceError('guest_not_found', 'Guest not found.', 404);
+  await optOutContact(db, (data as { guest_contact_id: string }).guest_contact_id, now);
+}
+
+/**
  * Apply STOP / START from an inbound text to the guest contact with that phone,
  * if there is one. Returns what happened; never throws.
  */
@@ -733,9 +794,7 @@ export async function handleGuestOptKeyword(
       await db.from('guest_contacts').update({ sms_opted_out_at: null }).eq('id', contactId);
       return 'opted_in';
     }
-    await db.from('guest_contacts').update({ sms_opted_out_at: now.toISO() }).eq('id', contactId);
-    const { data: guestRows } = await db.from('reservation_guests').select('id').eq('guest_contact_id', contactId);
-    await cancelPendingForGuests(db, ((guestRows || []) as Array<{ id: string }>).map((r) => r.id), undefined, 'opted_out');
+    await optOutContact(db, contactId, now);
     return 'opted_out';
   } catch (err) {
     console.error('[reservation guests] opt keyword handling failed', err);
