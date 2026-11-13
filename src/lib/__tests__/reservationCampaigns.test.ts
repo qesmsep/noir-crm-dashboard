@@ -213,6 +213,52 @@ describe('sendReservationCreatedMessages', () => {
   });
 });
 
+describe('{{guest_link}} in the confirmation', () => {
+  const saved = process.env.NEXT_PUBLIC_SITE_URL;
+  beforeAll(() => {
+    process.env.NEXT_PUBLIC_SITE_URL = 'https://noir.example';
+  });
+  afterAll(() => {
+    if (saved === undefined) delete process.env.NEXT_PUBLIC_SITE_URL;
+    else process.env.NEXT_PUBLIC_SITE_URL = saved;
+  });
+
+  it("puts the reservation's own add-guests link in the text, reusing it after", async () => {
+    seed(
+      [reservation('r-gl', { member_id: 'm-1' })],
+      [
+        message('msg-gl', 'member_only', 'Confirmed! Add your guests: {{guest_link}}'),
+        message('msg-gl2', 'member_only', 'Again: {{guest_link}}'),
+      ],
+    );
+    await sendReservationCreatedMessages('r-gl');
+    const token = db.rows('reservations')[0].guest_link_token;
+    expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
+    expect(mockSend.mock.calls[0][0].content).toBe(`Confirmed! Add your guests: https://noir.example/r/${token}/guests`);
+    expect(mockSend.mock.calls[1][0].content).toBe(`Again: https://noir.example/r/${token}/guests`);
+  });
+
+  it('never sends a {{guest_link}} message without the link; records a failure for retry', async () => {
+    const err = jest.spyOn(console, 'error').mockImplementation(() => {});
+    seed(
+      [reservation('r-nolink', { member_id: 'm-1' })],
+      [message('msg-gl', 'member_only', 'Add your guests: {{guest_link}}')],
+      { missingColumns: { reservations: ['guest_link_token'] } },
+    );
+    const result = await sendReservationCreatedMessages('r-nolink');
+    expect(result.failed).toBe(1);
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(db.rows('scheduled_messages')[0]).toMatchObject({ status: 'failed', error_message: 'guest link unavailable' });
+    err.mockRestore();
+  });
+
+  it('messages without the token never create a link', async () => {
+    seed([reservation('r-plain')], [NONMEMBER_MSG]);
+    await sendReservationCreatedMessages('r-plain');
+    expect(db.rows('reservations')[0].guest_link_token).toBeUndefined();
+  });
+});
+
 describe('the cron cannot resend what the booking sent', () => {
   it('claimReservationSend reports a duplicate after the inline send', async () => {
     seed([reservation('r-20')], [NONMEMBER_MSG]);

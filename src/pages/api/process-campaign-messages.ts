@@ -6,6 +6,8 @@ import {
   claimReservationSend,
   finishReservationSend,
   isCancelled,
+  guestLinkForReservation,
+  usesGuestLink,
   renderReservationMessage,
   reservationMatchesRecipientType,
   type LocationInfo,
@@ -384,7 +386,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
             let reservationQuery = supabaseAdmin
           .from('reservations')
-          .select('phone, start_time, end_time, party_size, first_name, last_name, email, location_id')
+          .select('id, phone, start_time, end_time, party_size, first_name, last_name, email, location_id')
           .gte('start_time', searchStart) // Include reservations from 1 hour ago
           .lte('start_time', searchEnd); // Up to 1 day in the future
 
@@ -443,6 +445,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
             party_size: reservation.party_size, // Store party_size for placeholders
             location_id: reservation.location_id, // Preserve location for filtering
             reservation_start_time: reservation.start_time,
+            reservation_id: reservation.id,
             created_at: reservation.start_time,
             updated_at: reservation.start_time
           };
@@ -872,6 +875,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // location timezone. For reservation_created the date/time is the
           // reservation start, not the moment it was booked.
           if (isReservationTrigger) {
+            // {{guest_link}}: the reservation's no-login add-guests link.
+            const guestLink =
+              member.reservation_id && usesGuestLink(message.content)
+                ? await guestLinkForReservation(member.reservation_id)
+                : '';
+            // Never send a {{guest_link}} message without the link.
+            if (usesGuestLink(message.content) && !guestLink) {
+              console.error(`❌ No guest link for reservation ${member.reservation_id}; skipping message ${message.id}`);
+              continue;
+            }
             messageContent = renderReservationMessage(
               message.content,
               {
@@ -888,6 +901,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 address: memberLocation?.address || null,
                 parking_instructions: memberLocation?.parking_instructions || null,
               },
+              { guestLink },
             );
           }
 
