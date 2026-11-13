@@ -172,7 +172,7 @@ export default async function handler(
 
     // Set httpOnly cookie for session (secure in production)
     const isProduction = process.env.NODE_ENV === 'production';
-    const cookieDomain = getSessionCookieDomain();
+    const cookieDomain = getSessionCookieDomain(req.headers.host);
     res.setHeader('Set-Cookie', [
       serialize('member_session', sessionToken, {
         httpOnly: true,

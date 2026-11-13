@@ -101,6 +101,47 @@ describe('getSessionCookieDomain', () => {
     process.env.COOKIE_DOMAIN = '.custom-domain.com';
     expect(getSessionCookieDomain()).toBe('.custom-domain.com');
   });
+
+  // Regression: login looped on www.noir.life because the cookie was always
+  // scoped to .noirkc.com, which the browser rejects on any other domain.
+  it('scopes the cookie to .noir.life on www.noir.life in production', () => {
+    process.env.NODE_ENV = 'production';
+    expect(getSessionCookieDomain('www.noir.life')).toBe('.noir.life');
+    expect(getSessionCookieDomain('noir.life')).toBe('.noir.life');
+  });
+
+  it('scopes the cookie to .noirkc.com on noirkc.com in production', () => {
+    process.env.NODE_ENV = 'production';
+    expect(getSessionCookieDomain('noirkc.com')).toBe('.noirkc.com');
+    expect(getSessionCookieDomain('www.noirkc.com:443')).toBe('.noirkc.com');
+  });
+
+  it('scopes the cookie to .therooftopkc.com on www.therooftopkc.com', () => {
+    process.env.NODE_ENV = 'production';
+    expect(getSessionCookieDomain('www.therooftopkc.com')).toBe('.therooftopkc.com');
+  });
+
+  it('uses a host-only cookie on an unknown host (e.g. a Vercel preview)', () => {
+    process.env.NODE_ENV = 'production';
+    expect(getSessionCookieDomain('noirkc-abc123-qesmseps-projects.vercel.app')).toBeUndefined();
+  });
+
+  it('ignores COOKIE_DOMAIN when the host is not under it', () => {
+    process.env.NODE_ENV = 'production';
+    process.env.COOKIE_DOMAIN = '.noirkc.com';
+    expect(getSessionCookieDomain('www.noir.life')).toBe('.noir.life');
+    expect(getSessionCookieDomain('www.noirkc.com')).toBe('.noirkc.com');
+  });
+
+  it('does not match a look-alike host', () => {
+    process.env.NODE_ENV = 'production';
+    expect(getSessionCookieDomain('evilnoir.life')).toBeUndefined();
+  });
+
+  it('accepts an array host header', () => {
+    process.env.NODE_ENV = 'production';
+    expect(getSessionCookieDomain(['www.noir.life'])).toBe('.noir.life');
+  });
 });
 
 // ── findMemberByPhone ──────────────────────────────────────────────────────
