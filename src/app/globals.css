@@ -899,12 +899,10 @@ button:hover {
   background-color: #f7fafc;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+/* No dark theme: phones in dark mode used to get white body text, which
+   inherited into inputs and buttons and turned them white-on-white. */
+:root {
+  --foreground-rgb: 31, 31, 31;
 }
 
 /* Always keep FullCalendar below the drawer */
