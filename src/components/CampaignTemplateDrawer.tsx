@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminRequestHeaders } from '@/lib/adminRequestHeaders';
 import { Info } from 'lucide-react';
 
 import { useToast } from '@/hooks/useToast';
@@ -217,7 +218,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/campaign-messages/${templateId}`);
+      const response = await fetch(`/api/campaign-messages/${templateId}`, { headers: await adminRequestHeaders() });
       if (!response.ok) {
         const errorData = await response.json();
         if (response.status === 500 && errorData.error?.includes('relation "campaign_messages" does not exist')) {
@@ -413,9 +414,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await adminRequestHeaders(),
         body: JSON.stringify(dataToSend),
       });
 
@@ -492,6 +491,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     try {
       const response = await fetch(`/api/campaign-messages/${templateId}`, {
         method: 'DELETE',
+        headers: await adminRequestHeaders(),
       });
 
       if (!response.ok) {

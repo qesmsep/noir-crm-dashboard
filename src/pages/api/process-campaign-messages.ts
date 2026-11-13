@@ -2,6 +2,7 @@ import { NextApiRequest, NextApiResponse } from 'next';
 import { supabase, supabaseAdmin } from '../../lib/supabase';
 import { DateTime } from 'luxon';
 import {
+  retryImmediateReservationSends,
   claimReservationSend,
   finishReservationSend,
   isCancelled,
@@ -10,7 +11,7 @@ import {
   type LocationInfo,
 } from '../../lib/reservationCampaigns';
 import { sendSMS } from '../../lib/sms';
-import { GUEST_REGISTRATION_TRIGGER, processGuestAddedCampaignMessage } from '../../lib/guestCampaigns';
+import { GUEST_REGISTRATION_TRIGGER, processGuestAddedCampaignMessage, retryImmediateGuestSends } from '../../lib/guestCampaigns';
 
 // Constants for message timing windows
 const MESSAGE_SEND_WINDOW_FUTURE_MINUTES = 5; // Send messages within 5 minutes of target time
@@ -225,6 +226,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log('⏰ Current time (default timezone):', now.setZone(defaultTimezone).toISO());
     console.log(`📊 Found ${messages.length} active campaign messages to process`);
     let processedCount = 0;
+
+    // Safety net for "Send immediately" texts: free stale claims and retry
+    // recent failures (max 3 attempts per text, within 2 hours).
+    const confirmationRetries = await retryImmediateReservationSends();
+    const guestIntroRetries = await retryImmediateGuestSends();
+    processedCount += confirmationRetries.retried + guestIntroRetries.retried;
+    console.log('🔁 Immediate-send retries:', { confirmationRetries, guestIntroRetries });
 
     // Per-reservation location name + timezone for reservation triggers, so
     // each reservation renders in its own venue's timezone.
@@ -1037,8 +1045,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               content: messageContent,
               scheduledTime,
             });
-            if (claim.kind === 'duplicate') {
-              console.log(`⏭️  Already sent for reservation ${member.reservation_id}`);
+            if (claim.kind === 'duplicate' || claim.kind === 'exhausted') {
+              console.log(`⏭️  ${claim.kind === 'duplicate' ? 'Already sent' : 'Out of attempts'} for reservation ${member.reservation_id}`);
               continue;
             }
             if (claim.kind === 'error') {

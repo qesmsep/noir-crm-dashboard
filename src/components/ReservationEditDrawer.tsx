@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { adminRequestHeaders } from '../lib/adminRequestHeaders';
 import {
   Drawer,
   DrawerBody,
@@ -449,9 +450,7 @@ const ReservationEditDrawer: React.FC<ReservationEditDrawerProps> = ({
         // For non-members (guests), use the new guest messaging API
         const res = await fetch('/api/sendGuestMessage', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json'
-          },
+          headers: await adminRequestHeaders(),
           body: JSON.stringify({
             phone: reservation.phone,
             content: messageText,

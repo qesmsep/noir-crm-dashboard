@@ -20,6 +20,7 @@ import { DateTime } from 'luxon';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { toE164 } from '@/lib/phone';
+import { MAX_SEND_ATTEMPTS, RETRY_WINDOW_MINUTES, STALE_CLAIM_MINUTES } from '@/lib/reservationCampaigns';
 import {
   activeKindsFrom,
   DEFAULT_ARRIVAL_INSTRUCTIONS,
@@ -211,7 +212,7 @@ async function loadContext(db: Db, guestId: string): Promise<Context | null> {
   return { guest: g, reservation, location: (loc as LocationRow) || null, host: host || 'your host' };
 }
 
-export type GuestCampaignOutcome = 'sent' | 'duplicate' | 'failed' | `skipped:${string}`;
+export type GuestCampaignOutcome = 'sent' | 'duplicate' | 'exhausted' | 'failed' | `skipped:${string}`;
 
 /** Re-check, render, claim, send and log one guest-added campaign message. */
 async function deliver(
@@ -256,6 +257,15 @@ async function deliver(
     timezone: location?.timezone || DEFAULT_TIMEZONE,
     arrivalInstructions: location?.guest_arrival_instructions,
   });
+
+  // Stop after MAX_SEND_ATTEMPTS failed tries for this (message, guest).
+  const { data: failedRows } = await db
+    .from('scheduled_messages')
+    .select('id')
+    .eq('campaign_message_id', message.id)
+    .eq('reservation_guest_id', guest.id)
+    .eq('status', 'failed');
+  if ((failedRows || []).length >= MAX_SEND_ATTEMPTS) return 'exhausted';
 
   const { data: claimed, error: claimError } = await db
     .from('scheduled_messages')
@@ -318,13 +328,14 @@ async function loadGuestAddedMessages(db: Db, immediateOnly: boolean): Promise<G
  */
 export async function sendGuestAddedCampaignMessages(
   guestId: string,
-  deps: GuestDeps = {},
+  deps: GuestDeps & { onlyMessageIds?: string[] } = {},
 ): Promise<{ outcomes: GuestCampaignOutcome[]; reason?: string }> {
   const { db, now } = resolve(deps);
   try {
     const ctx = await loadContext(db, guestId);
     if (!ctx) return { outcomes: [], reason: 'guest_not_found' };
     const messages = (await loadGuestAddedMessages(db, true)).filter((m) =>
+      (!deps.onlyMessageIds || deps.onlyMessageIds.includes(m.id)) &&
       messageAppliesToGuestLocation(m, ctx.reservation.location_id || ctx.guest.location_id),
     );
     if (messages.length === 0) return { outcomes: [], reason: 'no_matching_message' };
@@ -400,4 +411,53 @@ export async function processGuestAddedCampaignMessage(message: GuestCampaignMes
     if ((await deliver(db, deps, message, ctx, target)) === 'sent') sent++;
   }
   return sent;
+}
+
+/**
+ * Cron safety net for "Send immediately" Guest Registration texts, same rules
+ * as retryImmediateReservationSends: stale claims are marked failed, failed
+ * sends for guests added in the last RETRY_WINDOW_MINUTES are retried, at most
+ * MAX_SEND_ATTEMPTS attempts per (message, guest). Delayed follow-ups retry
+ * through the normal cron window under the same attempt cap.
+ */
+export async function retryImmediateGuestSends(deps: GuestDeps = {}): Promise<{ staleMarked: number; retried: number }> {
+  const { db, now } = resolve(deps);
+  const out = { staleMarked: 0, retried: 0 };
+  try {
+    const { data: stale } = await db
+      .from('scheduled_messages')
+      .update({ status: 'failed', error_message: 'Interrupted before the send finished' })
+      .eq('status', 'pending')
+      .not('reservation_guest_id', 'is', null)
+      .is('sent_time', null)
+      .lt('created_at', now.minus({ minutes: STALE_CLAIM_MINUTES }).toUTC().toISO()!)
+      .select('id');
+    out.staleMarked = ((stale as unknown[]) || []).length;
+
+    const { data: failed } = await db
+      .from('scheduled_messages')
+      .select('campaign_message_id, reservation_guest_id')
+      .eq('status', 'failed')
+      .not('reservation_guest_id', 'is', null)
+      .gte('created_at', now.minus({ minutes: RETRY_WINDOW_MINUTES }).toUTC().toISO()!);
+    const attempts = new Map<string, { messageId: string; guestId: string; count: number }>();
+    for (const row of (failed || []) as Array<{ campaign_message_id: string; reservation_guest_id: string }>) {
+      const key = `${row.campaign_message_id}|${row.reservation_guest_id}`;
+      const a = attempts.get(key) || { messageId: row.campaign_message_id, guestId: row.reservation_guest_id, count: 0 };
+      a.count++;
+      attempts.set(key, a);
+    }
+    const byGuest = new Map<string, string[]>();
+    for (const a of attempts.values()) {
+      if (a.count >= MAX_SEND_ATTEMPTS) continue;
+      byGuest.set(a.guestId, [...(byGuest.get(a.guestId) || []), a.messageId]);
+    }
+    for (const [guestId, messageIds] of byGuest) {
+      const r = await sendGuestAddedCampaignMessages(guestId, { ...deps, onlyMessageIds: messageIds });
+      out.retried += r.outcomes.filter((o) => o === 'sent').length;
+    }
+  } catch (err) {
+    console.error('[guest campaigns] retry pass failed', err);
+  }
+  return out;
 }

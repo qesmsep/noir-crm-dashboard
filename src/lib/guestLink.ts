@@ -21,7 +21,7 @@ export interface GuestLinkSummary {
 }
 
 export type GuestLinkLookup =
-  | { ok: true; reservationId: string; summary: GuestLinkSummary }
+  | { ok: true; reservationId: string; partySize: number; summary: GuestLinkSummary }
   | { ok: false; reason: 'invalid' | 'expired' | 'closed' };
 
 export async function lookupGuestLink(token: unknown, deps: { db?: Db; now?: DateTime } = {}): Promise<GuestLinkLookup> {
@@ -54,6 +54,7 @@ export async function lookupGuestLink(token: unknown, deps: { db?: Db; now?: Dat
   return {
     ok: true,
     reservationId: r.id,
+    partySize: r.party_size || 1,
     summary: {
       location_name: (loc as { name?: string } | null)?.name || 'Noir',
       date: start.toFormat('cccc, LLLL d'),
@@ -91,4 +92,24 @@ export async function ensureGuestLink(reservationId: string, deps: { db?: Db; no
   const { error: saveError } = await db.from('reservations').update({ guest_link_token: token, guest_link_expires_at: expiresAt }).eq('id', reservationId);
   if (saveError) return { ok: false, status: 500, error: 'Could not create the link.' };
   return { ok: true, token, expiresAt, created: true };
+}
+
+/**
+ * Abuse cap for the public link: total guests ever added through this
+ * reservation's link (removed ones included, so remove-and-re-add loops count)
+ * may not exceed party size − 1 plus a small allowance for corrections, and
+ * never more than GUEST_LINK_HARD_CAP. Every add can trigger texts, so this
+ * bounds how many numbers a leaked link can make us text.
+ */
+export const GUEST_LINK_CORRECTION_ALLOWANCE = 2;
+export const GUEST_LINK_HARD_CAP = 20;
+
+export function guestLinkAddCap(partySize: number): number {
+  return Math.min(GUEST_LINK_HARD_CAP, Math.max(0, (partySize || 1) - 1) + GUEST_LINK_CORRECTION_ALLOWANCE);
+}
+
+export async function guestLinkAddsUsed(reservationId: string, deps: { db?: Db } = {}): Promise<number> {
+  const db = deps.db ?? supabaseAdmin;
+  const { data } = await db.from('reservation_guests').select('id').eq('reservation_id', reservationId).eq('added_via', 'guest_link');
+  return ((data as unknown[]) || []).length;
 }

@@ -45,3 +45,19 @@ export async function verifyAdmin(req: NextApiRequest): Promise<boolean> {
 export function isInternalCall(req: NextApiRequest): boolean {
   return req.headers['x-internal-secret'] === process.env.CRON_SECRET;
 }
+
+/**
+ * Guard for pages-router API routes: lets through an active admin (Bearer
+ * token) or an internal caller (x-internal-secret = CRON_SECRET). Otherwise
+ * sends 401 and returns false, so a route can simply `if (!(await requireAdmin(req, res))) return;`.
+ */
+export async function requireAdmin(
+  req: NextApiRequest,
+  res: { status: (code: number) => { json: (body: unknown) => unknown } },
+  opts: { allowInternal?: boolean } = { allowInternal: true },
+): Promise<boolean> {
+  if (opts.allowInternal !== false && process.env.CRON_SECRET && isInternalCall(req)) return true;
+  if (await verifyAdmin(req)) return true;
+  res.status(401).json({ error: 'Admin access required' });
+  return false;
+}

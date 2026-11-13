@@ -1,7 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { requireAdmin } from '../../lib/admin-auth';
 import { supabaseAdmin } from '../../lib/supabase';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Admin (or internal) only: this route reads or writes sent texts / campaign messages.
+  if (!(await requireAdmin(req, res))) return;
+
   try {
     console.log('Testing campaign_messages table...');
     
