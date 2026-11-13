@@ -65,15 +65,24 @@ describe('NoirLifeCard', () => {
     expect(container.querySelectorAll('img')).toHaveLength(1);
   });
 
-  it('shows the first post cover as a full-width banner', () => {
+  it('shows the first post cover on the left half of the card', () => {
     const withCover = [{ ...posts[1], id: 'post-3', is_pinned: true }, posts[0], posts[1]];
-    render(<NoirLifeCard posts={withCover} loading={false} onOpenFeed={jest.fn()} onOpenPost={jest.fn()} />);
+    const { container } = render(
+      <NoirLifeCard posts={withCover} loading={false} onOpenFeed={jest.fn()} onOpenPost={jest.fn()} />
+    );
     const banner = screen.getByTestId('noir-life-banner');
-    expect(banner).toHaveClass('w-full', 'aspect-video', 'object-cover');
+    expect(banner).toHaveClass('w-1/2', 'object-cover');
     expect(screen.getByTestId('noir-life-featured')).toContainElement(banner);
     // Later posts keep the small square thumbnail
-    const thumbs = document.querySelectorAll('img.w-14');
+    const thumbs = container.querySelectorAll('img.w-14');
     expect(thumbs).toHaveLength(1);
+  });
+
+  it('hides the featured image if it fails to load', () => {
+    render(<NoirLifeCard posts={[posts[1]]} loading={false} onOpenFeed={jest.fn()} onOpenPost={jest.fn()} />);
+    const banner = screen.getByTestId('noir-life-banner');
+    fireEvent.error(banner);
+    expect(banner).not.toBeVisible();
   });
 
   it('shows no banner when the featured post has no cover image', () => {

@@ -9,7 +9,7 @@ import { NOIR_LIFE_CLUB_LABEL, NoirLifeClub, NoirLifePost, formatPostDate } from
 // The Noir.life card on the member dashboard. Same shell as the other dashboard
 // cards (Reservations, Balance, Membership) with a preview of the latest posts.
 // The card opens the feed; a post opens that post. The newest (or pinned) post
-// is featured with its cover image as a full-width banner.
+// is featured, with its cover image on the left half and its text on the right.
 
 export type NoirLifeCardPost = Pick<
   NoirLifePost,
@@ -36,8 +36,8 @@ function PostMeta({ post }: { post: NoirLifeCardPost }) {
 }
 
 export default function NoirLifeCard({ posts, loading, onOpenFeed, onOpenPost }: Props) {
-  // The first post is featured: its cover image runs full width as a banner.
-  // Any further posts stay as compact rows so the card doesn't grow too tall.
+  // The first post is featured: its cover image takes the left half of the card
+  // and its text the right half. Any further posts stay as compact rows.
   const [featured, ...rest] = posts;
 
   const open = (e: React.MouseEvent, postId: string) => {
@@ -70,7 +70,7 @@ export default function NoirLifeCard({ posts, loading, onOpenFeed, onOpenPost }:
             <button
               type="button"
               onClick={(e) => open(e, featured.id)}
-              className="w-full block text-left pb-3 hover:opacity-95"
+              className="w-full flex items-center gap-3 text-left pb-3 hover:opacity-95"
               style={{ touchAction: 'manipulation' }}
               data-testid="noir-life-featured"
             >
@@ -78,15 +78,20 @@ export default function NoirLifeCard({ posts, loading, onOpenFeed, onOpenPost }:
                 <img
                   src={featured.cover_image_url}
                   alt=""
-                  className="w-full aspect-video rounded-xl object-cover mb-3"
+                  className="w-1/2 aspect-[4/3] rounded-xl object-cover flex-shrink-0"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
                   data-testid="noir-life-banner"
                 />
               )}
-              <PostMeta post={featured} />
-              <p className="text-base font-medium text-[#1F1F1F] mt-0.5">{featured.title}</p>
-              {featured.summary && (
-                <p className="text-sm text-[#5A5A5A] line-clamp-2 mt-0.5">{featured.summary}</p>
-              )}
+              <div className="flex-1 min-w-0">
+                <PostMeta post={featured} />
+                <p className="text-sm font-medium text-[#1F1F1F] mt-0.5 line-clamp-2">{featured.title}</p>
+                {featured.summary && (
+                  <p className="text-xs text-[#5A5A5A] line-clamp-3 mt-0.5">{featured.summary}</p>
+                )}
+              </div>
             </button>
             {rest.map((post) => (
               <button
