@@ -12,7 +12,7 @@ import { getAdmin } from '@/lib/guestApi';
  *   parking_instructions        → {{parking_instructions}}
  */
 const FIELDS = 'id, address, guest_arrival_instructions, parking_instructions';
-const LIMITS: Record<string, number> = { address: 200, guest_arrival_instructions: 200, parking_instructions: 200 };
+const LIMITS: Record<string, number> = { address: 200, guest_arrival_instructions: 1000, parking_instructions: 1000 };
 const LABELS: Record<string, string> = { address: 'Address', guest_arrival_instructions: 'How guests get in', parking_instructions: 'Parking' };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
