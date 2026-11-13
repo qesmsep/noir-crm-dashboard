@@ -337,18 +337,45 @@ export async function logAuthEvent(params: {
   });
 }
 
+/** Site domains this app is served on. A session cookie is shared across a site's subdomains. */
+const KNOWN_SITE_DOMAINS = ['noirkc.com', 'noir.life', 'therooftopkc.com'];
+
+function hostMatchesDomain(host: string, domain: string): boolean {
+  const bare = domain.replace(/^\./, '').toLowerCase();
+  return host === bare || host.endsWith(`.${bare}`);
+}
+
 /**
- * Get cookie domain for session cookies.
- * Uses COOKIE_DOMAIN env var if set, otherwise falls back to '.noirkc.com' in production.
- * Returns undefined in development (cookie scoped to current host).
+ * Get cookie domain for session cookies, for the host the request came in on.
+ *
+ * A browser drops a Set-Cookie whose Domain doesn't match the page's host, so a
+ * fixed domain (the old '.noirkc.com' default) silently breaks login on every
+ * other domain, e.g. www.noir.life: the session cookie is never stored and the
+ * member is bounced back to the login screen.
+ *
+ * - COOKIE_DOMAIN env var is used only when the host falls under it.
+ * - Otherwise, in production, the known site domain the host belongs to.
+ * - Otherwise undefined: a host-only cookie, which always works.
  */
-export function getSessionCookieDomain(): string | undefined {
+export function getSessionCookieDomain(rawHost?: string | string[]): string | undefined {
+  const hostHeader = Array.isArray(rawHost) ? rawHost[0] : rawHost;
+  const host = hostHeader ? hostHeader.split(':')[0].trim().toLowerCase() : '';
+
   const envDomain = process.env.COOKIE_DOMAIN?.trim();
   if (envDomain) {
-    return envDomain;
+    if (!host || hostMatchesDomain(host, envDomain)) {
+      return envDomain;
+    }
   }
-  if (process.env.NODE_ENV === 'production') {
+
+  if (process.env.NODE_ENV !== 'production') {
+    return undefined;
+  }
+
+  if (!host) {
     return '.noirkc.com';
   }
-  return undefined;
+
+  const site = KNOWN_SITE_DOMAINS.find((d) => hostMatchesDomain(host, d));
+  return site ? `.${site}` : undefined;
 }
