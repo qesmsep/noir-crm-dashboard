@@ -166,6 +166,18 @@ describe('guest link tokens', () => {
     expect(JSON.stringify(ok.body)).not.toMatch(/555|phone|member_id/);
   });
 
+  it('API: caps total adds through one link (removed guests still count)', async () => {
+    // party of 4 → 3 guests + 2 corrections = 5 adds through the link, ever
+    db.rows('reservation_guests').push(
+      ...[1, 2, 3, 4].map((i) => ({ id: `gl-${i}`, reservation_id: R_MINE, guest_contact_id: 'c1', status: 'removed', added_via: 'guest_link', created_at: '2026-01-02' })),
+    );
+    const ok = await call(guestLinkHandler, { method: 'POST', query: { token: TOKEN }, body: { guests: [{ first_name: 'Bo', phone: '9135550122' }] } });
+    expect(ok.statusCode).toBe(201);
+    const capped = await call(guestLinkHandler, { method: 'POST', query: { token: TOKEN }, body: { guests: [{ first_name: 'Cy', phone: '9135550123' }] } });
+    expect(capped.statusCode).toBe(429);
+    expect(capped.body.code).toBe('GUEST_LINK_CAP');
+  });
+
   it('API: adds guests through a valid link', async () => {
     const res = await call(guestLinkHandler, { method: 'POST', query: { token: TOKEN }, body: { guests: [{ first_name: 'Bo', phone: '9135550122' }] } });
     expect(res.statusCode).toBe(201);

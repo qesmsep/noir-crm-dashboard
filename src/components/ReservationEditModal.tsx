@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { adminRequestHeaders } from '../lib/adminRequestHeaders';
 import { createPortal } from 'react-dom';
 import { useToast } from '@/hooks/useToast';
 import { formatDateTime, utcToLocalInput, localInputToUTC } from '../utils/dateUtils';
@@ -419,9 +420,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
       } else {
         const res = await fetch('/api/sendGuestMessage', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json'
-          },
+          headers: await adminRequestHeaders(),
           body: JSON.stringify({
             phone: reservation.phone,
             content: messageText,

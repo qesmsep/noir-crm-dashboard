@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminRequestHeaders } from '../../../lib/adminRequestHeaders';
 import {
   Box,
   VStack,
@@ -130,7 +131,7 @@ export default function CampaignEditPage() {
   const fetchTemplates = async () => {
     try {
       console.log('Fetching templates for campaign_id:', campaign?.id);
-      const response = await fetch(`/api/campaign-messages?campaign_id=${campaign?.id}`);
+      const response = await fetch(`/api/campaign-messages?campaign_id=${campaign?.id}`, { headers: await adminRequestHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch templates');
       }
@@ -231,6 +232,7 @@ export default function CampaignEditPage() {
     try {
       const response = await fetch(`/api/campaign-messages/${templateId}`, {
         method: 'DELETE',
+        headers: await adminRequestHeaders(),
       });
 
       if (!response.ok) {
@@ -261,9 +263,7 @@ export default function CampaignEditPage() {
     try {
       const response = await fetch(`/api/campaign-messages/${template.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await adminRequestHeaders(),
         body: JSON.stringify({ is_active: !template.is_active }),
       });
 

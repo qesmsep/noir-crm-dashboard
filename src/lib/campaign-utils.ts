@@ -1,5 +1,5 @@
 // Campaign utility functions to avoid hardcoded UUIDs
-import { supabase } from './supabase';
+import { supabaseAdmin as supabase } from './supabase';
 
 export interface Campaign {
   id: string;

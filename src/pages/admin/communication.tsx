@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminRequestHeaders } from '../../lib/adminRequestHeaders';
 import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabase';
 import AdminLayout from '../../components/layouts/AdminLayout';
@@ -127,7 +128,7 @@ export default function CommunicationPage() {
 
   const fetchCampaignTemplates = async (campaignId: string) => {
     try {
-      const response = await fetch(`/api/campaign-messages?campaign_id=${campaignId}`);
+      const response = await fetch(`/api/campaign-messages?campaign_id=${campaignId}`, { headers: await adminRequestHeaders() });
       if (!response.ok) throw new Error('Failed to fetch campaign templates');
 
       const data = await response.json();
@@ -204,7 +205,7 @@ export default function CommunicationPage() {
     if (!confirm('Are you sure you want to delete this template?')) return;
 
     try {
-      const response = await fetch(`/api/campaign-messages/${id}`, { method: 'DELETE' });
+      const response = await fetch(`/api/campaign-messages/${id}`, { method: 'DELETE', headers: await adminRequestHeaders() });
       if (!response.ok) throw new Error('Failed to delete template');
 
       showToast('Success', 'Template deleted successfully', 'success');
@@ -219,7 +220,7 @@ export default function CommunicationPage() {
     try {
       const response = await fetch(`/api/campaign-messages/${template.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await adminRequestHeaders(),
         body: JSON.stringify({ is_active: !template.is_active }),
       });
 

@@ -139,9 +139,17 @@ function isMissingColumnError(error: { code?: string; message?: string } | null 
   return error.code === 'PGRST204' || error.code === '42703' || /reservation_id/.test(error.message || '') && /column/i.test(error.message || '');
 }
 
+/** A text is attempted at most this many times (first try + 2 retries). */
+export const MAX_SEND_ATTEMPTS = 3;
+/** A claim still pending after this long means the sender died mid-send. */
+export const STALE_CLAIM_MINUTES = 10;
+/** Failed "Send immediately" texts are retried only this soon after booking. */
+export const RETRY_WINDOW_MINUTES = 120;
+
 export type ClaimResult =
   | { kind: 'claimed'; rowId: string | null }
   | { kind: 'duplicate' }
+  | { kind: 'exhausted' }
   | { kind: 'error'; error: string };
 
 /**
@@ -166,6 +174,21 @@ export async function claimReservationSend(
     scheduledTime: string;
   },
 ): Promise<ClaimResult> {
+  // Stop after MAX_SEND_ATTEMPTS failed tries for this (message, reservation).
+  const { data: failedRows, error: countError } = await db
+    .from('scheduled_messages')
+    .select('id')
+    .eq('campaign_message_id', args.campaignMessageId)
+    .eq('reservation_id', args.reservationId)
+    .eq('status', 'failed');
+  if (countError) {
+    // Can't read the attempt count: carry on (a confirmation matters more than
+    // the cap), but make it visible.
+    console.error('[reservation campaigns] could not count failed attempts', countError.message);
+  } else if ((failedRows || []).length >= MAX_SEND_ATTEMPTS) {
+    return { kind: 'exhausted' };
+  }
+
   const { data, error } = await db
     .from('scheduled_messages')
     .insert({
@@ -256,7 +279,7 @@ export interface SendReservationCreatedResult {
  */
 export async function sendReservationCreatedMessages(
   reservationId: string,
-  deps: ReservationCampaignDeps = {},
+  deps: ReservationCampaignDeps & { onlyMessageIds?: string[] } = {},
 ): Promise<SendReservationCreatedResult> {
   const db = deps.db ?? supabaseAdmin;
   const send = deps.send ?? sendSMS;
@@ -289,6 +312,7 @@ export async function sendReservationCreatedMessages(
 
     const matching = ((messages || []) as unknown as CampaignMessageForReservation[]).filter(
       (m) =>
+        (!deps.onlyMessageIds || deps.onlyMessageIds.includes(m.id)) &&
         m.campaigns?.trigger_type === 'reservation_created' &&
         m.campaigns?.is_active !== false &&
         messageAppliesToLocation(m, r.location_id) &&
@@ -329,7 +353,7 @@ export async function sendReservationCreatedMessages(
         content,
         scheduledTime,
       });
-      if (claim.kind === 'duplicate') {
+      if (claim.kind === 'duplicate' || claim.kind === 'exhausted') {
         result.skipped++;
         continue;
       }
@@ -354,4 +378,56 @@ export async function sendReservationCreatedMessages(
     console.error('[reservation campaigns] unexpected error', err);
     return { ...result, reason: 'error' };
   }
+}
+
+/**
+ * Cron safety net for "Send immediately" confirmations:
+ *  1. a claim left pending for STALE_CLAIM_MINUTES (the sender died mid-send)
+ *     is marked failed, which frees the slot;
+ *  2. a failed send for a reservation booked in the last RETRY_WINDOW_MINUTES
+ *     is retried, up to MAX_SEND_ATTEMPTS attempts in total.
+ * A retry after an interrupted send can, rarely, repeat a text OpenPhone had
+ * already delivered; that trade was chosen over a lost confirmation.
+ */
+export async function retryImmediateReservationSends(deps: ReservationCampaignDeps = {}): Promise<{ staleMarked: number; retried: number }> {
+  const db = deps.db ?? supabaseAdmin;
+  const now = (deps.now ?? (() => DateTime.now()))();
+  const out = { staleMarked: 0, retried: 0 };
+  try {
+    const { data: stale } = await db
+      .from('scheduled_messages')
+      .update({ status: 'failed', error_message: 'Interrupted before the send finished' })
+      .eq('status', 'pending')
+      .not('reservation_id', 'is', null)
+      .is('sent_time', null)
+      .lt('created_at', now.minus({ minutes: STALE_CLAIM_MINUTES }).toUTC().toISO()!)
+      .select('id');
+    out.staleMarked = ((stale as unknown[]) || []).length;
+
+    const { data: failed } = await db
+      .from('scheduled_messages')
+      .select('campaign_message_id, reservation_id')
+      .eq('status', 'failed')
+      .not('reservation_id', 'is', null)
+      .gte('created_at', now.minus({ minutes: RETRY_WINDOW_MINUTES }).toUTC().toISO()!);
+    const attempts = new Map<string, { messageId: string; reservationId: string; count: number }>();
+    for (const row of (failed || []) as Array<{ campaign_message_id: string; reservation_id: string }>) {
+      const key = `${row.campaign_message_id}|${row.reservation_id}`;
+      const a = attempts.get(key) || { messageId: row.campaign_message_id, reservationId: row.reservation_id, count: 0 };
+      a.count++;
+      attempts.set(key, a);
+    }
+    const byReservation = new Map<string, string[]>();
+    for (const a of attempts.values()) {
+      if (a.count >= MAX_SEND_ATTEMPTS) continue;
+      byReservation.set(a.reservationId, [...(byReservation.get(a.reservationId) || []), a.messageId]);
+    }
+    for (const [reservationId, messageIds] of byReservation) {
+      const r = await sendReservationCreatedMessages(reservationId, { ...deps, onlyMessageIds: messageIds });
+      out.retried += r.sent;
+    }
+  } catch (err) {
+    console.error('[reservation campaigns] retry pass failed', err);
+  }
+  return out;
 }

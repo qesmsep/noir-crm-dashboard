@@ -99,7 +99,13 @@ export function tokenExpired(expiresAt: string | null | undefined, now = DateTim
   return !exp.isValid || exp <= now;
 }
 
+let warnedMissingSiteUrl = false;
+
 export function guestLinkUrl(token: string): string {
   const base = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_BASE_URL || '';
+  if (!base && !warnedMissingSiteUrl) {
+    warnedMissingSiteUrl = true;
+    console.warn('[guest link] NEXT_PUBLIC_SITE_URL is not set; guest links will be relative and unusable in texts');
+  }
   return `${base.replace(/\/$/, '')}/r/${token}/guests`;
 }
