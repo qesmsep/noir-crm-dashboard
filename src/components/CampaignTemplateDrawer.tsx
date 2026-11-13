@@ -554,6 +554,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         .replace(/\{\{location_name\}\}/g, 'Noir KC')
         .replace(/\{\{location_address\}\}/g, '1234 Main St, Kansas City, MO')
         .replace(/\{\{parking_instructions\}\}/g, 'Free parking in the garage on 13th St.')
+        .replace(/\{\{guest_link\}\}/g, 'https://noirkc.com/r/abc123/guests')
         .replace(/\{\{party_size\}\}/g, '4');
     }
 
@@ -783,6 +784,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       { name: '{{location_name}}', description: 'Reservation location name' },
       { name: '{{location_address}}', description: 'Reservation location address (Settings → location)' },
       { name: '{{parking_instructions}}', description: 'Parking at the location (Settings → location)' },
+      { name: '{{guest_link}}', description: 'Link for the booker to add their guests (no login; reservation triggers)' },
       { name: '{{event_name}}', description: 'Private event name' },
       { name: '{{event_date}}', description: 'Private event date' },
       { name: '{{event_time}}', description: 'Private event time' },

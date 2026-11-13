@@ -110,6 +110,7 @@ export function renderReservationMessage(
   content: string,
   reservation: Pick<CampaignReservation, 'first_name' | 'last_name' | 'email' | 'phone' | 'party_size' | 'start_time'>,
   location: { name?: string | null; timezone?: string | null; address?: string | null; parking_instructions?: string | null } | null,
+  extras: { guestLink?: string | null } = {},
 ): string {
   const tz = location?.timezone || DEFAULT_VENUE_TIMEZONE;
   const start = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(tz);
@@ -127,8 +128,30 @@ export function renderReservationMessage(
     .replace(/\{\{location_name\}\}/g, () => location?.name || '')
     .replace(/\{\{location_address\}\}/g, () => (location?.address || '').trim())
     .replace(/\{\{parking_instructions\}\}/g, () => (location?.parking_instructions || '').trim())
+    .replace(/\{\{guest_link\}\}/g, () => extras.guestLink || '')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
+}
+
+export function usesGuestLink(content: string): boolean {
+  return content.includes('{{guest_link}}');
+}
+
+/**
+ * The no-login "add your guests" link for a reservation, created on first use
+ * and reused after (same token as staff "Text link to member"). Empty when the
+ * reservation is cancelled or over, or the link can't be made.
+ */
+export async function guestLinkForReservation(reservationId: string, db?: typeof supabaseAdmin): Promise<string> {
+  try {
+    const { ensureGuestLink } = await import('@/lib/guestLink');
+    const { guestLinkUrl } = await import('@/lib/guestApi');
+    const link = await ensureGuestLink(reservationId, db ? { db } : {});
+    return link.ok ? guestLinkUrl(link.token) : '';
+  } catch (err) {
+    console.error('[reservation campaigns] could not create guest link', reservationId, err);
+    return '';
+  }
 }
 
 type Db = typeof supabaseAdmin;
@@ -349,7 +372,8 @@ export async function sendReservationCreatedMessages(
         result.skipped++;
         continue;
       }
-      const content = renderReservationMessage(message.content, r, location);
+      const guestLink = usesGuestLink(message.content) ? await guestLinkForReservation(r.id, db) : '';
+      const content = renderReservationMessage(message.content, r, location, { guestLink });
       const scheduledTime = now.toISO()!;
       const claim = await claimReservationSend(db, {
         campaignMessageId: message.id,
