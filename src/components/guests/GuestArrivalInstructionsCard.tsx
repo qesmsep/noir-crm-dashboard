@@ -14,7 +14,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { adminRequestHeaders } from '@/lib/adminRequestHeaders';
 
 const ARRIVAL_DEFAULT = "Give your name at the door and we'll take it from there.";
-const MAX = 200;
+const MAX: Record<keyof GuestInfo, number> = { address: 200, guest_arrival_instructions: 1000, parking_instructions: 1000 };
 
 interface GuestInfo {
   address: string;
@@ -96,8 +96,8 @@ export default function GuestArrivalInstructionsCard({ locationId, locationName 
         {multiline ? (
           <Textarea
             id={id}
-            rows={3}
-            maxLength={MAX}
+            rows={5}
+            maxLength={MAX[key]}
             className="text-base"
             placeholder={placeholder}
             value={value[key]}
@@ -107,7 +107,7 @@ export default function GuestArrivalInstructionsCard({ locationId, locationName 
         ) : (
           <Input
             id={id}
-            maxLength={MAX}
+            maxLength={MAX[key]}
             className="h-11 text-base"
             placeholder={placeholder}
             value={value[key]}
@@ -116,7 +116,7 @@ export default function GuestArrivalInstructionsCard({ locationId, locationName 
           />
         )}
         <p className="text-xs text-text-muted">
-          {hint} {value[key].length}/{MAX}
+          {hint} {value[key].length}/{MAX[key]}
         </p>
       </div>
     );
