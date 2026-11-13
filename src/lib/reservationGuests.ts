@@ -525,7 +525,8 @@ async function shrinkGrownParty(db: Db, reservationId: string, grewFrom: number 
   if (grewFrom === null || !grownTo) return;
   const fit = Math.max(grewFrom, guestCount + 1);
   if (fit >= grownTo) return;
-  await db.from('reservations').update({ party_size: fit }).eq('id', reservationId).eq('party_size', grownTo);
+  const { error } = await db.from('reservations').update({ party_size: fit }).eq('id', reservationId).eq('party_size', grownTo);
+  if (error) console.error('[reservation guests] could not shrink party size back after a failed add', reservationId, error.message);
 }
 
 export async function removeGuest(reservationId: string, guestId: string, deps: GuestDeps = {}): Promise<void> {

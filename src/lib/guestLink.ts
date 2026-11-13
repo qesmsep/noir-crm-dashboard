@@ -73,8 +73,7 @@ export async function lookupGuestLink(token: unknown, deps: { db?: Db; now?: Dat
   type GuestNameRow = { first_name_snapshot: string | null; guest_contacts?: { first_name?: string | null; last_name?: string | null } | null };
   const guestRows = ((guests as GuestNameRow[] | null) || []);
   const guestNames = guestRows
-    .map((g) => guestDisplayName(g.first_name_snapshot || g.guest_contacts?.first_name, g.guest_contacts?.last_name))
-    .filter(Boolean);
+    .map((g) => guestDisplayName(g.first_name_snapshot || g.guest_contacts?.first_name, g.guest_contacts?.last_name) || 'Guest');
   return {
     ok: true,
     reservationId: r.id,
