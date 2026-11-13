@@ -46,6 +46,7 @@ interface CampaignTemplate {
   relative_quantity?: number;
   relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
   relative_proximity?: 'before' | 'after';
+  relative_anchor?: 'trigger' | 'reservation_start' | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -251,6 +252,10 @@ export default function CommunicationPage() {
       return display;
     } else if (template.timing_type === 'relative') {
       const unit = template.relative_quantity === 1 ? template.relative_unit : template.relative_unit + 's';
+      if (template.relative_anchor === 'reservation_start') {
+        const exact = template.relative_unit === 'minute' || template.relative_unit === 'hour';
+        return `Send ${exact ? '' : `at ${template.relative_time} `}${template.relative_quantity} ${unit} ${template.relative_proximity} the reservation`;
+      }
       return `Send at ${template.relative_time} ${template.relative_quantity} ${unit} ${template.relative_proximity} trigger`;
     }
     return 'Timing not configured';

@@ -10,6 +10,9 @@ export const DEFAULT_ARRIVAL_INSTRUCTIONS = "Give your name at the door and we'l
 export interface RenderContext {
   guestFirstName: string;
   hostFirstName: string;
+  hostLastName?: string | null;
+  locationAddress?: string | null;
+  parkingInstructions?: string | null;
   locationName: string;
   start: string;
   timezone?: string | null;
@@ -21,12 +24,15 @@ export function renderGuestMessage(body: string, ctx: RenderContext): string {
   const start = DateTime.fromISO(ctx.start, { zone: 'utc' }).setZone(tz);
   const arrival = (ctx.arrivalInstructions || '').trim() || DEFAULT_ARRIVAL_INSTRUCTIONS;
   return body
-    .replace(/\{\{guest_first_name\}\}/g, ctx.guestFirstName)
-    .replace(/\{\{host_first_name\}\}/g, ctx.hostFirstName)
-    .replace(/\{\{location_name\}\}/g, ctx.locationName)
-    .replace(/\{\{date\}\}/g, start.isValid ? start.toFormat('cccc, LLLL d') : '')
-    .replace(/\{\{time\}\}/g, start.isValid ? start.toFormat('h:mm a') : '')
-    .replace(/\{\{arrival_instructions\}\}/g, arrival)
+    .replace(/\{\{guest_first_name\}\}/g, () => ctx.guestFirstName)
+    .replace(/\{\{host_first_name\}\}/g, () => ctx.hostFirstName)
+    .replace(/\{\{host_last_name\}\}/g, () => ctx.hostLastName || '')
+    .replace(/\{\{location_name\}\}/g, () => ctx.locationName)
+    .replace(/\{\{location_address\}\}/g, () => (ctx.locationAddress || '').trim())
+    .replace(/\{\{parking_instructions\}\}/g, () => (ctx.parkingInstructions || '').trim())
+    .replace(/\{\{date\}\}/g, () => start.isValid ? start.toFormat('cccc, LLLL d') : '')
+    .replace(/\{\{time\}\}/g, () => start.isValid ? start.toFormat('h:mm a') : '')
+    .replace(/\{\{arrival_instructions\}\}/g, () => arrival)
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
@@ -44,11 +50,11 @@ export interface MemberLinkContext {
 export function renderMemberLinkMessage(body: string, ctx: MemberLinkContext): string {
   const start = DateTime.fromISO(ctx.start, { zone: 'utc' }).setZone(ctx.timezone || DEFAULT_TIMEZONE);
   return body
-    .replace(/\{\{member_first_name\}\}/g, ctx.memberFirstName)
-    .replace(/\{\{location_name\}\}/g, ctx.locationName)
-    .replace(/\{\{date\}\}/g, start.isValid ? start.toFormat('cccc, LLLL d') : '')
-    .replace(/\{\{time\}\}/g, start.isValid ? start.toFormat('h:mm a') : '')
-    .replace(/\{\{guest_link\}\}/g, ctx.guestLink)
+    .replace(/\{\{member_first_name\}\}/g, () => ctx.memberFirstName)
+    .replace(/\{\{location_name\}\}/g, () => ctx.locationName)
+    .replace(/\{\{date\}\}/g, () => start.isValid ? start.toFormat('cccc, LLLL d') : '')
+    .replace(/\{\{time\}\}/g, () => start.isValid ? start.toFormat('h:mm a') : '')
+    .replace(/\{\{guest_link\}\}/g, () => ctx.guestLink)
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }

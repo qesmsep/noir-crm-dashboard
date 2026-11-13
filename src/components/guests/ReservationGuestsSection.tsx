@@ -140,8 +140,9 @@ function MessagesTab() {
         </p>
       </div>
       <p className="text-sm text-text-muted">
-        Guest placeholders: {'{{guest_first_name}} {{host_first_name}} {{location_name}} {{date}} {{time}} {{arrival_instructions}}'}. End every guest
-        text with &ldquo;Reply STOP to opt out.&rdquo;
+        Guest placeholders:{' '}
+        {'{{guest_first_name}} {{host_first_name}} {{host_last_name}} {{location_name}} {{location_address}} {{date}} {{time}} {{arrival_instructions}} {{parking_instructions}}'}.
+        Address, arrival and parking are set per location in Settings. End every guest text with &ldquo;Reply STOP to opt out.&rdquo;
       </p>
       {templates.map((t) => {
         const d = drafts[t.kind] || t;
@@ -157,7 +158,10 @@ function MessagesTab() {
             : renderGuestMessage(d.body, {
                 guestFirstName: 'Ava',
                 hostFirstName: 'Tim',
+                hostLastName: 'Wirick',
                 locationName: 'Noir KC',
+                locationAddress: '1234 Main St, Kansas City, MO',
+                parkingInstructions: 'Free parking in the garage on 13th St.',
                 start: previewStart,
                 timezone: TZ,
                 arrivalInstructions: null,

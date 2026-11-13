@@ -57,6 +57,7 @@ interface CampaignTemplate {
   relative_quantity?: number;
   relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
   relative_proximity?: 'before' | 'after';
+  relative_anchor?: 'trigger' | 'reservation_start' | null;
   include_ledger_pdf?: boolean; // Whether to include ledger PDF link
   is_active: boolean;
   created_at?: string;
@@ -133,6 +134,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     relative_quantity: 1,
     relative_unit: 'day' as 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year',
     relative_proximity: 'after' as 'before' | 'after',
+    relative_anchor: 'trigger' as 'trigger' | 'reservation_start',
     include_ledger_pdf: false,
     is_active: true,
     // New fields for reservation range campaigns
@@ -180,6 +182,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           relative_quantity: 1,
           relative_unit: 'day',
           relative_proximity: 'after',
+          relative_anchor: 'trigger',
           include_ledger_pdf: false,
           is_active: true,
           // New fields for reservation range campaigns
@@ -256,6 +259,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         relative_quantity: data.relative_quantity || 1,
         relative_unit: data.relative_unit || 'day',
         relative_proximity: data.relative_proximity || 'after',
+        relative_anchor: data.relative_anchor || 'trigger',
         include_ledger_pdf: data.include_ledger_pdf || false,
         is_active: data.is_active !== undefined ? data.is_active : true,
         // New fields for reservation range campaigns
@@ -396,7 +400,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         'specific_phone', 'timing_type', 'specific_time', 'specific_date',
         'recurring_type', 'recurring_time', 'recurring_weekdays', 'recurring_monthly_type',
         'recurring_monthly_day', 'recurring_monthly_value', 'recurring_yearly_date',
-        'relative_time', 'relative_quantity', 'relative_unit', 'relative_proximity',
+        'relative_time', 'relative_quantity', 'relative_unit', 'relative_proximity', 'relative_anchor',
         'include_ledger_pdf', 'is_active', 'selected_private_event_id'
       ];
 
@@ -532,7 +536,10 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         .replace(/\{\{(guest_first_name|first_name)\}\}/g, 'Ava')
         .replace(/\{\{(guest_last_name|last_name)\}\}/g, 'Stone')
         .replace(/\{\{host_first_name\}\}/g, 'Tim')
+        .replace(/\{\{host_last_name\}\}/g, 'Wirick')
         .replace(/\{\{location_name\}\}/g, 'Noir KC')
+        .replace(/\{\{location_address\}\}/g, '1234 Main St, Kansas City, MO')
+        .replace(/\{\{parking_instructions\}\}/g, 'Free parking in the garage on 13th St.')
         .replace(/\{\{reservation_date\}\}/g, 'Friday, March 15')
         .replace(/\{\{reservation_time\}\}/g, '8:00 PM')
         .replace(/\{\{party_size\}\}/g, '4')
@@ -545,6 +552,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         .replace(/\{\{reservation_time\}\}/g, '7:30 PM')
         .replace(/\{\{reservation_date\}\}/g, 'March 15, 2026')
         .replace(/\{\{location_name\}\}/g, 'Noir KC')
+        .replace(/\{\{location_address\}\}/g, '1234 Main St, Kansas City, MO')
+        .replace(/\{\{parking_instructions\}\}/g, 'Free parking in the garage on 13th St.')
         .replace(/\{\{party_size\}\}/g, '4');
     }
 
@@ -568,6 +577,14 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     return previewContent;
   };
 
+  // Guest Registration messages can count from when the guest was added or
+  // from the reservation start. From the reservation, minute and hour offsets
+  // are exact (no clock time); days and longer land on the clock time.
+  const usesReservationAnchor = () =>
+    campaignTriggerType === 'guest_registration' && formData.timing_type === 'relative' && formData.relative_anchor === 'reservation_start';
+  const showsClockTime = () =>
+    formData.relative_unit !== 'minute' && !(usesReservationAnchor() && formData.relative_unit === 'hour');
+
   const formatTimingDisplay = () => {
     if (formData.timing_type === 'immediate') {
       return 'Send immediately';
@@ -585,14 +602,15 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       }
       return display;
     } else if (formData.timing_type === 'relative') {
+      const anchor = usesReservationAnchor() ? 'the reservation' : campaignTriggerType === 'guest_registration' ? 'the guest is added' : 'trigger';
       if (formData.relative_quantity === 0) {
-        return `Send at ${formData.relative_time} ON trigger date`;
+        return usesReservationAnchor() ? 'Send at the reservation time' : `Send at ${formData.relative_time} ON trigger date`;
       } else {
         const unit = formData.relative_quantity === 1 ? formData.relative_unit : formData.relative_unit + 's';
-        if (formData.relative_unit === 'minute') {
-          return `Send ${formData.relative_quantity} ${unit} ${formData.relative_proximity} trigger`;
+        if (!showsClockTime()) {
+          return `Send ${formData.relative_quantity} ${unit} ${formData.relative_proximity} ${anchor}`;
         } else {
-          return `Send at ${formData.relative_time} ${formData.relative_quantity} ${unit} ${formData.relative_proximity} trigger`;
+          return `Send at ${formData.relative_time} ${formData.relative_quantity} ${unit} ${formData.relative_proximity} ${anchor}`;
         }
       }
     } else {
@@ -743,7 +761,10 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         { name: '{{guest_first_name}}', description: 'Guest first name' },
         { name: '{{guest_last_name}}', description: 'Guest last name (may be blank)' },
         { name: '{{host_first_name}}', description: 'Member who added them' },
+        { name: '{{host_last_name}}', description: "Host's last name (may be blank)" },
         { name: '{{location_name}}', description: 'Reservation location' },
+        { name: '{{location_address}}', description: 'Location address (Settings → location)' },
+        { name: '{{parking_instructions}}', description: 'Parking (Settings → location)' },
         { name: '{{reservation_date}}', description: 'e.g. Friday, March 15' },
         { name: '{{reservation_time}}', description: 'e.g. 8:00 PM' },
         { name: '{{party_size}}', description: 'Reservation party size' },
@@ -760,6 +781,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       { name: '{{reservation_date}}', description: 'Reservation date only' },
       { name: '{{party_size}}', description: 'Reservation party size' },
       { name: '{{location_name}}', description: 'Reservation location name' },
+      { name: '{{location_address}}', description: 'Reservation location address (Settings → location)' },
+      { name: '{{parking_instructions}}', description: 'Parking at the location (Settings → location)' },
       { name: '{{event_name}}', description: 'Private event name' },
       { name: '{{event_date}}', description: 'Private event date' },
       { name: '{{event_time}}', description: 'Private event time' },
@@ -1112,7 +1135,20 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
               {formData.timing_type === 'relative' && (
                 <div className="space-y-4">
-                  {formData.relative_unit !== 'minute' && (
+                  {campaignTriggerType === 'guest_registration' && (
+                    <Field label="Relative to" htmlFor="relative-anchor">
+                      <SelectField
+                        id="relative-anchor"
+                        value={formData.relative_anchor || 'trigger'}
+                        onChange={(e) => handleInputChange('relative_anchor', e.target.value)}
+                      >
+                        <option value="trigger">When the guest is added</option>
+                        <option value="reservation_start">The reservation time</option>
+                      </SelectField>
+                    </Field>
+                  )}
+
+                  {showsClockTime() && (
                     <Field label="Time" htmlFor="relative-time">
                       <TextField
                         id="relative-time"

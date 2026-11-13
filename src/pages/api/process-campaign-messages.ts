@@ -231,7 +231,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // each reservation renders in its own venue's timezone.
     const locationsById: Map<string, LocationInfo> = new Map();
     {
-      const { data: locationRows } = await supabaseAdmin.from('locations').select('id, name, timezone');
+      const { data: locationRows } = await supabaseAdmin.from('locations').select('id, name, timezone, address, parking_instructions');
       (locationRows || []).forEach((l: LocationInfo) => locationsById.set(l.id, l));
     }
 
@@ -882,7 +882,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 party_size: member.party_size,
                 start_time: member.reservation_start_time || member.join_date,
               },
-              { name: memberLocation?.name || null, timezone: memberTimezone },
+              {
+                name: memberLocation?.name || null,
+                timezone: memberTimezone,
+                address: memberLocation?.address || null,
+                parking_instructions: memberLocation?.parking_instructions || null,
+              },
             );
           }
 
