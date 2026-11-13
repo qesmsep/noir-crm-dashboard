@@ -86,7 +86,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .filter((r) => !liveReservationIds.has(r.reservation_id))
       .map((r) => r.id);
     if (cancelledReminderIds.length > 0) {
-      const { error: cancelError } = await supabase
+      const { error: cancelError } = await supabaseAdmin
         .from('scheduled_reservation_reminders')
         .update({ status: 'cancelled', error_message: 'Reservation cancelled or deleted', updated_at: new Date().toISOString() })
         .in('id', cancelledReminderIds)

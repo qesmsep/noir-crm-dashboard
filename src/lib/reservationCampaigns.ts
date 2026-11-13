@@ -181,7 +181,13 @@ export async function claimReservationSend(
     .eq('campaign_message_id', args.campaignMessageId)
     .eq('reservation_id', args.reservationId)
     .eq('status', 'failed');
-  if (!countError && (failedRows || []).length >= MAX_SEND_ATTEMPTS) return { kind: 'exhausted' };
+  if (countError) {
+    // Can't read the attempt count: carry on (a confirmation matters more than
+    // the cap), but make it visible.
+    console.error('[reservation campaigns] could not count failed attempts', countError.message);
+  } else if ((failedRows || []).length >= MAX_SEND_ATTEMPTS) {
+    return { kind: 'exhausted' };
+  }
 
   const { data, error } = await db
     .from('scheduled_messages')

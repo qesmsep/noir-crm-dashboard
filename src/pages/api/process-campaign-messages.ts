@@ -227,13 +227,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     console.log(`📊 Found ${messages.length} active campaign messages to process`);
     let processedCount = 0;
 
-    // Safety net for "Send immediately" texts: free stale claims and retry
-    // recent failures (max 3 attempts per text, within 2 hours).
-    const confirmationRetries = await retryImmediateReservationSends();
-    const guestIntroRetries = await retryImmediateGuestSends();
-    processedCount += confirmationRetries.retried + guestIntroRetries.retried;
-    console.log('🔁 Immediate-send retries:', { confirmationRetries, guestIntroRetries });
-
     // Per-reservation location name + timezone for reservation triggers, so
     // each reservation renders in its own venue's timezone.
     const locationsById: Map<string, LocationInfo> = new Map();
@@ -1243,6 +1236,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
     }
+
+    // Safety net for "Send immediately" texts, after the normal sends so a slow
+    // retry can't hold them up: free stale claims and retry recent failures
+    // (max 3 attempts per text, within 2 hours).
+    const confirmationRetries = await retryImmediateReservationSends();
+    const guestIntroRetries = await retryImmediateGuestSends();
+    processedCount += confirmationRetries.retried + guestIntroRetries.retried;
+    console.log('🔁 Immediate-send retries:', { confirmationRetries, guestIntroRetries });
 
     console.log('\n🎉 ==========================================');
     console.log(`🎉 Campaign processing complete. Processed ${processedCount} messages.`);

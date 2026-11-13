@@ -1,4 +1,5 @@
 import { NextApiRequest } from 'next';
+import { timingSafeEqual } from 'crypto';
 import { supabaseAdmin } from './supabase';
 
 /**
@@ -43,7 +44,12 @@ export async function verifyAdmin(req: NextApiRequest): Promise<boolean> {
  * the Authorization header used by admin JWTs.
  */
 export function isInternalCall(req: NextApiRequest): boolean {
-  return req.headers['x-internal-secret'] === process.env.CRON_SECRET;
+  const secret = process.env.CRON_SECRET;
+  const given = req.headers['x-internal-secret'];
+  if (!secret || typeof given !== 'string') return false;
+  const a = Buffer.from(given);
+  const b = Buffer.from(secret);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /**
