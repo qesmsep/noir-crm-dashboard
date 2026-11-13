@@ -442,7 +442,14 @@ export async function addGuests(
     if (newSize > MAX_PARTY_SIZE) {
       throw new GuestServiceError('over_max_party', `A reservation can be for up to ${MAX_PARTY_SIZE} people. Contact us for a larger group.`, 400);
     }
-    const { error: growError } = await db.from('reservations').update({ party_size: newSize }).eq('id', reservation.id);
+    const before = reservation.party_size || 1;
+    // Guarded on the size we read, so a concurrent edit or add isn't overwritten.
+    const { data: grown, error: growError } = await db
+      .from('reservations')
+      .update({ party_size: newSize })
+      .eq('id', reservation.id)
+      .eq('party_size', before)
+      .select('id');
     if (growError) {
       if (isCapacityError(growError)) {
         throw new GuestServiceError(
@@ -453,7 +460,10 @@ export async function addGuests(
       }
       throw new GuestServiceError('save_failed', 'Could not update the party size.', 500);
     }
-    grewFrom = reservation.party_size || 1;
+    if (!grown || (grown as unknown[]).length === 0) {
+      throw new GuestServiceError('reservation_changed', 'The reservation just changed. Please try again.', 409);
+    }
+    grewFrom = before;
     reservation.party_size = newSize;
   } else if (existing.length + clean.length > cap) {
     const room = Math.max(0, cap - existing.length);
@@ -487,13 +497,13 @@ export async function addGuests(
       .single();
     if (error?.code === '23505') continue; // added concurrently — already on the reservation
     if (error || !row) {
-      if (grewFrom !== null && created.length === 0) {
-        await db.from('reservations').update({ party_size: grewFrom }).eq('id', reservation.id);
-      }
+      await shrinkGrownParty(db, reservation.id, grewFrom, reservation.party_size, existing.length + created.length);
       throw new GuestServiceError('save_failed', 'Could not save guest.', 500);
     }
     created.push({ id: (row as { id: string }).id } as GuestRow);
   }
+  // Everyone was already on it (added concurrently): don't keep the bigger party.
+  await shrinkGrownParty(db, reservation.id, grewFrom, reservation.party_size, existing.length + created.length);
 
   // Built-in day-of text, then the "Guest Registration" campaign intro.
   // (Imported lazily: guestCampaigns builds on this module.)
@@ -504,6 +514,18 @@ export async function addGuests(
   }
 
   return listGuests(reservation.id, 'staff', deps);
+}
+
+/**
+ * After addGuests raised the party size, bring it back down to fit the guests
+ * actually saved (never below where it started). Guarded on the size we set,
+ * so a later edit by someone else is left alone.
+ */
+async function shrinkGrownParty(db: Db, reservationId: string, grewFrom: number | null, grownTo: number | null, guestCount: number): Promise<void> {
+  if (grewFrom === null || !grownTo) return;
+  const fit = Math.max(grewFrom, guestCount + 1);
+  if (fit >= grownTo) return;
+  await db.from('reservations').update({ party_size: fit }).eq('id', reservationId).eq('party_size', grownTo);
 }
 
 export async function removeGuest(reservationId: string, guestId: string, deps: GuestDeps = {}): Promise<void> {
@@ -749,7 +771,8 @@ export function classifyOptKeyword(text: string | null | undefined): 'opt_out' |
 async function optOutContact(db: Db, contactId: string, now: DateTime): Promise<void> {
   const { error } = await db.from('guest_contacts').update({ sms_opted_out_at: now.toISO() }).eq('id', contactId);
   if (error) throw new GuestServiceError('save_failed', 'Could not stop texts.', 500);
-  const { data: guestRows } = await db.from('reservation_guests').select('id').eq('guest_contact_id', contactId);
+  const { data: guestRows, error: listError } = await db.from('reservation_guests').select('id').eq('guest_contact_id', contactId);
+  if (listError) console.error('[reservation guests] opt-out: could not list guest rows; sends still re-check the opt-out', listError.message);
   await cancelPendingForGuests(db, ((guestRows || []) as Array<{ id: string }>).map((r) => r.id), undefined, 'opted_out');
 }
 

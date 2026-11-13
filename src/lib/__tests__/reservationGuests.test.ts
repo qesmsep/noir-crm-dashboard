@@ -178,7 +178,11 @@ describe('addGuests rules', () => {
       if (table !== 'reservations') return q;
       return new Proxy(q, {
         get(target, prop) {
-          if (prop === 'update') return () => ({ eq: async () => ({ data: null, error: { message: 'CAPACITY_EXCEEDED: over cap' } }) });
+          if (prop === 'update') {
+            const refused = { data: null, error: { message: 'CAPACITY_EXCEEDED: over cap' } };
+            const chain: any = { eq: () => chain, select: async () => refused, then: (r: any) => Promise.resolve(refused).then(r) };
+            return () => chain;
+          }
           const v = (target as any)[prop];
           return typeof v === 'function' ? v.bind(target) : v;
         },
@@ -197,6 +201,17 @@ describe('addGuests rules', () => {
     await expectError(p, 'capacity_exceeded');
     expect(db.rows('reservations')[0].party_size).toBe(3);
     expect(db.rows('reservation_guests')).toHaveLength(0);
+  });
+
+  it('growParty refuses past 20 people', async () => {
+    db.rows('reservations')[0].party_size = 20;
+    const many = Array.from({ length: 19 }, (_, i) => ({ first_name: `G${i}`, phone: `91355502${String(i).padStart(2, '0')}` }));
+    await addGuests('r-1', many, { via: 'guest_link', growParty: true }, deps());
+    await expectError(
+      addGuests('r-1', [{ first_name: 'Extra', phone: '9135550299' }], { via: 'guest_link', growParty: true }, deps()),
+      'over_max_party',
+    );
+    expect(db.rows('reservations')[0].party_size).toBe(20);
   });
 
   it('a removed guest frees a slot', async () => {

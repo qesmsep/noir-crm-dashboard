@@ -22,11 +22,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       await removeGuest(reservationId, guestId);
     } else {
       const { first_name, last_name, checked_in, stop_texts } = req.body || {};
-      if (stop_texts === true) await stopGuestTexts(reservationId, guestId);
       if (typeof checked_in === 'boolean') await setGuestCheckedIn(reservationId, guestId, checked_in);
       if (first_name !== undefined || last_name !== undefined) {
         await updateGuest(reservationId, guestId, { first_name, last_name }, { via: 'staff' });
       }
+      // Last, so a failed name or check-in change doesn't leave texts stopped behind an error.
+      if (stop_texts === true) await stopGuestTexts(reservationId, guestId);
     }
     return res.status(200).json({ guests: await listGuests(reservationId, 'staff') });
   } catch (err) {

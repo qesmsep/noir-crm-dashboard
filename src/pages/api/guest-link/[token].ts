@@ -46,7 +46,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const guests = Array.isArray(req.body?.guests) ? req.body.guests : [];
     const used = await guestLinkAddsUsed(link.reservationId);
     // The cap follows the party size these guests would make, since adding can raise it.
-    const currentGuests = link.partySize - 1 - link.summary.spots_left;
+    const currentGuests = link.summary.guests.length;
     const sizeAfter = Math.max(link.partySize, currentGuests + guests.length + 1);
     if (used + guests.length > guestLinkAddCap(sizeAfter)) {
       return res.status(429).json({
