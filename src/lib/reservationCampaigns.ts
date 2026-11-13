@@ -57,6 +57,8 @@ export interface LocationInfo {
   id: string;
   name: string | null;
   timezone: string | null;
+  address?: string | null;
+  parking_instructions?: string | null;
 }
 
 /**
@@ -107,7 +109,7 @@ export function recipientPhoneFor(
 export function renderReservationMessage(
   content: string,
   reservation: Pick<CampaignReservation, 'first_name' | 'last_name' | 'email' | 'phone' | 'party_size' | 'start_time'>,
-  location: { name?: string | null; timezone?: string | null } | null,
+  location: { name?: string | null; timezone?: string | null; address?: string | null; parking_instructions?: string | null } | null,
 ): string {
   const tz = location?.timezone || DEFAULT_VENUE_TIMEZONE;
   const start = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(tz);
@@ -122,7 +124,11 @@ export function renderReservationMessage(
     .replace(/\{\{reservation_time\}\}/g, start.isValid ? start.toFormat('h:mm a') : '')
     .replace(/\{\{reservation_date\}\}/g, start.isValid ? start.toFormat('MMMM d, yyyy') : '')
     .replace(/\{\{party_size\}\}/g, reservation.party_size != null ? String(reservation.party_size) : '')
-    .replace(/\{\{location_name\}\}/g, location?.name || '');
+    .replace(/\{\{location_name\}\}/g, location?.name || '')
+    .replace(/\{\{location_address\}\}/g, (location?.address || '').trim())
+    .replace(/\{\{parking_instructions\}\}/g, (location?.parking_instructions || '').trim())
+    .replace(/[ \t]{2,}/g, ' ')
+    .trim();
 }
 
 type Db = typeof supabaseAdmin;
@@ -328,7 +334,7 @@ export async function sendReservationCreatedMessages(
 
     let location: LocationInfo | null = null;
     if (r.location_id) {
-      const { data: loc } = await db.from('locations').select('id, name, timezone').eq('id', r.location_id).single();
+      const { data: loc } = await db.from('locations').select('id, name, timezone, address, parking_instructions').eq('id', r.location_id).single();
       location = (loc as LocationInfo) || null;
     }
 

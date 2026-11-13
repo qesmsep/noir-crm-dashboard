@@ -10,6 +10,9 @@ export const DEFAULT_ARRIVAL_INSTRUCTIONS = "Give your name at the door and we'l
 export interface RenderContext {
   guestFirstName: string;
   hostFirstName: string;
+  hostLastName?: string | null;
+  locationAddress?: string | null;
+  parkingInstructions?: string | null;
   locationName: string;
   start: string;
   timezone?: string | null;
@@ -23,7 +26,10 @@ export function renderGuestMessage(body: string, ctx: RenderContext): string {
   return body
     .replace(/\{\{guest_first_name\}\}/g, ctx.guestFirstName)
     .replace(/\{\{host_first_name\}\}/g, ctx.hostFirstName)
+    .replace(/\{\{host_last_name\}\}/g, ctx.hostLastName || '')
     .replace(/\{\{location_name\}\}/g, ctx.locationName)
+    .replace(/\{\{location_address\}\}/g, (ctx.locationAddress || '').trim())
+    .replace(/\{\{parking_instructions\}\}/g, (ctx.parkingInstructions || '').trim())
     .replace(/\{\{date\}\}/g, start.isValid ? start.toFormat('cccc, LLLL d') : '')
     .replace(/\{\{time\}\}/g, start.isValid ? start.toFormat('h:mm a') : '')
     .replace(/\{\{arrival_instructions\}\}/g, arrival)

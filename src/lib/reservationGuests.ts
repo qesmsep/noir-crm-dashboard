@@ -84,6 +84,7 @@ interface ReservationRow {
   party_size: number;
   phone: string | null;
   first_name: string | null;
+  last_name?: string | null;
   member_id: string | null;
   location_id: string | null;
 }
@@ -127,9 +128,11 @@ interface LocationRow {
   name: string | null;
   timezone: string | null;
   guest_arrival_instructions?: string | null;
+  address?: string | null;
+  parking_instructions?: string | null;
 }
 
-const RESERVATION_COLUMNS = 'id, status, start_time, end_time, party_size, phone, first_name, member_id, location_id';
+const RESERVATION_COLUMNS = 'id, status, start_time, end_time, party_size, phone, first_name, last_name, member_id, location_id';
 const GUEST_COLUMNS =
   'id, reservation_id, guest_contact_id, location_id, added_by_member_id, added_via, first_name_snapshot, matched_member_id, status, checked_in_at, notified_at, followed_up_at, followed_up_by, follow_up_note, created_at, guest_contacts(id, phone, first_name, last_name, sms_opted_out_at)';
 
@@ -264,7 +267,7 @@ async function loadLocation(db: Db, locationId: string | null): Promise<Location
   if (!locationId) return null;
   const { data } = await db
     .from('locations')
-    .select('id, name, timezone, guest_arrival_instructions')
+    .select('id, name, timezone, guest_arrival_instructions, address, parking_instructions')
     .eq('id', locationId)
     .maybeSingle();
   return (data as LocationRow) || null;
@@ -299,14 +302,21 @@ async function hostPhones(db: Db, reservation: ReservationRow): Promise<Set<stri
   return set;
 }
 
-async function hostFirstName(db: Db, reservation: ReservationRow): Promise<string> {
-  if (reservation.first_name && reservation.first_name.trim()) return reservation.first_name.trim();
+export interface HostName {
+  first: string;
+  last: string;
+}
+
+/** The host's name: the name on the reservation, else the member's. */
+async function hostName(db: Db, reservation: ReservationRow): Promise<HostName> {
+  const first = (reservation.first_name || '').trim();
+  if (first) return { first, last: (reservation.last_name || '').trim() };
   if (reservation.member_id) {
-    const { data } = await db.from('members').select('first_name').eq('member_id', reservation.member_id).maybeSingle();
-    const name = (data as { first_name?: string | null } | null)?.first_name;
-    if (name) return name;
+    const { data } = await db.from('members').select('first_name, last_name').eq('member_id', reservation.member_id).maybeSingle();
+    const m = (data as { first_name?: string | null; last_name?: string | null } | null) || {};
+    if ((m.first_name || '').trim()) return { first: (m.first_name || '').trim(), last: (m.last_name || '').trim() };
   }
-  return 'your host';
+  return { first: 'your host', last: '' };
 }
 
 async function upsertContact(
@@ -668,7 +678,7 @@ export async function onReservationCancelled(
       return;
     }
     const reservation = await loadReservation(db, reservationId);
-    const [location, host] = await Promise.all([loadLocation(db, reservation.location_id), hostFirstName(db, reservation)]);
+    const [location, host] = await Promise.all([loadLocation(db, reservation.location_id), hostName(db, reservation)]);
     for (const g of toTell) {
       await deliver(db, deps, {
         kind: 'cancelled',
@@ -760,7 +770,7 @@ interface DeliverArgs {
   guest: GuestRow;
   reservation: ReservationRow;
   location: LocationRow | null;
-  host: string;
+  host: HostName;
   template: TemplateRow | null;
 }
 
@@ -789,7 +799,10 @@ async function deliver(db: Db, deps: GuestDeps, a: DeliverArgs): Promise<Deliver
 
   const content = renderGuestMessage(a.template.body, {
     guestFirstName: a.guest.first_name_snapshot || contact.first_name,
-    hostFirstName: a.host,
+    hostFirstName: a.host.first,
+    hostLastName: a.host.last,
+    locationAddress: a.location?.address,
+    parkingInstructions: a.location?.parking_instructions,
     locationName: a.location?.name || 'Noir',
     start: a.reservation.start_time,
     timezone: a.location?.timezone,
@@ -845,7 +858,7 @@ export async function processDueGuestMessages(opts: { limit?: number } = {}, dep
 
   const templates = await loadTemplates(db);
   const locationCache = new Map<string, LocationRow | null>();
-  const hostCache = new Map<string, string>();
+  const hostCache = new Map<string, HostName>();
 
   for (const { id } of (due || []) as Array<{ id: string }>) {
     const { data: claimedRows } = await db
@@ -876,7 +889,7 @@ export async function processDueGuestMessages(opts: { limit?: number } = {}, dep
           const reservation = res as ReservationRow;
           const locKey = reservation.location_id || '';
           if (!locationCache.has(locKey)) locationCache.set(locKey, await loadLocation(db, reservation.location_id));
-          if (!hostCache.has(reservation.id)) hostCache.set(reservation.id, await hostFirstName(db, reservation));
+          if (!hostCache.has(reservation.id)) hostCache.set(reservation.id, await hostName(db, reservation));
           outcome = await deliver(db, deps, {
             kind: claimed.kind,
             guest: g,

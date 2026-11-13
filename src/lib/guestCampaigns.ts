@@ -52,6 +52,8 @@ export interface GuestCampaignMessage {
   relative_quantity?: number | null;
   relative_unit?: string | null;
   relative_proximity?: string | null;
+  /** NULL/'trigger' = from when the guest was added; 'reservation_start' = from the reservation start. */
+  relative_anchor?: string | null;
   campaigns?: {
     id: string;
     trigger_type: string;
@@ -79,6 +81,7 @@ interface GuestCampaignReservation {
   start_time: string;
   party_size: number | null;
   first_name: string | null;
+  last_name?: string | null;
   member_id: string | null;
   location_id: string | null;
 }
@@ -88,14 +91,16 @@ interface LocationRow {
   name: string | null;
   timezone: string | null;
   guest_arrival_instructions?: string | null;
+  address?: string | null;
+  parking_instructions?: string | null;
 }
 
 const GUEST_SELECT =
   'id, reservation_id, location_id, status, first_name_snapshot, matched_member_id, notified_at, created_at, guest_contacts(id, phone, first_name, last_name, sms_opted_out_at)';
-const RESERVATION_SELECT = 'id, status, start_time, party_size, first_name, member_id, location_id';
+const RESERVATION_SELECT = 'id, status, start_time, party_size, first_name, last_name, member_id, location_id';
 const MESSAGE_SELECT = `
   id, name, content, recipient_type, specific_phone, timing_type, is_active,
-  specific_time, specific_date, relative_time, relative_quantity, relative_unit, relative_proximity,
+  specific_time, specific_date, relative_time, relative_quantity, relative_unit, relative_proximity, relative_anchor,
   campaigns!inner ( id, trigger_type, is_active, applies_to_all_locations, campaign_locations ( location_id ) )
 `;
 
@@ -114,23 +119,40 @@ export function messageAppliesToGuestLocation(message: GuestCampaignMessage, loc
   return !!locationId && (c.campaign_locations || []).some((cl) => cl.location_id === locationId);
 }
 
+export function anchorsOnReservation(message: GuestCampaignMessage): boolean {
+  return message.timing_type === 'relative' && message.relative_anchor === 'reservation_start';
+}
+
+const LUXON_UNITS = { minute: 'minutes', hour: 'hours', day: 'days', week: 'weeks', month: 'months', year: 'years' } as const;
+
 /**
- * When this message goes out for a guest added at `addedAt`, in the venue
- * timezone. Minute offsets count from the moment the guest was added; larger
- * units land on the message's clock time (same as other campaigns).
+ * When this message goes out for one guest, in the venue timezone.
+ *
+ * Counted from when the guest was added (default) or, with relative_anchor
+ * 'reservation_start', from the reservation start ("3 hours before the
+ * reservation", "1 day after"). Minute offsets — and hour offsets from the
+ * reservation — are exact; larger units land on the message's clock time,
+ * like other campaigns.
  */
-export function guestAddedSendTime(message: GuestCampaignMessage, addedAt: DateTime, timezone: string): DateTime | null {
-  const trigger = addedAt.setZone(timezone);
-  if (message.timing_type === 'immediate') return trigger;
+export function guestAddedSendTime(
+  message: GuestCampaignMessage,
+  addedAt: DateTime,
+  timezone: string,
+  reservationStart?: string | null,
+): DateTime | null {
+  const fromReservation = anchorsOnReservation(message);
+  if (fromReservation && !reservationStart) return null;
+  const trigger = fromReservation
+    ? DateTime.fromISO(reservationStart!, { zone: 'utc' }).setZone(timezone)
+    : addedAt.setZone(timezone);
+  if (message.timing_type === 'immediate') return addedAt.setZone(timezone);
   if (message.timing_type === 'relative') {
     const q = message.relative_quantity || 0;
     const unit = message.relative_unit || 'day';
     const sign = message.relative_proximity === 'before' ? -1 : 1;
-    const luxonUnit = ({ minute: 'minutes', hour: 'hours', day: 'days', week: 'weeks', month: 'months', year: 'years' } as const)[
-      unit as 'minute'
-    ] || 'days';
+    const luxonUnit = LUXON_UNITS[unit as keyof typeof LUXON_UNITS] || 'days';
     const moved = q > 0 ? trigger.plus({ [luxonUnit]: sign * q }) : trigger;
-    if (unit === 'minute') return moved.set({ second: 0, millisecond: 0 });
+    if (unit === 'minute' || (fromReservation && unit === 'hour')) return moved.set({ second: 0, millisecond: 0 });
     const [h, m] = (message.relative_time || '10:00').split(':').map(Number);
     return moved.set({ hour: h || 0, minute: m || 0, second: 0, millisecond: 0 });
   }
@@ -140,6 +162,13 @@ export function guestAddedSendTime(message: GuestCampaignMessage, addedAt: DateT
     return day.set({ hour: h || 0, minute: m || 0, second: 0, millisecond: 0 });
   }
   return null;
+}
+
+/** Signed offset in minutes (approximate for months/years) for a relative message. */
+function signedOffsetMinutes(message: GuestCampaignMessage): number {
+  const q = message.relative_quantity || 0;
+  const per = ({ minute: 1, hour: 60, day: 1440, week: 10080, month: 44640, year: 527040 } as Record<string, number>)[message.relative_unit || 'day'] || 1440;
+  return (message.relative_proximity === 'before' ? -1 : 1) * q * per;
 }
 
 /** How far back to look for guests whose send time could be due now. */
@@ -160,7 +189,10 @@ export function renderGuestCampaignMessage(
     guestFirstName: string;
     guestLastName: string | null;
     hostFirstName: string;
+    hostLastName?: string | null;
     locationName: string;
+    locationAddress?: string | null;
+    parkingInstructions?: string | null;
     start: string;
     partySize: number | null;
     timezone: string;
@@ -173,7 +205,10 @@ export function renderGuestCampaignMessage(
     .replace(/\{\{(guest_first_name|first_name)\}\}/g, ctx.guestFirstName)
     .replace(/\{\{(guest_last_name|last_name)\}\}/g, ctx.guestLastName || '')
     .replace(/\{\{host_first_name\}\}/g, ctx.hostFirstName)
+    .replace(/\{\{host_last_name\}\}/g, ctx.hostLastName || '')
     .replace(/\{\{location_name\}\}/g, ctx.locationName)
+    .replace(/\{\{location_address\}\}/g, (ctx.locationAddress || '').trim())
+    .replace(/\{\{parking_instructions\}\}/g, (ctx.parkingInstructions || '').trim())
     .replace(/\{\{reservation_date\}\}/g, start.isValid ? start.toFormat('cccc, LLLL d') : '')
     .replace(/\{\{reservation_time\}\}/g, start.isValid ? start.toFormat('h:mm a') : '')
     .replace(/\{\{party_size\}\}/g, ctx.partySize != null ? String(ctx.partySize) : '')
@@ -191,6 +226,7 @@ interface Context {
   reservation: GuestCampaignReservation;
   location: LocationRow | null;
   host: string;
+  hostLast: string;
 }
 
 async function loadContext(db: Db, guestId: string): Promise<Context | null> {
@@ -202,14 +238,20 @@ async function loadContext(db: Db, guestId: string): Promise<Context | null> {
   const reservation = res as GuestCampaignReservation;
   const locationId = reservation.location_id || g.location_id;
   const { data: loc } = locationId
-    ? await db.from('locations').select('id, name, timezone, guest_arrival_instructions').eq('id', locationId).maybeSingle()
+    ? await db
+        .from('locations')
+        .select('id, name, timezone, guest_arrival_instructions, address, parking_instructions')
+        .eq('id', locationId)
+        .maybeSingle()
     : { data: null };
   let host = (reservation.first_name || '').trim().split(' ')[0];
+  let hostLast = host ? (reservation.last_name || '').trim() : '';
   if (!host && reservation.member_id) {
-    const { data: m } = await db.from('members').select('first_name').eq('member_id', reservation.member_id).maybeSingle();
+    const { data: m } = await db.from('members').select('first_name, last_name').eq('member_id', reservation.member_id).maybeSingle();
     host = ((m as { first_name?: string } | null)?.first_name || '').trim();
+    hostLast = host ? ((m as { last_name?: string } | null)?.last_name || '').trim() : '';
   }
-  return { guest: g, reservation, location: (loc as LocationRow) || null, host: host || 'your host' };
+  return { guest: g, reservation, location: (loc as LocationRow) || null, host: host || 'your host', hostLast };
 }
 
 export type GuestCampaignOutcome = 'sent' | 'duplicate' | 'exhausted' | 'failed' | `skipped:${string}`;
@@ -251,6 +293,9 @@ async function deliver(
     guestFirstName: guest.first_name_snapshot || contact.first_name,
     guestLastName: contact.last_name,
     hostFirstName: ctx.host,
+    hostLastName: ctx.hostLast,
+    locationAddress: location?.address,
+    parkingInstructions: location?.parking_instructions,
     locationName: location?.name || 'Noir',
     start: reservation.start_time,
     partySize: reservation.party_size,
@@ -367,22 +412,61 @@ export async function processGuestAddedCampaignMessage(message: GuestCampaignMes
   if (message.timing_type === 'immediate') return 0; // sent as the guest is added
   if (message.campaigns?.is_active === false) return 0;
 
-  const since = now.minus({ minutes: lookbackMinutes(message) }).toUTC().toISO()!;
-  const { data: guests, error } = await db
-    .from('reservation_guests')
-    .select('id, location_id, created_at')
-    .eq('status', 'active')
-    .gte('created_at', since)
-    .order('created_at', { ascending: true })
-    .limit(1000);
-  if (error) {
-    console.error('[guest campaigns] could not load guests', error.message);
-    return 0;
+  // Which guests could be due now. Counted from the reservation: guests on
+  // reservations starting in the matching window. Counted from when the guest
+  // was added: guests added within the lookback.
+  type Candidate = { id: string; location_id: string | null; created_at: string; reservation_start?: string | null };
+  let candidates: Candidate[] = [];
+  if (anchorsOnReservation(message)) {
+    const offset = signedOffsetMinutes(message);
+    const slack = ['minute', 'hour'].includes(message.relative_unit || 'day') ? 0 : 1440;
+    const from = now.minus({ minutes: offset + WINDOW_PAST_MINUTES + 1 + slack }).toUTC().toISO()!;
+    const to = now.minus({ minutes: offset - WINDOW_FUTURE_MINUTES - 1 - slack }).toUTC().toISO()!;
+    const { data: resRows, error: resError } = await db
+      .from('reservations')
+      .select('id, start_time, status')
+      .gte('start_time', from)
+      .lte('start_time', to)
+      .limit(1000);
+    if (resError) {
+      console.error('[guest campaigns] could not load reservations', resError.message);
+      return 0;
+    }
+    const live = ((resRows || []) as Array<{ id: string; start_time: string; status: string | null }>).filter((r) => r.status !== 'cancelled');
+    if (live.length === 0) return 0;
+    const startById = new Map(live.map((r) => [r.id, r.start_time]));
+    const { data: guestRows, error: guestError } = await db
+      .from('reservation_guests')
+      .select('id, location_id, created_at, reservation_id')
+      .eq('status', 'active')
+      .in('reservation_id', [...startById.keys()]);
+    if (guestError) {
+      console.error('[guest campaigns] could not load guests', guestError.message);
+      return 0;
+    }
+    candidates = ((guestRows || []) as Array<Candidate & { reservation_id: string }>).map((g) => ({
+      ...g,
+      reservation_start: startById.get(g.reservation_id) || null,
+    }));
+  } else {
+    const since = now.minus({ minutes: lookbackMinutes(message) }).toUTC().toISO()!;
+    const { data: guests, error } = await db
+      .from('reservation_guests')
+      .select('id, location_id, created_at')
+      .eq('status', 'active')
+      .gte('created_at', since)
+      .order('created_at', { ascending: true })
+      .limit(1000);
+    if (error) {
+      console.error('[guest campaigns] could not load guests', error.message);
+      return 0;
+    }
+    candidates = (guests || []) as Candidate[];
   }
 
   const tzCache = new Map<string, string>();
   let sent = 0;
-  for (const row of (guests || []) as Array<{ id: string; location_id: string | null; created_at: string }>) {
+  for (const row of candidates) {
     if (!messageAppliesToGuestLocation(message, row.location_id)) continue;
     const locKey = row.location_id || '';
     if (!tzCache.has(locKey)) {
@@ -391,7 +475,7 @@ export async function processGuestAddedCampaignMessage(message: GuestCampaignMes
         : { data: null };
       tzCache.set(locKey, (loc as { timezone?: string } | null)?.timezone || DEFAULT_TIMEZONE);
     }
-    const target = guestAddedSendTime(message, DateTime.fromISO(row.created_at, { zone: 'utc' }), tzCache.get(locKey)!);
+    const target = guestAddedSendTime(message, DateTime.fromISO(row.created_at, { zone: 'utc' }), tzCache.get(locKey)!, row.reservation_start);
     if (!target) continue;
     const diff = target.diff(now, 'minutes').minutes;
     if (diff > WINDOW_FUTURE_MINUTES || diff < -WINDOW_PAST_MINUTES) continue;

@@ -4,9 +4,17 @@ import { getAdmin } from '@/lib/guestApi';
 
 /**
  * GET   /api/admin/locations/[id]/guest-arrival
- * PATCH /api/admin/locations/[id]/guest-arrival  { guest_arrival_instructions }
- * How reservation guests get in, per venue ({{arrival_instructions}} in guest texts).
+ * PATCH /api/admin/locations/[id]/guest-arrival  { address?, guest_arrival_instructions?, parking_instructions? }
+ *
+ * Per-venue guest info used in texts:
+ *   address                     → {{location_address}}
+ *   guest_arrival_instructions  → {{arrival_instructions}}
+ *   parking_instructions        → {{parking_instructions}}
  */
+const FIELDS = 'id, address, guest_arrival_instructions, parking_instructions';
+const LIMITS: Record<string, number> = { address: 200, guest_arrival_instructions: 200, parking_instructions: 200 };
+const LABELS: Record<string, string> = { address: 'Address', guest_arrival_instructions: 'How guests get in', parking_instructions: 'Parking' };
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'GET' && req.method !== 'PATCH') {
     res.setHeader('Allow', ['GET', 'PATCH']);
@@ -16,21 +24,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const id = String(req.query.id || '');
 
   if (req.method === 'GET') {
-    const { data, error } = await supabaseAdmin.from('locations').select('id, guest_arrival_instructions').eq('id', id).maybeSingle();
-    if (error) return res.status(500).json({ error: 'Needs the reservation-guests migration applied.' });
+    const { data, error } = await supabaseAdmin.from('locations').select(FIELDS).eq('id', id).maybeSingle();
+    if (error) return res.status(500).json({ error: 'Could not load location guest info.' });
     if (!data) return res.status(404).json({ error: 'Location not found' });
     return res.status(200).json(data);
   }
 
-  const raw = req.body?.guest_arrival_instructions;
-  const text = raw == null ? null : String(raw).trim() || null;
-  if (text && text.length > 200) return res.status(400).json({ error: 'Keep it under 200 characters — it goes in a text message.' });
-  const { data, error } = await supabaseAdmin
-    .from('locations')
-    .update({ guest_arrival_instructions: text })
-    .eq('id', id)
-    .select('id, guest_arrival_instructions')
-    .maybeSingle();
+  const patch: Record<string, string | null> = {};
+  for (const key of Object.keys(LIMITS)) {
+    if (req.body?.[key] === undefined) continue;
+    const text = req.body[key] == null ? null : String(req.body[key]).trim() || null;
+    if (text && text.length > LIMITS[key]) {
+      return res.status(400).json({ error: `${LABELS[key]}: keep it under ${LIMITS[key]} characters — it goes in a text message.` });
+    }
+    patch[key] = text;
+  }
+  if (Object.keys(patch).length === 0) return res.status(400).json({ error: 'Nothing to update.' });
+
+  const { data, error } = await supabaseAdmin.from('locations').update(patch).eq('id', id).select(FIELDS).maybeSingle();
   if (error) return res.status(500).json({ error: 'Could not save.' });
   if (!data) return res.status(404).json({ error: 'Location not found' });
   return res.status(200).json(data);

@@ -86,6 +86,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return;
       }
 
+      if (message.relative_anchor != null && !['trigger', 'reservation_start'].includes(message.relative_anchor)) {
+        res.status(400).json({ error: 'Invalid relative_anchor', details: 'Must be trigger or reservation_start' });
+        return;
+      }
+
       // Check if campaign exists
       const { data: campaign, error: campaignError } = await supabaseAdmin
         .from('campaigns')

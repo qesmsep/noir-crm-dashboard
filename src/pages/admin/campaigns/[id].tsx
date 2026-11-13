@@ -63,6 +63,7 @@ interface CampaignTemplate {
   relative_quantity?: number;
   relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
   relative_proximity?: 'before' | 'after';
+  relative_anchor?: 'trigger' | 'reservation_start' | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -350,6 +351,10 @@ export default function CampaignEditPage() {
         return `${displayTime} on trigger date`;
       } else {
         const unitText = quantity === 1 ? unit : unit + 's';
+        if (template.relative_anchor === 'reservation_start') {
+          const exact = unit === 'minute' || unit === 'hour';
+          return `${exact ? '' : `${displayTime} `}${quantity} ${unitText} ${proximity} the reservation`;
+        }
         return `${displayTime} ${quantity} ${unitText} ${proximity} trigger`;
       }
     }
