@@ -10,7 +10,7 @@ import StaffReservationGuests from './guests/StaffReservationGuests';
 
 // Small label above each field so staff can tell fields apart once they hold values.
 const fieldStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.25rem' };
-const labelStyle: React.CSSProperties = { fontSize: '0.75rem', fontWeight: 600, color: '#6B7280' };
+const labelStyle: React.CSSProperties = { fontSize: '0.75rem', fontWeight: 600, color: '#4B5563' };
 
 const eventTypes = [
   { value: 'birthday', label: '🎂 Birthday' },
@@ -498,7 +498,10 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
       <div
         style={{
           backgroundColor: '#ECEDE8',
+          // Own text color + light controls: phones in dark mode otherwise inherit
+          // white body text from globals.css, leaving fields white on white.
           color: '#1F1F1F',
+          colorScheme: 'light',
           borderRadius: isMobile ? '0' : '16px',
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
           maxWidth: isMobile ? '100%' : '600px',
@@ -633,6 +636,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       borderRadius: '10px',
                       fontSize: '0.875rem',
                       backgroundColor: 'white',
+                      color: '#1F1F1F',
                       outline: 'none',
                     }}
                   />
@@ -652,6 +656,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       borderRadius: '10px',
                       fontSize: '0.875rem',
                       backgroundColor: 'white',
+                      color: '#1F1F1F',
                       outline: 'none',
                     }}
                   />
@@ -671,6 +676,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       borderRadius: '10px',
                       fontSize: '0.875rem',
                       backgroundColor: 'white',
+                      color: '#1F1F1F',
                       outline: 'none',
                     }}
                   />
@@ -690,6 +696,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       borderRadius: '10px',
                       fontSize: '0.875rem',
                       backgroundColor: 'white',
+                      color: '#1F1F1F',
                       outline: 'none',
                     }}
                   />
@@ -711,6 +718,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       borderRadius: '10px',
                       fontSize: '0.875rem',
                       backgroundColor: 'white',
+                      color: '#1F1F1F',
                       outline: 'none',
                       cursor: 'pointer',
                     }}
@@ -733,6 +741,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       borderRadius: '10px',
                       fontSize: '0.875rem',
                       backgroundColor: 'white',
+                      color: '#1F1F1F',
                       outline: 'none',
                       cursor: 'pointer',
                     }}
@@ -756,6 +765,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       borderRadius: '10px',
                       fontSize: '0.875rem',
                       backgroundColor: 'white',
+                      color: '#1F1F1F',
                       outline: 'none',
                       cursor: 'pointer',
                     }}
@@ -783,6 +793,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       borderRadius: '10px',
                       fontSize: '0.875rem',
                       backgroundColor: 'white',
+                      color: '#1F1F1F',
                       outline: 'none',
                     }}
                   />
@@ -802,6 +813,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                       borderRadius: '10px',
                       fontSize: '0.875rem',
                       backgroundColor: 'white',
+                      color: '#1F1F1F',
                       outline: 'none',
                     }}
                   />
@@ -823,6 +835,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     borderRadius: '10px',
                     fontSize: '0.875rem',
                     backgroundColor: 'white',
+                    color: '#1F1F1F',
                     outline: 'none',
                     resize: 'vertical',
                     fontFamily: 'inherit',
@@ -884,6 +897,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     borderRadius: '10px',
                     fontSize: '0.875rem',
                     backgroundColor: 'white',
+                    color: '#1F1F1F',
                     outline: 'none',
                     resize: 'vertical',
                     fontFamily: 'inherit',
