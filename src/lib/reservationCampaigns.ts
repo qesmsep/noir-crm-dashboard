@@ -116,17 +116,17 @@ export function renderReservationMessage(
   const first = reservation.first_name || 'Guest';
   const last = reservation.last_name || '';
   return content
-    .replace(/\{\{first_name\}\}/g, first)
-    .replace(/\{\{last_name\}\}/g, last)
-    .replace(/\{\{member_name\}\}/g, `${first} ${last}`.trim())
-    .replace(/\{\{phone\}\}/g, reservation.phone || '')
-    .replace(/\{\{email\}\}/g, reservation.email || '')
-    .replace(/\{\{reservation_time\}\}/g, start.isValid ? start.toFormat('h:mm a') : '')
-    .replace(/\{\{reservation_date\}\}/g, start.isValid ? start.toFormat('MMMM d, yyyy') : '')
-    .replace(/\{\{party_size\}\}/g, reservation.party_size != null ? String(reservation.party_size) : '')
-    .replace(/\{\{location_name\}\}/g, location?.name || '')
-    .replace(/\{\{location_address\}\}/g, (location?.address || '').trim())
-    .replace(/\{\{parking_instructions\}\}/g, (location?.parking_instructions || '').trim())
+    .replace(/\{\{first_name\}\}/g, () => first)
+    .replace(/\{\{last_name\}\}/g, () => last)
+    .replace(/\{\{member_name\}\}/g, () => `${first} ${last}`.trim())
+    .replace(/\{\{phone\}\}/g, () => reservation.phone || '')
+    .replace(/\{\{email\}\}/g, () => reservation.email || '')
+    .replace(/\{\{reservation_time\}\}/g, () => start.isValid ? start.toFormat('h:mm a') : '')
+    .replace(/\{\{reservation_date\}\}/g, () => start.isValid ? start.toFormat('MMMM d, yyyy') : '')
+    .replace(/\{\{party_size\}\}/g, () => reservation.party_size != null ? String(reservation.party_size) : '')
+    .replace(/\{\{location_name\}\}/g, () => location?.name || '')
+    .replace(/\{\{location_address\}\}/g, () => (location?.address || '').trim())
+    .replace(/\{\{parking_instructions\}\}/g, () => (location?.parking_instructions || '').trim())
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }

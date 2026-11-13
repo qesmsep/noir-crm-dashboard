@@ -83,6 +83,18 @@ function msg(extra: Partial<GuestCampaignMessage>): GuestCampaignMessage {
   } as GuestCampaignMessage;
 }
 
+describe('admin-entered text is inserted literally', () => {
+  it('keeps $ sequences and braces as typed', () => {
+    const r = { first_name: 'Ava', last_name: null, email: null, phone: null, party_size: 2, start_time: START };
+    expect(renderReservationMessage('{{parking_instructions}}', r, { name: 'Noir KC', timezone: TZ, parking_instructions: "Valet $5 $& $' {{first_name}}" })).toBe(
+      "Valet $5 $& $' {{first_name}}",
+    );
+    expect(
+      renderGuestMessage('{{location_address}}', { guestFirstName: 'A', hostFirstName: 'T', locationName: 'N', locationAddress: 'Suite $1', start: START, timezone: TZ }),
+    ).toBe('Suite $1');
+  });
+});
+
 describe('timing relative to the reservation', () => {
   const added = DateTime.fromISO('2026-11-12T18:00:00Z', { zone: 'utc' });
   it('"3 hours before the reservation" is exact', () => {
@@ -129,6 +141,13 @@ describe('cron: reservation-anchored Guest Registration messages', () => {
         },
       },
     );
+  });
+
+  it('"1 month before" is found despite month-length differences', async () => {
+    // Reservation Nov 19 8 PM Central; 1 month before at 10:00 → Oct 19 10:00 CDT = 15:00Z
+    db.rows('reservation_guests')[0].created_at = '2026-10-01T18:00:00Z';
+    const m = msg({ relative_quantity: 1, relative_unit: 'month', relative_proximity: 'before', relative_time: '10:00' });
+    expect(await processGuestAddedCampaignMessage(m, { now: () => DateTime.fromISO('2026-10-19T15:01:00Z', { zone: 'utc' }) })).toBe(1);
   });
 
   it('sends 3 hours before the reservation, once, and skips cancelled reservations', async () => {

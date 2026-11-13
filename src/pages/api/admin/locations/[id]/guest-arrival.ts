@@ -32,8 +32,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   const patch: Record<string, string | null> = {};
   for (const key of Object.keys(LIMITS)) {
-    if (req.body?.[key] === undefined) continue;
-    const text = req.body[key] == null ? null : String(req.body[key]).trim() || null;
+    const raw = req.body?.[key];
+    if (raw === undefined) continue;
+    if (raw !== null && typeof raw !== 'string') return res.status(400).json({ error: `${LABELS[key]} must be text.` });
+    const text = raw == null ? null : raw.trim() || null;
     if (text && text.length > LIMITS[key]) {
       return res.status(400).json({ error: `${LABELS[key]}: keep it under ${LIMITS[key]} characters — it goes in a text message.` });
     }

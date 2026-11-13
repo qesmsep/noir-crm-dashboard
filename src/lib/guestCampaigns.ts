@@ -140,12 +140,12 @@ export function guestAddedSendTime(
   timezone: string,
   reservationStart?: string | null,
 ): DateTime | null {
+  if (message.timing_type === 'immediate') return addedAt.setZone(timezone);
   const fromReservation = anchorsOnReservation(message);
   if (fromReservation && !reservationStart) return null;
   const trigger = fromReservation
     ? DateTime.fromISO(reservationStart!, { zone: 'utc' }).setZone(timezone)
     : addedAt.setZone(timezone);
-  if (message.timing_type === 'immediate') return addedAt.setZone(timezone);
   if (message.timing_type === 'relative') {
     const q = message.relative_quantity || 0;
     const unit = message.relative_unit || 'day';
@@ -202,17 +202,17 @@ export function renderGuestCampaignMessage(
   const start = DateTime.fromISO(ctx.start, { zone: 'utc' }).setZone(ctx.timezone);
   const arrival = (ctx.arrivalInstructions || '').trim() || DEFAULT_ARRIVAL_INSTRUCTIONS;
   return content
-    .replace(/\{\{(guest_first_name|first_name)\}\}/g, ctx.guestFirstName)
-    .replace(/\{\{(guest_last_name|last_name)\}\}/g, ctx.guestLastName || '')
-    .replace(/\{\{host_first_name\}\}/g, ctx.hostFirstName)
-    .replace(/\{\{host_last_name\}\}/g, ctx.hostLastName || '')
-    .replace(/\{\{location_name\}\}/g, ctx.locationName)
-    .replace(/\{\{location_address\}\}/g, (ctx.locationAddress || '').trim())
-    .replace(/\{\{parking_instructions\}\}/g, (ctx.parkingInstructions || '').trim())
-    .replace(/\{\{reservation_date\}\}/g, start.isValid ? start.toFormat('cccc, LLLL d') : '')
-    .replace(/\{\{reservation_time\}\}/g, start.isValid ? start.toFormat('h:mm a') : '')
-    .replace(/\{\{party_size\}\}/g, ctx.partySize != null ? String(ctx.partySize) : '')
-    .replace(/\{\{arrival_instructions\}\}/g, arrival)
+    .replace(/\{\{(guest_first_name|first_name)\}\}/g, () => ctx.guestFirstName)
+    .replace(/\{\{(guest_last_name|last_name)\}\}/g, () => ctx.guestLastName || '')
+    .replace(/\{\{host_first_name\}\}/g, () => ctx.hostFirstName)
+    .replace(/\{\{host_last_name\}\}/g, () => ctx.hostLastName || '')
+    .replace(/\{\{location_name\}\}/g, () => ctx.locationName)
+    .replace(/\{\{location_address\}\}/g, () => (ctx.locationAddress || '').trim())
+    .replace(/\{\{parking_instructions\}\}/g, () => (ctx.parkingInstructions || '').trim())
+    .replace(/\{\{reservation_date\}\}/g, () => start.isValid ? start.toFormat('cccc, LLLL d') : '')
+    .replace(/\{\{reservation_time\}\}/g, () => start.isValid ? start.toFormat('h:mm a') : '')
+    .replace(/\{\{party_size\}\}/g, () => ctx.partySize != null ? String(ctx.partySize) : '')
+    .replace(/\{\{arrival_instructions\}\}/g, () => arrival)
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
@@ -419,7 +419,10 @@ export async function processGuestAddedCampaignMessage(message: GuestCampaignMes
   let candidates: Candidate[] = [];
   if (anchorsOnReservation(message)) {
     const offset = signedOffsetMinutes(message);
-    const slack = ['minute', 'hour'].includes(message.relative_unit || 'day') ? 0 : 1440;
+    // Offsets in minutes are approximate for calendar units (a month is 28–31
+    // days, a year 365–366) and day+ units land on a clock time, so widen the
+    // search; the exact send time is computed per guest below.
+    const slack = ({ minute: 0, hour: 0, day: 1440, week: 1440, month: 5 * 1440, year: 3 * 1440 } as Record<string, number>)[message.relative_unit || 'day'] ?? 1440;
     const from = now.minus({ minutes: offset + WINDOW_PAST_MINUTES + 1 + slack }).toUTC().toISO()!;
     const to = now.minus({ minutes: offset - WINDOW_FUTURE_MINUTES - 1 - slack }).toUTC().toISO()!;
     const { data: resRows, error: resError } = await db
@@ -427,27 +430,31 @@ export async function processGuestAddedCampaignMessage(message: GuestCampaignMes
       .select('id, start_time, status')
       .gte('start_time', from)
       .lte('start_time', to)
-      .limit(1000);
+      .order('start_time', { ascending: true })
+      .limit(2000);
     if (resError) {
       console.error('[guest campaigns] could not load reservations', resError.message);
       return 0;
     }
+    if ((resRows || []).length >= 2000) console.warn('[guest campaigns] reservation window hit the 2000-row cap; some guests may be skipped', message.id);
     const live = ((resRows || []) as Array<{ id: string; start_time: string; status: string | null }>).filter((r) => r.status !== 'cancelled');
     if (live.length === 0) return 0;
     const startById = new Map(live.map((r) => [r.id, r.start_time]));
-    const { data: guestRows, error: guestError } = await db
-      .from('reservation_guests')
-      .select('id, location_id, created_at, reservation_id')
-      .eq('status', 'active')
-      .in('reservation_id', [...startById.keys()]);
-    if (guestError) {
-      console.error('[guest campaigns] could not load guests', guestError.message);
-      return 0;
+    const ids = [...startById.keys()];
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data: guestRows, error: guestError } = await db
+        .from('reservation_guests')
+        .select('id, location_id, created_at, reservation_id')
+        .eq('status', 'active')
+        .in('reservation_id', ids.slice(i, i + 150));
+      if (guestError) {
+        console.error('[guest campaigns] could not load guests', guestError.message);
+        return 0;
+      }
+      for (const g of (guestRows || []) as Array<Candidate & { reservation_id: string }>) {
+        candidates.push({ ...g, reservation_start: startById.get(g.reservation_id) || null });
+      }
     }
-    candidates = ((guestRows || []) as Array<Candidate & { reservation_id: string }>).map((g) => ({
-      ...g,
-      reservation_start: startById.get(g.reservation_id) || null,
-    }));
   } else {
     const since = now.minus({ minutes: lookbackMinutes(message) }).toUTC().toISO()!;
     const { data: guests, error } = await db
