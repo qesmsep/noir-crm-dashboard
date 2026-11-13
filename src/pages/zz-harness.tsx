@@ -26,5 +26,12 @@ if (typeof window !== 'undefined' && !(window as any).__harness) {
 const Modal = dynamic(() => import('../components/ReservationEditModal'), { ssr: false });
 
 export default function Harness() {
+  if (typeof window !== 'undefined' && window.location.search.includes('frame')) {
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: '#111', zIndex: 2147483647, padding: 8 }}>
+        <iframe src="/zz-harness" style={{ width: 390, height: 844, border: 0, background: '#fff' }} />
+      </div>
+    );
+  }
   return <Modal isOpen reservationId="r1" onClose={() => {}} onReservationUpdated={() => {}} />;
 }
