@@ -372,7 +372,8 @@ export async function sendReservationCreatedMessages(
         result.skipped++;
         continue;
       }
-      const guestLink = usesGuestLink(message.content) ? await guestLinkForReservation(r.id, db) : '';
+      const needsLink = usesGuestLink(message.content);
+      const guestLink = needsLink ? await guestLinkForReservation(r.id, db) : '';
       const content = renderReservationMessage(message.content, r, location, { guestLink });
       const scheduledTime = now.toISO()!;
       const claim = await claimReservationSend(db, {
@@ -389,6 +390,19 @@ export async function sendReservationCreatedMessages(
       }
       if (claim.kind === 'error') {
         console.error('[reservation campaigns] could not record send', claim.error);
+        result.failed++;
+        continue;
+      }
+      // A message that uses {{guest_link}} never goes out without the link:
+      // record a failed attempt instead, so the retry pass tries again.
+      if (needsLink && !guestLink) {
+        await finishReservationSend(
+          db,
+          claim.rowId,
+          { ok: false, error: 'guest link unavailable' },
+          { campaignMessageId: message.id, memberId: r.member_id, phone, content, scheduledTime },
+          now,
+        );
         result.failed++;
         continue;
       }

@@ -880,6 +880,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
               member.reservation_id && usesGuestLink(message.content)
                 ? await guestLinkForReservation(member.reservation_id)
                 : '';
+            // Never send a {{guest_link}} message without the link.
+            if (usesGuestLink(message.content) && !guestLink) {
+              console.error(`❌ No guest link for reservation ${member.reservation_id}; skipping message ${message.id}`);
+              continue;
+            }
             messageContent = renderReservationMessage(
               message.content,
               {
