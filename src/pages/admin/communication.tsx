@@ -29,7 +29,7 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest' | 'reservation_guest_member' | 'reservation_guest_nonmember';
   specific_phone?: string;
   timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   specific_time?: string;
@@ -267,7 +267,11 @@ export default function CommunicationPage() {
       case 'all_members':
         return 'All Members';
       case 'reservation_guest':
-        return 'The guest';
+        return 'All guests';
+      case 'reservation_guest_member':
+        return 'Guests who are members';
+      case 'reservation_guest_nonmember':
+        return "Guests who aren't members";
       case 'member_only':
         return "Members' reservations";
       case 'guest_only':

@@ -32,6 +32,8 @@ import {
   type GuestDeps,
 } from '@/lib/reservationGuests';
 
+import { GUEST_RECIPIENT_TYPES, guestRecipientMatches, isGuestRecipient } from '@/lib/guestRecipients';
+
 export const GUEST_REGISTRATION_TRIGGER = 'guest_registration';
 /** Sent through the guest queue when a reservation with guests moves or is cancelled. */
 export const RESERVATION_MOVED_TRIGGER = 'reservation_moved';
@@ -280,15 +282,22 @@ async function deliver(
   if (reservation.status === 'cancelled') return 'skipped:reservation_cancelled';
   if (!contact) return 'skipped:no_contact';
 
-  const toGuest = message.recipient_type === 'reservation_guest';
+  const toGuest = isGuestRecipient(message.recipient_type);
   let phone: string | null;
   if (toGuest) {
     if (contact.sms_opted_out_at) return 'skipped:opted_out';
-    if (guest.matched_member_id) return 'skipped:matched_member';
-    const memberNow = await findMemberIdByPhone(db, contact.phone);
-    if (memberNow) {
-      await db.from('reservation_guests').update({ matched_member_id: memberNow }).eq('id', guest.id);
-      return 'skipped:matched_member';
+    // Members on someone else's reservation get the guest texts too. Keep the
+    // member badge current if they joined since they were added.
+    let isMember = !!guest.matched_member_id;
+    if (!isMember) {
+      const memberNow = await findMemberIdByPhone(db, contact.phone);
+      if (memberNow) {
+        isMember = true;
+        await db.from('reservation_guests').update({ matched_member_id: memberNow }).eq('id', guest.id);
+      }
+    }
+    if (!guestRecipientMatches(message.recipient_type, isMember)) {
+      return isMember ? 'skipped:recipient_nonmembers_only' : 'skipped:recipient_members_only';
     }
     phone = contact.phone;
   } else if (message.recipient_type === 'specific_phone') {
@@ -385,7 +394,7 @@ export async function loadGuestEventMessages(db: Db, trigger: string, locationId
     .from('campaign_messages')
     .select(MESSAGE_SELECT)
     .eq('is_active', true)
-    .eq('recipient_type', 'reservation_guest')
+    .in('recipient_type', [...GUEST_RECIPIENT_TYPES])
     .eq('campaigns.trigger_type', trigger);
   if (error) {
     console.error('[guest campaigns] could not load messages', trigger, error.message);
@@ -393,7 +402,7 @@ export async function loadGuestEventMessages(db: Db, trigger: string, locationId
   }
   return ((data || []) as unknown as GuestCampaignMessage[])
     .filter((m) => messageAppliesToGuestLocation(m, locationId, trigger))
-    .map((m) => ({ id: m.id, content: m.content, active: true }));
+    .map((m) => ({ id: m.id, content: m.content, active: true, recipient_type: m.recipient_type }));
 }
 
 /** One queued moved/cancelled message, re-read at send time (it may have been edited or turned off). */
@@ -401,7 +410,7 @@ export async function loadEventCampaignMessage(db: Db, id: string): Promise<Even
   const { data } = await db.from('campaign_messages').select(MESSAGE_SELECT).eq('id', id).maybeSingle();
   if (!data) return null;
   const m = data as unknown as GuestCampaignMessage;
-  return { id: m.id, content: m.content, active: m.is_active !== false && m.campaigns?.is_active !== false };
+  return { id: m.id, content: m.content, active: m.is_active !== false && m.campaigns?.is_active !== false, recipient_type: m.recipient_type };
 }
 
 /**
@@ -433,9 +442,10 @@ export async function sendGuestAddedCampaignMessages(
     for (const m of late) outcomes.push(await deliver(db, deps, m, ctx, now));
     const templates = await loadTemplates(db);
     const legacyDayOf = introCoveredByDayOf({ start: ctx.reservation.start_time, now, dayOfActive: activeKindsFrom(templates).has('day_of') });
-    const lateToGuest = catchUp.some((m) => m.recipient_type === 'reservation_guest');
+    const isMember = !!ctx.guest.matched_member_id;
+    const lateToGuest = catchUp.some((m) => guestRecipientMatches(m.recipient_type, isMember));
     if (legacyDayOf || lateToGuest) {
-      for (const m of messages.filter((x) => x.recipient_type !== 'reservation_guest')) outcomes.push(await deliver(db, deps, m, ctx, now));
+      for (const m of messages.filter((x) => !isGuestRecipient(x.recipient_type))) outcomes.push(await deliver(db, deps, m, ctx, now));
       return { outcomes, reason: 'intro_covered_by_day_of' };
     }
     for (const m of messages) outcomes.push(await deliver(db, deps, m, ctx, now));

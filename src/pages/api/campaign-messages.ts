@@ -66,7 +66,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const validRecipientTypes = [
         'member', 'all_members', 'specific_phone', 'both_members',
         'reservation_phones', 'private_event_rsvps', 'all_primary_members',
-        'member_only', 'guest_only', 'reservation_guest'
+        'member_only', 'guest_only', 'reservation_guest', 'reservation_guest_member', 'reservation_guest_nonmember'
       ];
       if (message.recipient_type && !validRecipientTypes.includes(message.recipient_type)) {
         res.status(400).json({ 
