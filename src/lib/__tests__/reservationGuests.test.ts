@@ -617,6 +617,17 @@ describe('guest texts from Campaigns', () => {
     expect(mockSend.mock.calls[0][0].content).toBe('See you at 8:00 PM, Ava.');
   });
 
+  it('the cron does not send the day-of again after the catch-up sent it', async () => {
+    seed({ intro: true, templates: TEMPLATES_OFF, messages: [DAY_OF] });
+    clock = DateTime.fromISO('2026-11-20T01:30:00.000Z', { zone: 'utc' });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    const { processGuestAddedCampaignMessage } = await import('../guestCampaigns');
+    clock = DateTime.fromISO('2026-11-20T01:35:00.000Z', { zone: 'utc' });
+    expect(await processGuestAddedCampaignMessage(DAY_OF as never, deps())).toBe(0);
+    expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
   it('a guest added well ahead gets the intro; the day-of waits for its time', async () => {
     seed({ intro: true, templates: TEMPLATES_OFF, messages: [DAY_OF] });
     await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());

@@ -104,9 +104,9 @@ BEGIN
 END $$;
 
 -- 3c) Day-of wording into a Guest Registration message (only once), timed
--- from the reservation. Skipped when a "before" Guest Registration message
--- already exists (step 5 times it from the reservation), so guests never get
--- two day-of texts.
+-- from the reservation. Skipped when an active "before" Guest Registration
+-- message to guests already exists (step 5 times it from the reservation), so
+-- guests never get two day-of texts.
 DO $$
 DECLARE
   t RECORD;
@@ -119,6 +119,8 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM public.campaign_messages m JOIN public.campaigns c ON c.id = m.campaign_id
      WHERE c.trigger_type = 'guest_registration'
+       AND c.is_active AND m.is_active
+       AND m.recipient_type = 'reservation_guest'
        AND m.timing_type = 'relative'
        AND m.relative_proximity = 'before'
        AND (m.relative_anchor IS NULL OR m.relative_anchor = 'reservation_start')
@@ -169,7 +171,8 @@ COMMIT;
 --  WHERE c.trigger_type = 'guest_registration' AND m.timing_type = 'relative'
 --    AND m.relative_proximity = 'before' AND m.relative_anchor IS NULL;
 -- SELECT m.name FROM campaign_messages m JOIN campaigns c ON c.id = m.campaign_id
---  WHERE c.trigger_type = 'guest_registration' AND m.timing_type = 'relative'
+--  WHERE c.trigger_type = 'guest_registration' AND c.is_active AND m.is_active
+--    AND m.recipient_type = 'reservation_guest' AND m.timing_type = 'relative'
 --    AND m.relative_proximity = 'before'
 --    AND (m.relative_anchor IS NULL OR m.relative_anchor = 'reservation_start');
 -- After applying:
