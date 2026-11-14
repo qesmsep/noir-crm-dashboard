@@ -6,7 +6,14 @@
 -- Note: this deletes every campaign on the three new triggers, including any
 -- messages staff created or edited after the forward migration ran.
 BEGIN;
-UPDATE public.guest_message_templates SET is_active = true WHERE kind IN ('day_of', 'time_changed', 'cancelled');
+-- day_of had no campaign copy, so it goes back on. time_changed and cancelled
+-- take the on/off state of the campaigns that replaced them, so a text staff
+-- had turned off stays off.
+UPDATE public.guest_message_templates SET is_active = true WHERE kind = 'day_of';
+UPDATE public.guest_message_templates t SET is_active = c.is_active
+  FROM public.campaigns c
+ WHERE (t.kind = 'time_changed' AND c.trigger_type = 'reservation_moved')
+    OR (t.kind = 'cancelled' AND c.trigger_type = 'reservation_cancelled');
 DELETE FROM public.scheduled_guest_messages WHERE campaign_message_id IS NOT NULL AND status = 'pending';
 -- Keep the sent/failed history: detach it before the campaign messages go,
 -- since the column cascades on delete.
