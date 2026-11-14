@@ -147,11 +147,15 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
 
   const spotsLeft = Math.max(0, partySize - 1 - guests.length);
 
+  // Explicit grays and a dark primary button: cork with white text is too faint
+  // to read on a phone, and the theme's muted/border tokens are undefined.
+  const darkButton = 'bg-[#1F1F1F] text-white hover:bg-black';
+
   return (
-    <section className="flex flex-col gap-3 rounded-lg border border-border-cream-1 bg-white p-3" aria-label="Guests">
+    <section className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 text-gray-900" aria-label="Guests">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-text-primary">
-          Guests {guests.length > 0 && <span className="font-normal text-text-muted">({guests.length})</span>}
+          Guests {guests.length > 0 && <span className="font-normal text-gray-700">({guests.length})</span>}
         </h3>
       </div>
 
@@ -162,10 +166,10 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
       )}
       {error && <p className="text-sm text-error-red">{error}</p>}
 
-      {!loading && !error && guests.length === 0 && <p className="text-sm text-text-muted">No guests added.</p>}
+      {!loading && !error && guests.length === 0 && <p className="text-sm text-gray-700">No guests added.</p>}
 
       {!loading && guests.length > 0 && (
-        <ul className="flex flex-col divide-y divide-border-cream-1">
+        <ul className="flex flex-col divide-y divide-gray-200">
           {guests.map((g) => (
             <li key={g.id} className="flex flex-col gap-2 py-2">
               {editing?.id === g.id ? (
@@ -180,7 +184,7 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
                   </div>
                   <div className="flex gap-2">
                     <Button
-                      className="h-11 flex-1"
+                      className={`h-11 flex-1 ${darkButton}`}
                       disabled={busy === g.id || !editing.first_name.trim()}
                       onClick={async () => {
                         if (await patch(g.id, { first_name: editing.first_name, last_name: editing.last_name })) setEditing(null);
@@ -188,7 +192,7 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
                     >
                       Save
                     </Button>
-                    <Button variant="ghost" className="h-11 flex-1" onClick={() => setEditing(null)}>
+                    <Button variant="ghost" className="h-11 flex-1 text-gray-900" onClick={() => setEditing(null)}>
                       Cancel
                     </Button>
                   </div>
@@ -200,12 +204,12 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
                       {g.first_name} {g.last_name || ''}
                     </p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                      <span className="text-xs text-text-muted">{g.phone_display}</span>
+                      <span className="text-xs text-gray-700">{g.phone_display}</span>
                       {g.is_member && <Badge variant="secondary">member</Badge>}
                       {g.opted_out && <Badge variant="outline">opted out</Badge>}
                     </div>
                   </div>
-                  <label className="flex h-11 items-center gap-2 text-xs text-text-muted">
+                  <label className="flex h-11 items-center gap-2 text-xs text-gray-700">
                     <Switch
                       checked={!!g.checked_in_at}
                       disabled={busy === g.id}
@@ -214,10 +218,10 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
                     />
                     In
                   </label>
-                  <Button variant="ghost" className="h-11 w-11 p-0" aria-label={`Edit ${g.first_name}`} onClick={() => setEditing({ id: g.id, first_name: g.first_name, last_name: g.last_name || '' })}>
+                  <Button variant="ghost" className="h-11 w-11 p-0 text-gray-700" aria-label={`Edit ${g.first_name}`} onClick={() => setEditing({ id: g.id, first_name: g.first_name, last_name: g.last_name || '' })}>
                     <Pencil className="h-4 w-4" aria-hidden />
                   </Button>
-                  <Button variant="ghost" className="h-11 w-11 p-0" aria-label={`Remove ${g.first_name}`} disabled={busy === g.id} onClick={() => remove(g.id)}>
+                  <Button variant="ghost" className="h-11 w-11 p-0 text-gray-700" aria-label={`Remove ${g.first_name}`} disabled={busy === g.id} onClick={() => remove(g.id)}>
                     <Trash2 className="h-4 w-4" aria-hidden />
                   </Button>
                 </div>
@@ -239,9 +243,10 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
         </ul>
       )}
 
-      {canAdd && !adding && (
-        <Button variant="outline" className="h-11 w-full" onClick={() => setAdding(true)} disabled={spotsLeft === 0}>
-          {spotsLeft === 0 ? 'Party is full' : 'Add guest'}
+      {canAdd && !adding && spotsLeft === 0 && <p className="py-2 text-center text-sm font-semibold text-gray-900">Party is full</p>}
+      {canAdd && !adding && spotsLeft > 0 && (
+        <Button variant="outline" className="h-11 w-full border-[#1F1F1F] text-[#1F1F1F] hover:bg-[#1F1F1F] hover:text-white" onClick={() => setAdding(true)}>
+          Add guest
         </Button>
       )}
       {canAdd && adding && (
@@ -266,24 +271,24 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
       )}
 
       {canAdd && (
-        <div className="flex flex-col gap-2 border-t border-border-cream-1 pt-3">
-          <p className="text-xs text-text-muted">
+        <div className="flex flex-col gap-2 border-t border-gray-200 pt-3">
+          <p className="text-xs text-gray-700">
             Guest link: the member adds guests without logging in. If they text you names instead, add them above.
           </p>
-          <Button className="h-11 w-full" onClick={textLinkToMember} disabled={texting || !hasHostPhone}>
+          <Button className={`h-11 w-full ${darkButton}`} onClick={textLinkToMember} disabled={texting || !hasHostPhone}>
             <MessageSquare className="mr-2 h-4 w-4" aria-hidden />
             {texting ? 'Sending…' : hasHostPhone ? 'Text link to member' : 'No phone on reservation'}
           </Button>
           {link ? (
             <div className="flex gap-2">
               <Input readOnly value={link} className="h-11 flex-1 text-xs" aria-label="Guest link" onFocus={(e) => e.currentTarget.select()} />
-              <Button className="h-11" onClick={copyLink} aria-label="Copy guest link">
+              <Button className={`h-11 ${darkButton}`} onClick={copyLink} aria-label="Copy guest link">
                 <Copy className="mr-1 h-4 w-4" aria-hidden />
                 Copy
               </Button>
             </div>
           ) : (
-            <Button variant="ghost" className="h-11 w-full" onClick={getLink} disabled={linkLoading}>
+            <Button variant="ghost" className="h-11 w-full text-gray-900" onClick={getLink} disabled={linkLoading}>
               <Link2 className="mr-2 h-4 w-4" aria-hidden />
               {linkLoading ? 'Creating…' : 'Get guest link'}
             </Button>
@@ -316,16 +321,16 @@ function GuestTextsControl({
 }) {
   if (confirming) {
     return (
-      <div className="mt-2 rounded-md border border-border-cream-1 p-3">
+      <div className="mt-2 rounded-md border border-gray-200 p-3">
         <p className="text-sm text-text-primary">Stop all texts to {guest.first_name}?</p>
-        <p className="mt-1 text-xs text-text-muted">
+        <p className="mt-1 text-xs text-gray-700">
           Queued and future guest texts to this number won&rsquo;t send, on any reservation. Only {guest.first_name} can turn them back on, by texting START.
         </p>
         <div className="mt-3 flex gap-2">
           <Button variant="destructive" className="h-11 flex-1" disabled={busy} onClick={onStop}>
             {busy ? <Spinner size="sm" /> : 'Stop texts'}
           </Button>
-          <Button variant="ghost" className="h-11 flex-1" disabled={busy} onClick={onCancel}>
+          <Button variant="ghost" className="h-11 flex-1 text-gray-900" disabled={busy} onClick={onCancel}>
             Cancel
           </Button>
         </div>
@@ -333,7 +338,7 @@ function GuestTextsControl({
     );
   }
   return (
-    <label className="mt-1 flex h-11 items-center gap-2 text-xs text-text-muted">
+    <label className="mt-1 flex h-11 items-center gap-2 text-xs text-gray-700">
       <Switch
         checked={!guest.opted_out}
         disabled={busy || guest.opted_out}

@@ -1034,8 +1034,8 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     height: isMobile ? '44px' : '36px',
                     minHeight: '44px',
                     padding: '0 1rem',
-                    backgroundColor: isSaving ? '#D1D5DB' : '#A59480',
-                    color: 'white',
+                    backgroundColor: isSaving ? '#D1D5DB' : TEXT_COLOR,
+                    color: isSaving ? '#4B5563' : 'white',
                     border: 'none',
                     borderRadius: '6px',
                     fontSize: '0.875rem',
@@ -1046,10 +1046,10 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     width: isMobile ? '100%' : 'auto',
                   }}
                   onMouseEnter={(e) => {
-                    if (!isSaving) e.currentTarget.style.backgroundColor = '#8C7C6D';
+                    if (!isSaving) e.currentTarget.style.backgroundColor = '#000000';
                   }}
                   onMouseLeave={(e) => {
-                    if (!isSaving) e.currentTarget.style.backgroundColor = '#A59480';
+                    if (!isSaving) e.currentTarget.style.backgroundColor = TEXT_COLOR;
                   }}
                 >
                   {isSaving ? 'Saving...' : 'Save'}
