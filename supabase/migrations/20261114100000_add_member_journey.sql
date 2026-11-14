@@ -1,16 +1,16 @@
 -- ========================================
 -- Migration: 90-day member journey
--- Created: 2026-11-11
+-- Created: 2026-11-14
 -- Description: The onboarding text series a new member gets over their first
 --              90 days, the record of what was sent and what the team has done,
 --              and the how-to posts the texts link to.
 --
 -- Tables Affected: member_journey_steps (new), member_journey_log (new),
---                  system_settings (one new row), noir_life_posts (7 new DRAFT rows)
--- Dependencies: members, noir_life_posts, system_settings
+--                  member_journey_settings (new), noir_life_posts (7 new DRAFT rows)
+-- Dependencies: members, noir_life_posts
 -- Breaking Changes: NO - new tables and new rows only. Nothing existing is altered.
 -- Access: RLS on with no policies, so only the server (service role) reads and
---         writes the two new tables. The admin API routes check auth first.
+--         writes the three new tables. The admin API routes check auth first.
 --
 -- Nothing sends until the series is switched on in Admin > Member journey.
 -- The seven posts are inserted unpublished; a text that links to a post waits
@@ -68,15 +68,32 @@ COMMENT ON TABLE public.member_journey_log IS
   '90-day member journey: one row per text sent to a member and per team action marked done.';
 
 -- 3. The switch ---------------------------------------------------------------
--- Off until someone turns it on. start_date is set the day it is first turned
--- on, so only members who join from then on get the series.
-INSERT INTO public.system_settings (key, value, description)
-VALUES (
-  'member_journey',
-  '{"enabled": false, "start_date": null, "footer": "Welcome note {{n}} of {{total}}. Sent automatically, but we read and answer every reply."}'::jsonb,
-  '90-day member journey: on/off, the first join date it applies to, and the line added under every text'
-)
-ON CONFLICT (key) DO NOTHING;
+-- One row. Off until someone turns it on. start_date is set the day it is first
+-- turned on, so only members who join from then on get the series.
+-- Its own table rather than system_settings: any signed-in user (members
+-- included) can update system_settings, and this row decides whether texts go
+-- out and what is written under every one of them.
+CREATE TABLE IF NOT EXISTS public.member_journey_settings (
+  id BOOLEAN PRIMARY KEY DEFAULT true CHECK (id),
+  enabled BOOLEAN NOT NULL DEFAULT false,
+  start_date DATE,
+  -- Added under every text; {{n}} and {{total}} become the count
+  footer TEXT NOT NULL DEFAULT 'Welcome note {{n}} of {{total}}. Sent automatically, but we read and answer every reply.'
+    CHECK (char_length(footer) <= 300),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.member_journey_settings ENABLE ROW LEVEL SECURITY;
+
+COMMENT ON TABLE public.member_journey_settings IS
+  '90-day member journey: on/off, the first join date it applies to, and the line added under every text. One row.';
+
+INSERT INTO public.member_journey_settings (id) VALUES (true) ON CONFLICT (id) DO NOTHING;
+
+-- RLS with no policies already keeps the browser roles out. Take the table
+-- grants away too, so a policy added by mistake later cannot open these up.
+REVOKE ALL ON public.member_journey_steps, public.member_journey_log, public.member_journey_settings
+  FROM anon, authenticated;
 
 -- 4. The how-to posts, as drafts ----------------------------------------------
 INSERT INTO public.noir_life_posts (id, club, title, summary, blocks, is_published)

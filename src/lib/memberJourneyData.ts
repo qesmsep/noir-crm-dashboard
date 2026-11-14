@@ -34,7 +34,6 @@ import {
   visitDates,
 } from './memberJourney';
 
-export const SETTINGS_KEY = 'member_journey';
 const PAGE = 1000;
 
 /** Supabase returns at most 1000 rows a request; read every page. */
@@ -83,18 +82,18 @@ async function purchasesFor(accountIds: string[], since?: string): Promise<Map<s
 
 export async function loadSettings(): Promise<JourneySettings> {
   const { data, error } = await supabaseAdmin
-    .from('system_settings')
-    .select('value')
-    .eq('key', SETTINGS_KEY)
+    .from('member_journey_settings')
+    .select('enabled, start_date, footer')
+    .eq('id', true)
     .maybeSingle();
   if (error && !isMissingTable(error)) throw error;
-  return parseSettings(data?.value);
+  return parseSettings(data);
 }
 
 export async function saveSettings(next: JourneySettings): Promise<void> {
   const { error } = await supabaseAdmin
-    .from('system_settings')
-    .upsert({ key: SETTINGS_KEY, value: next, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    .from('member_journey_settings')
+    .upsert({ id: true, ...next, updated_at: new Date().toISOString() }, { onConflict: 'id' });
   if (error) throw error;
 }
 

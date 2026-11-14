@@ -6,6 +6,7 @@ Tracks a new member's first 90 days and sends the onboarding text series.
 
 - **Day 0** is the member's `join_date` (set when their signup payment completes).
 - **Visits** are counted from the ledger: a day with a house-account purchase at a venue is one visit (`isVisit` in `src/lib/businessMetricsCore.ts`, the same rule the business dashboard uses).
+- The on/off switch, start date and footer are the one row in `member_journey_settings`.
 - Nothing about a member's journey is stored except `member_journey_log`: the texts sent and the team actions marked done. Everything else is worked out from the join date and the ledger.
 
 ## Texts
@@ -33,4 +34,4 @@ Tracks a new member's first 90 days and sends the onboarding text series.
 | Cron | `src/pages/api/cron/member-journey.ts`, `vercel.json` |
 | Admin API | `src/pages/api/admin/member-journey.ts` |
 | Cards and page | `src/components/admin/MemberJourneyCards.tsx`, `src/pages/admin/member-journey.tsx` |
-| Tables, texts, draft posts | `supabase/migrations/20261111000000_add_member_journey.sql` (+ `_ROLLBACK`) |
+| Tables, texts, draft posts | `supabase/migrations/20261114100000_add_member_journey.sql` (+ `_ROLLBACK`) |

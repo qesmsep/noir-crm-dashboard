@@ -1,12 +1,12 @@
 -- Rollback: 90-day member journey
--- Removes the two journey tables and the settings row.
+-- Removes the three journey tables.
 -- The seven how-to posts are removed only while they are still unpublished
 -- drafts; a post someone has published is left alone.
 
 DROP TABLE IF EXISTS public.member_journey_log;
 DROP TABLE IF EXISTS public.member_journey_steps;
 
-DELETE FROM public.system_settings WHERE key = 'member_journey';
+DROP TABLE IF EXISTS public.member_journey_settings;
 
 DELETE FROM public.noir_life_posts
 WHERE is_published = false
