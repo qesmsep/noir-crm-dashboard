@@ -32,6 +32,10 @@
     {
       "path": "/api/cron/toast-sync",
       "schedule": "30 12 * * *"
+    },
+    {
+      "path": "/api/cron/member-journey",
+      "schedule": "28 15,16 * * *"
     }
   ],
   "functions": {
@@ -54,6 +58,9 @@
       "maxDuration": 30
     },
     "src/pages/api/cron/toast-sync.ts": {
+      "maxDuration": 60
+    },
+    "src/pages/api/cron/member-journey.ts": {
       "maxDuration": 60
     },
     "src/pages/api/inventory/toast/sync.ts": {

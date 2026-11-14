@@ -463,6 +463,20 @@ async function getMonthlyCreditForMembership(membership: string): Promise<number
 
 // Helper function to send welcome SMS
 async function sendWelcomeSMS(waitlist: any): Promise<void> {
+  // When the 90-day journey is on, tell the new member the weekly notes are
+  // coming, so the first one is expected. Off, or unreadable: say nothing.
+  let seriesLine = '';
+  try {
+    const { loadSettings } = await import('@/lib/memberJourneyData');
+    if ((await loadSettings()).enabled) {
+      seriesLine = `
+
+Over your first 90 days we'll send a short note about once a week to help you get the most from your membership. They're sent automatically, but we read and answer every reply.`;
+    }
+  } catch (settingsError) {
+    console.error('Could not read member journey settings:', settingsError);
+  }
+
   const message = `Welcome to Noir, ${waitlist.first_name}! 🖤
 
 Your membership to Noir is now active.
@@ -470,7 +484,7 @@ Your membership to Noir is now active.
 We HIGHLY recommend saving this number as "Noir"—this is how we stay in touch. To make a reservation, text "Reservation + Date/time + # of Guests" to this number anytime.
 
 You can also manage your membership at:
-https://noirkc.com/member/login
+https://noirkc.com/member/login${seriesLine}
 
 Questions? Just reply to this text.
 

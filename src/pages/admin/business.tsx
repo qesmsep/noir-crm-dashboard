@@ -3,6 +3,7 @@ import { Spinner } from '@/components/ui/spinner';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import styles from '../../styles/BusinessDashboard.module.css';
 import { supabase } from '../../lib/supabase';
+import { JourneyAttentionCard, TodaysMembersCard, useMemberJourney } from '../../components/admin/MemberJourneyCards';
 
 // ---------------------------------------------------------------------------
 // Types (mirror /api/admin/business-metrics response)
@@ -566,6 +567,8 @@ export default function BusinessDashboard() {
   const [showAtRisk, setShowAtRisk] = useState(false);
   const [issues, setIssues] = useState<PaymentIssues | null>(null);
   const [issuesError, setIssuesError] = useState<string | null>(null);
+  // 90-day member journey: fetched on its own so it never holds up the page
+  const journey = useMemberJourney();
   // Tile explanations are hidden by default to keep the dashboard compact;
   // the choice is remembered per browser.
   const [showDetails, setShowDetails] = useState(false);
@@ -670,6 +673,9 @@ export default function BusinessDashboard() {
         {error && <div className={styles.error}>{error}</div>}
 
         <PaymentIssuesCard data={issues} error={issuesError} onResolve={resolveIssue} />
+
+        <TodaysMembersCard data={journey.data} error={journey.error} />
+        <JourneyAttentionCard data={journey.data} error={journey.error} onDone={journey.markDone} />
 
         {m && (m.dataQuality?.unknownPlanAccounts ?? 0) > 0 && (
           <div className={styles.error}>
