@@ -25,7 +25,6 @@ const inputStyle: React.CSSProperties = {
   fontSize: '0.875rem',
   backgroundColor: 'white',
   color: TEXT_COLOR,
-  outline: 'none',
 };
 const selectStyle: React.CSSProperties = { ...inputStyle, cursor: 'pointer' };
 const textareaStyle: React.CSSProperties = {
@@ -764,7 +763,6 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     fontSize: '0.875rem',
                     backgroundColor: 'white',
                     color: TEXT_COLOR,
-                    outline: 'none',
                     resize: 'vertical',
                     fontFamily: 'inherit',
                     marginBottom: '0.75rem',
