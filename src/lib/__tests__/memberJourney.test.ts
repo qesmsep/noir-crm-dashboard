@@ -134,6 +134,13 @@ describe('pickNextText', () => {
     expect(pickNextText({ ...base, day: 2, log: [failed(3)] }).send).toBeNull();
   });
 
+  it('never resends a text whose send was started but not recorded', () => {
+    const stuck: JourneyLogRow = { ...sent('welcome'), status: 'failed', attempts: 1, detail: 'sending' };
+    const next = pickNextText({ ...base, day: 5, log: [stuck] });
+    expect(next.unconfirmed.map(s => s.key)).toEqual(['welcome']);
+    expect(next.send!.step.key).toBe('reservations');
+  });
+
   it('skips a text that is turned off', () => {
     const off = steps.map(s => (s.key === 'welcome' ? { ...s, is_active: false } : s));
     const { send } = pickNextText({ ...base, steps: off, day: 5, log: [] });

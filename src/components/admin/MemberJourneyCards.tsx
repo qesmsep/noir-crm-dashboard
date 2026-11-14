@@ -240,6 +240,12 @@ export function JourneyAttentionCard({
         </div>
       )}
 
+      {data.roster.filter(r => r.unconfirmed.length > 0).map(r => (
+        <div key={`unconfirmed-${r.memberId}`} className="rounded-lg bg-[#FFF1F0] border border-[#F5C2BE] px-2.5 py-1.5 text-[0.8125rem] text-[#7A271A] mb-2">
+          A text to <a className="underline font-semibold" href={`/admin/members/${r.accountId}`}>{r.name}</a> may or may not have gone out ({r.unconfirmed.join(', ')}). It will not be sent again; check your thread with them and send it by hand if it is missing.
+        </div>
+      ))}
+
       {count === 0 ? (
         <div className="text-sm font-medium text-[#248a3d]">✓ Nothing needs you right now.</div>
       ) : (

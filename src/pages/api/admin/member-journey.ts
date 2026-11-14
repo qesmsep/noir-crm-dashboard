@@ -22,6 +22,8 @@ import {
  * Turning the series on for the first time sets its start date to today, so
  * only members who join from then on get the texts.
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const admin = await resolveAdmin(req.headers.authorization?.split(' ')[1]);
   if (!admin) return res.status(401).json({ error: 'Admin access required' });
@@ -58,7 +60,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'POST') {
       const { memberId, key } = req.body || {};
-      if (typeof memberId !== 'string' || !ACTION_KEYS.includes(key)) {
+      if (typeof memberId !== 'string' || !UUID_RE.test(memberId) || !ACTION_KEYS.includes(key)) {
         return res.status(400).json({ error: 'memberId and a valid action key are required' });
       }
       const { error } = await supabaseAdmin.from('member_journey_log').upsert(

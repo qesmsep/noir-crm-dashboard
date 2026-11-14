@@ -12,6 +12,7 @@ import { ACTIVE_SUBSCRIPTION_STATUSES } from './memberStatusFilter';
 import {
   JOURNEY_DAYS,
   CATCH_UP_DAYS,
+  CLAIM_MARK,
   JourneyLogRow,
   JourneySettings,
   JourneyStep,
@@ -154,6 +155,8 @@ export interface RosterRow {
   textsTotal: number;
   nextText: { label: string; date: string } | null;
   waitingOnPost: string[];
+  /** Texts that may or may not have gone out; they are not resent automatically. */
+  unconfirmed: string[];
   /** Why this member is not being texted, if they are not. */
   notTexting: string | null;
   actions: TeamAction[];
@@ -200,7 +203,7 @@ export async function loadJourney(today: string): Promise<JourneyState> {
     fetchAll<JourneyLogRow>((from, to) =>
       supabaseAdmin
         .from('member_journey_log')
-        .select('member_id, step_key, kind, status, attempts, updated_at')
+        .select('member_id, step_key, kind, status, attempts, detail, updated_at')
         .in('member_id', memberIds)
         .order('id', { ascending: true })
         .range(from, to)
@@ -257,6 +260,7 @@ export async function loadJourney(today: string): Promise<JourneyState> {
       textsTotal: mine.length,
       nextText: upcoming ? { label: upcoming.label, date: addDays(joinDate, upcoming.day_offset) } : null,
       waitingOnPost: next.waitingOnPost.map(s => s.label),
+      unconfirmed: next.unconfirmed.map(s => s.label),
       notTexting,
       actions: enrolled ? teamActions({ firstName: m.first_name, day, visits, today, done }) : [],
     });
@@ -276,6 +280,8 @@ export interface SendResult {
 }
 
 const MAX_PER_RUN = 150;
+/** Stop starting new sends after this long, so a run always finishes inside the function's 60 seconds. */
+const RUN_BUDGET_MS = 40000;
 
 /**
  * Send this morning's texts: at most one per member. Safe to call twice; a
@@ -290,8 +296,14 @@ export async function runJourneySends(now: Date = new Date(), opts: { force?: bo
   if (!state.ready) return { ...result, skipped: 'Journey tables are not set up yet' };
   if (!state.settings.enabled) return { ...result, skipped: 'Series is off' };
 
+  const startedAt = Date.now();
   for (const row of state.roster) {
     if (result.sent + result.failed >= MAX_PER_RUN) break;
+    // Anyone not reached this morning gets their text tomorrow.
+    if (Date.now() - startedAt > RUN_BUDGET_MS) {
+      result.errors.push('Stopped early to stay inside the time limit; the rest go out tomorrow.');
+      break;
+    }
     if (row.notTexting) continue;
     const { member, log } = state.internal.get(row.memberId)!;
     if (sentTextOn(log, today)) continue;
@@ -309,7 +321,7 @@ export async function runJourneySends(now: Date = new Date(), opts: { force?: bo
     if (prior) {
       const { data: claimed, error } = await supabaseAdmin
         .from('member_journey_log')
-        .update({ attempts: prior.attempts + 1, detail: 'sending', updated_at: stamp })
+        .update({ attempts: prior.attempts + 1, detail: CLAIM_MARK, updated_at: stamp })
         .eq('member_id', row.memberId)
         .eq('step_key', send.step.key)
         .eq('status', 'failed')
@@ -318,7 +330,7 @@ export async function runJourneySends(now: Date = new Date(), opts: { force?: bo
       if (error || !claimed?.length) continue;
     } else {
       const { error } = await supabaseAdmin.from('member_journey_log').insert({
-        member_id: row.memberId, step_key: send.step.key, kind: 'text', status: 'failed', detail: 'sending', created_by: 'cron',
+        member_id: row.memberId, step_key: send.step.key, kind: 'text', status: 'failed', detail: CLAIM_MARK, created_by: 'cron',
       });
       if (error) continue; // unique violation: another run has it
     }

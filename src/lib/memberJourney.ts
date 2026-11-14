@@ -49,7 +49,21 @@ export interface JourneyLogRow {
   kind: 'text' | 'action';
   status: 'sent' | 'failed' | 'done';
   attempts: number;
+  /** The text as sent, the send error, or CLAIM_MARK while a send is in flight. */
+  detail?: string | null;
   updated_at: string;
+}
+
+/**
+ * Written to a text's log row just before it is handed to the SMS line, and
+ * replaced with the outcome right after. A row still carrying it means the run
+ * stopped in between: the text may or may not have gone out.
+ */
+export const CLAIM_MARK = 'sending';
+
+/** A send that started and never recorded how it ended. Never resent automatically. */
+export function isUnconfirmed(l: JourneyLogRow): boolean {
+  return l.kind === 'text' && l.status === 'failed' && l.detail === CLAIM_MARK;
 }
 
 export function parseSettings(value: unknown): JourneySettings {
@@ -159,6 +173,8 @@ export interface NextText {
   send: { step: JourneyStep; n: number; total: number } | null;
   /** Due texts that are waiting on their how-to post being published. */
   waitingOnPost: JourneyStep[];
+  /** Texts whose send was started but never recorded. A person should check before anything is resent. */
+  unconfirmed: JourneyStep[];
 }
 
 /**
@@ -178,13 +194,19 @@ export function pickNextText(args: {
 }): NextText {
   const mine = stepsFor(args.steps, args.isPrimary);
   const texts = new Map(args.log.filter(l => l.kind === 'text').map(l => [l.step_key, l]));
-  const out: NextText = { send: null, waitingOnPost: [] };
+  const out: NextText = { send: null, waitingOnPost: [], unconfirmed: [] };
   if (args.day < 0 || args.day > JOURNEY_DAYS + CATCH_UP_DAYS) return out;
 
   mine.forEach((step, i) => {
     if (step.day_offset > args.day) return;
     const prior = texts.get(step.key);
     if (prior?.status === 'sent') return;
+    // The run stopped between handing this text to the SMS line and recording
+    // the result. It may have been delivered, so it is not sent again.
+    if (prior && isUnconfirmed(prior)) {
+      out.unconfirmed.push(step);
+      return;
+    }
     if (prior?.status === 'failed' && prior.attempts >= MAX_SEND_ATTEMPTS) return;
     if (step.post_id && !args.publishedPostIds.has(step.post_id)) {
       out.waitingOnPost.push(step);
