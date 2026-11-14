@@ -104,6 +104,14 @@ describe('timing relative to the reservation', () => {
     const t = guestAddedSendTime(msg({ relative_quantity: 1, relative_unit: 'day', relative_proximity: 'after', relative_time: '11:00' }), added, TZ, START)!;
     expect(t.setZone(TZ).toFormat('yyyy-LL-dd HH:mm')).toBe('2026-11-20 11:00');
   });
+  it('"1 day before the reservation" with no clock time is exactly 24 hours before', () => {
+    const t = guestAddedSendTime(msg({ relative_quantity: 1, relative_unit: 'day', relative_proximity: 'before', relative_time: null }), added, TZ, START)!;
+    expect(t.toUTC().toISO()).toBe(DateTime.fromISO(START, { zone: 'utc' }).minus({ days: 1 }).toUTC().toISO());
+  });
+  it('"2 days after the guest is added" with no clock time is exact', () => {
+    const t = guestAddedSendTime(msg({ relative_anchor: null, relative_quantity: 2, relative_unit: 'day', relative_proximity: 'after', relative_time: null }), added, TZ, START)!;
+    expect(t.toUTC().toISO()).toBe('2026-11-14T18:00:00.000Z');
+  });
   it('default anchor is still when the guest was added', () => {
     expect(guestAddedSendTime(msg({ relative_anchor: null, relative_quantity: 30, relative_unit: 'minute', relative_proximity: 'after' }), added, TZ, START)!.toUTC().toISO()).toBe(
       '2026-11-12T18:30:00.000Z',

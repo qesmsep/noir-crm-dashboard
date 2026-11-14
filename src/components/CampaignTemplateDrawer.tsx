@@ -54,7 +54,7 @@ interface CampaignTemplate {
   recurring_monthly_value?: number; // 1-31 for day, 1-7 for weekday
   recurring_yearly_date?: string; // MM-DD format
   // Relative fields
-  relative_time?: string; // HH:MM format
+  relative_time?: string | null; // HH:MM format; null = no clock time (guest messages)
   relative_quantity?: number;
   relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
   relative_proximity?: 'before' | 'after';
@@ -131,7 +131,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     recurring_monthly_day: undefined as 'day' | 'weekday' | undefined,
     recurring_monthly_value: undefined as number | undefined,
     recurring_yearly_date: undefined as string | undefined,
-    relative_time: '10:00',
+    relative_time: '10:00' as string | null,
     relative_quantity: 1,
     relative_unit: 'day' as 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year',
     relative_proximity: 'after' as 'before' | 'after',
@@ -261,7 +261,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         recurring_monthly_day: data.recurring_monthly_day || undefined,
         recurring_monthly_value: data.recurring_monthly_value || undefined,
         recurring_yearly_date: data.recurring_yearly_date || undefined,
-        relative_time: data.relative_time || '10:00',
+        // Guest messages can have no clock time (exact offset), stored as null.
+        relative_time: data.relative_time === null ? null : data.relative_time || '10:00',
         relative_quantity: data.relative_quantity || 1,
         relative_unit: data.relative_unit || 'day',
         relative_proximity: data.relative_proximity || 'after',
@@ -399,6 +400,11 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
       // Remove trigger_type as it's not in the database schema
       delete cleanedData.trigger_type;
+
+      // Only guest messages can skip the clock time; other campaigns keep one.
+      if (campaignTriggerType !== 'guest_registration' && !cleanedData.relative_time) {
+        cleanedData.relative_time = '10:00';
+      }
 
       // Send all relevant fields including the new timing fields
       const basicFields = [
@@ -592,8 +598,13 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   // are exact (no clock time); days and longer land on the clock time.
   const usesReservationAnchor = () =>
     campaignTriggerType === 'guest_registration' && formData.timing_type === 'relative' && formData.relative_anchor === 'reservation_start';
-  const showsClockTime = () =>
+  const clockTimeApplies = () =>
     formData.relative_unit !== 'minute' && !(usesReservationAnchor() && formData.relative_unit === 'hour');
+  // Guest messages may skip the clock time: "1 day before the reservation" then
+  // means exactly 24 hours before it.
+  const clockTimeOptional = () => campaignTriggerType === 'guest_registration' && clockTimeApplies();
+  const showsClockTime = () =>
+    clockTimeApplies() && (campaignTriggerType !== 'guest_registration' || !!formData.relative_time);
 
   const formatTimingDisplay = () => {
     if (formData.timing_type === 'immediate') {
@@ -614,7 +625,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     } else if (formData.timing_type === 'relative') {
       const anchor = usesReservationAnchor() ? 'the reservation' : campaignTriggerType === 'guest_registration' ? 'the guest is added' : 'trigger';
       if (formData.relative_quantity === 0) {
-        return usesReservationAnchor() ? 'Send at the reservation time' : `Send at ${formData.relative_time} ON trigger date`;
+        if (usesReservationAnchor()) return 'Send at the reservation time';
+        return formData.relative_time ? `Send at ${formData.relative_time} ON trigger date` : `Send when ${anchor}`;
       } else {
         const unit = formData.relative_quantity === 1 ? formData.relative_unit : formData.relative_unit + 's';
         if (!showsClockTime()) {
@@ -1190,13 +1202,25 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                     </Field>
                   )}
 
+                  {clockTimeOptional() && (
+                    <label className="flex items-center gap-2 text-sm text-[#353535]">
+                      <input
+                        type="checkbox"
+                        style={{ width: 18, height: 18, minWidth: 18, minHeight: 18, padding: 0, margin: 0, accentColor: '#a59480' }}
+                        checked={!!formData.relative_time}
+                        onChange={(e) => handleInputChange('relative_time', e.target.checked ? '10:00' : null)}
+                      />
+                      Send at a set time of day
+                    </label>
+                  )}
+
                   {showsClockTime() && (
                     <Field label="Time" htmlFor="relative-time">
                       <TextField
                         id="relative-time"
                         type="time"
                         value={formData.relative_time || '10:00'}
-                        onChange={(e) => handleInputChange('relative_time', e.target.value)}
+                        onChange={(e) => handleInputChange('relative_time', e.target.value || null)}
                       />
                     </Field>
                   )}

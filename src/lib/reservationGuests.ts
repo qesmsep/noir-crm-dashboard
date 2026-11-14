@@ -11,9 +11,9 @@
  *
  * Texts:
  *   intro + follow-ups  Campaigns, trigger "Guest Registration"
- *                 (src/lib/guestCampaigns.ts). The immediate intro is skipped
- *                 when the reservation starts within 2 hours and day_of is on,
- *                 because day_of goes out right away and covers it.
+ *                 (src/lib/guestCampaigns.ts). The immediate intro always
+ *                 goes when a guest is added; a "before the reservation" text
+ *                 whose time has passed goes right after it.
  *   day of        a Guest Registration message timed from the reservation
  *                 ("Relative to: The reservation time"); a guest added after
  *                 that time but before the start gets it right away

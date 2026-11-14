@@ -59,7 +59,7 @@ interface CampaignTemplate {
   recurring_monthly_day?: 'day' | 'weekday';
   recurring_monthly_value?: number;
   recurring_yearly_date?: string;
-  relative_time?: string;
+  relative_time?: string | null;
   relative_quantity?: number;
   relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
   relative_proximity?: 'before' | 'after';
@@ -347,12 +347,17 @@ export default function CampaignEditPage() {
       const unit = template.relative_unit || 'day';
       const proximity = template.relative_proximity || 'after';
       
+      const noClock = !template.relative_time && (campaign?.trigger_type as string | undefined) === 'guest_registration';
       if (quantity === 0) {
-        return `${displayTime} on trigger date`;
+        if (template.relative_anchor === 'reservation_start') return 'At the reservation time';
+        return noClock ? 'When the guest is added' : `${displayTime} on trigger date`;
       } else {
         const unitText = quantity === 1 ? unit : unit + 's';
+        if (noClock && template.relative_anchor !== 'reservation_start') {
+          return `${quantity} ${unitText} ${proximity} the guest is added`;
+        }
         if (template.relative_anchor === 'reservation_start') {
-          const exact = unit === 'minute' || unit === 'hour';
+          const exact = unit === 'minute' || unit === 'hour' || noClock;
           return `${exact ? '' : `${displayTime} `}${quantity} ${unitText} ${proximity} the reservation`;
         }
         return `${displayTime} ${quantity} ${unitText} ${proximity} trigger`;

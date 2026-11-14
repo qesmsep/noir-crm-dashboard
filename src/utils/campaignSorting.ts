@@ -18,7 +18,7 @@ export interface CampaignTemplate {
   recurring_monthly_day?: 'day' | 'weekday';
   recurring_monthly_value?: number;
   recurring_yearly_date?: string;
-  relative_time?: string;
+  relative_time?: string | null;
   relative_quantity?: number;
   relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
   relative_proximity?: 'before' | 'after';

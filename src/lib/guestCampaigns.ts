@@ -22,12 +22,9 @@ import { sendSMS } from '@/lib/sms';
 import { toE164 } from '@/lib/phone';
 import { MAX_SEND_ATTEMPTS, RETRY_WINDOW_MINUTES, STALE_CLAIM_MINUTES } from '@/lib/reservationCampaigns';
 import {
-  activeKindsFrom,
   DEFAULT_ARRIVAL_INSTRUCTIONS,
   DEFAULT_TIMEZONE,
   findMemberIdByPhone,
-  introCoveredByDayOf,
-  loadTemplates,
   type EventCampaignMessage,
   type GuestDeps,
 } from '@/lib/reservationGuests';
@@ -143,7 +140,7 @@ const LUXON_UNITS = { minute: 'minutes', hour: 'hours', day: 'days', week: 'week
  * 'reservation_start', from the reservation start ("3 hours before the
  * reservation", "1 day after"). Minute offsets — and hour offsets from the
  * reservation — are exact; larger units land on the message's clock time,
- * like other campaigns.
+ * like other campaigns, unless the message has no clock time (then exact).
  */
 export function guestAddedSendTime(
   message: GuestCampaignMessage,
@@ -163,8 +160,11 @@ export function guestAddedSendTime(
     const sign = message.relative_proximity === 'before' ? -1 : 1;
     const luxonUnit = LUXON_UNITS[unit as keyof typeof LUXON_UNITS] || 'days';
     const moved = q > 0 ? trigger.plus({ [luxonUnit]: sign * q }) : trigger;
-    if (unit === 'minute' || (fromReservation && unit === 'hour')) return moved.set({ second: 0, millisecond: 0 });
-    const [h, m] = (message.relative_time || '10:00').split(':').map(Number);
+    // No clock time set: the offset is exact ("1 day before" = 24 hours before).
+    if (unit === 'minute' || (fromReservation && unit === 'hour') || !message.relative_time) {
+      return moved.set({ second: 0, millisecond: 0 });
+    }
+    const [h, m] = message.relative_time.split(':').map(Number);
     return moved.set({ hour: h || 0, minute: m || 0, second: 0, millisecond: 0 });
   }
   if (message.timing_type === 'specific_time') {
@@ -448,19 +448,11 @@ export async function sendGuestAddedCampaignMessages(
     if (messages.length === 0 && late.length === 0) return { outcomes: [], reason: 'no_matching_message' };
 
     const outcomes: GuestCampaignOutcome[] = [];
-    // Added after a "before the reservation" text's time: it goes now. It
-    // covers the intro, so the guest-facing intro is skipped (staff alerts
-    // still go), as it is when the legacy built-in day-of text is on.
-    for (const m of late) outcomes.push(await deliver(db, deps, m, ctx, now));
-    const templates = await loadTemplates(db);
-    const legacyDayOf = introCoveredByDayOf({ start: ctx.reservation.start_time, now, dayOfActive: activeKindsFrom(templates).has('day_of') });
-    const isMember = !!ctx.guest.matched_member_id;
-    const lateToGuest = catchUp.some((m) => guestRecipientMatches(m.recipient_type, isMember));
-    if (legacyDayOf || lateToGuest) {
-      for (const m of messages.filter((x) => !isGuestRecipient(x.recipient_type))) outcomes.push(await deliver(db, deps, m, ctx, now));
-      return { outcomes, reason: 'intro_covered_by_day_of' };
-    }
+    // The "Send immediately" intro always goes first. Then, if the guest was
+    // added after a "before the reservation" text's time (e.g. the day-of
+    // text), that text goes right after it.
     for (const m of messages) outcomes.push(await deliver(db, deps, m, ctx, now));
+    for (const m of late) outcomes.push(await deliver(db, deps, m, ctx, now));
     return { outcomes };
   } catch (err) {
     console.error('[guest campaigns] immediate send failed', guestId, err);
