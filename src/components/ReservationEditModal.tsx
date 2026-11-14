@@ -676,7 +676,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                 <label style={fieldStyle}>
                   <span style={labelStyle}>Event type</span>
                   <select value={formData.event_type} onChange={(e) => handleInputChange('event_type', e.target.value)} style={selectStyle}>
-                    <option value="">Event Type (Optional)</option>
+                    <option value="">None</option>
                     {eventTypes.map(type => (
                       <option key={type.value} value={type.value}>{type.label}</option>
                     ))}
@@ -685,7 +685,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                 <label style={fieldStyle}>
                   <span style={labelStyle}>Table</span>
                   <select value={formData.table_id} onChange={(e) => handleInputChange('table_id', e.target.value)} style={selectStyle}>
-                    <option value="">Table (Optional)</option>
+                    <option value="">None</option>
                     {tables.map(table => (
                       <option key={table.id} value={table.id}>
                         Table {String(table.table_number).padStart(2, '0')} ({table.seats} seats)
