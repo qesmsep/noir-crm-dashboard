@@ -8,6 +8,34 @@ import { useSettings } from '../context/SettingsContext';
 import { Trash2, X } from 'lucide-react';
 import StaffReservationGuests from './guests/StaffReservationGuests';
 
+// Explicit colors: phones in dark mode otherwise inherit white body text from
+// globals.css, which left these fields white on white.
+const TEXT_COLOR = '#1F1F1F';
+const LABEL_COLOR = '#4B5563';
+
+// Small label above each field so staff can tell fields apart once they hold values.
+const fieldStyle: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: '0.25rem' };
+const labelStyle: React.CSSProperties = { fontSize: '0.75rem', fontWeight: 600, color: LABEL_COLOR };
+const inputStyle: React.CSSProperties = {
+  width: '100%',
+  height: '44px',
+  padding: '0 1rem',
+  border: '1px solid #D1D5DB',
+  borderRadius: '10px',
+  fontSize: '0.875rem',
+  backgroundColor: 'white',
+  color: TEXT_COLOR,
+};
+const selectStyle: React.CSSProperties = { ...inputStyle, cursor: 'pointer' };
+const textareaStyle: React.CSSProperties = {
+  ...inputStyle,
+  height: 'auto',
+  minHeight: '80px',
+  padding: '0.75rem 1rem',
+  resize: 'vertical',
+  fontFamily: 'inherit',
+};
+
 const eventTypes = [
   { value: 'birthday', label: '🎂 Birthday' },
   { value: 'engagement', label: '💍 Engagement' },
@@ -494,6 +522,9 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
       <div
         style={{
           backgroundColor: '#ECEDE8',
+          // Own text color + light native controls (see TEXT_COLOR).
+          color: TEXT_COLOR,
+          colorScheme: 'light',
           borderRadius: isMobile ? '0' : '16px',
           boxShadow: '0 4px 24px rgba(0, 0, 0, 0.15)',
           maxWidth: isMobile ? '100%' : '600px',
@@ -509,11 +540,11 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         {/* Header */}
         <div style={{ borderBottom: '1px solid #D1D5DB', padding: isMobile ? '1rem' : '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           {isLoading ? (
-            <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>Loading...</h2>
+            <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: '600', color: TEXT_COLOR, margin: 0 }}>Loading...</h2>
           ) : reservation ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, paddingRight: isMobile ? '3.5rem' : '3rem' }}>
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: isMobile ? '0.5rem' : '0', width: '100%' }}>
-                <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>
+                <h2 style={{ fontSize: isMobile ? '1.25rem' : '1.5rem', fontWeight: '600', color: TEXT_COLOR, margin: 0 }}>
                   {formData.first_name} {formData.last_name}
                 </h2>
                 <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -565,7 +596,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
               </p>
             </div>
           ) : (
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1F1F1F', margin: 0 }}>Edit Reservation</h2>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: TEXT_COLOR, margin: 0 }}>Edit Reservation</h2>
           )}
           <button
             onClick={handleClose}
@@ -613,187 +644,69 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
               {/* Contact Information */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
-                <input
-                  type="text"
-                  value={formData.first_name}
-                  onChange={(e) => handleInputChange('first_name', e.target.value)}
-                  placeholder="First Name"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 1rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                  }}
-                />
-                <input
-                  type="text"
-                  value={formData.last_name}
-                  onChange={(e) => handleInputChange('last_name', e.target.value)}
-                  placeholder="Last Name"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 1rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                  }}
-                />
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="Email"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 1rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                  }}
-                />
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="Phone"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 1rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                  }}
-                />
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>First name</span>
+                  <input type="text" value={formData.first_name} onChange={(e) => handleInputChange('first_name', e.target.value)} style={inputStyle} />
+                </label>
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>Last name</span>
+                  <input type="text" value={formData.last_name} onChange={(e) => handleInputChange('last_name', e.target.value)} style={inputStyle} />
+                </label>
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>Email</span>
+                  <input type="email" value={formData.email} onChange={(e) => handleInputChange('email', e.target.value)} style={inputStyle} />
+                </label>
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>Phone</span>
+                  <input type="tel" value={formData.phone} onChange={(e) => handleInputChange('phone', e.target.value)} style={inputStyle} />
+                </label>
               </div>
 
               {/* Reservation Details */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '1rem' }}>
-                <select
-                  value={formData.party_size}
-                  onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 1rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  {Array.from({ length: 15 }, (_, i) => i + 1).map(num => (
-                    <option key={num} value={num}>{num} {num === 1 ? 'person' : 'people'}</option>
-                  ))}
-                </select>
-                <select
-                  value={formData.event_type}
-                  onChange={(e) => handleInputChange('event_type', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 1rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <option value="">Event Type (Optional)</option>
-                  {eventTypes.map(type => (
-                    <option key={type.value} value={type.value}>{type.label}</option>
-                  ))}
-                </select>
-                <select
-                  value={formData.table_id}
-                  onChange={(e) => handleInputChange('table_id', e.target.value)}
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 1rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                    cursor: 'pointer',
-                  }}
-                >
-                  <option value="">Table (Optional)</option>
-                  {tables.map(table => (
-                    <option key={table.id} value={table.id}>
-                      Table {String(table.table_number).padStart(2, '0')} ({table.seats} seats)
-                    </option>
-                  ))}
-                </select>
-                <input
-                  type="datetime-local"
-                  value={formData.start_time}
-                  onChange={(e) => handleInputChange('start_time', e.target.value)}
-                  placeholder="Start Time"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 1rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                  }}
-                />
-                <input
-                  type="datetime-local"
-                  value={formData.end_time}
-                  onChange={(e) => handleInputChange('end_time', e.target.value)}
-                  placeholder="End Time"
-                  style={{
-                    width: '100%',
-                    height: '44px',
-                    padding: '0 1rem',
-                    border: '1px solid #D1D5DB',
-                    borderRadius: '10px',
-                    fontSize: '0.875rem',
-                    backgroundColor: 'white',
-                    outline: 'none',
-                  }}
-                />
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>Party size</span>
+                  <select value={formData.party_size} onChange={(e) => handleInputChange('party_size', parseInt(e.target.value))} style={selectStyle}>
+                    {Array.from({ length: 15 }, (_, i) => i + 1).map(num => (
+                      <option key={num} value={num}>{num} {num === 1 ? 'person' : 'people'}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>Event type</span>
+                  <select value={formData.event_type} onChange={(e) => handleInputChange('event_type', e.target.value)} style={selectStyle}>
+                    <option value="">None</option>
+                    {eventTypes.map(type => (
+                      <option key={type.value} value={type.value}>{type.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>Table</span>
+                  <select value={formData.table_id} onChange={(e) => handleInputChange('table_id', e.target.value)} style={selectStyle}>
+                    <option value="">None</option>
+                    {tables.map(table => (
+                      <option key={table.id} value={table.id}>
+                        Table {String(table.table_number).padStart(2, '0')} ({table.seats} seats)
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>Start time</span>
+                  <input type="datetime-local" value={formData.start_time} onChange={(e) => handleInputChange('start_time', e.target.value)} style={inputStyle} />
+                </label>
+                <label style={fieldStyle}>
+                  <span style={labelStyle}>End time</span>
+                  <input type="datetime-local" value={formData.end_time} onChange={(e) => handleInputChange('end_time', e.target.value)} style={inputStyle} />
+                </label>
               </div>
 
               {/* Notes */}
-              <textarea
-                value={formData.notes}
-                onChange={(e) => handleInputChange('notes', e.target.value)}
-                placeholder="Notes (Optional)"
-                style={{
-                  width: '100%',
-                  minHeight: '80px',
-                  padding: '0.75rem 1rem',
-                  border: '1px solid #D1D5DB',
-                  borderRadius: '10px',
-                  fontSize: '0.875rem',
-                  backgroundColor: 'white',
-                  outline: 'none',
-                  resize: 'vertical',
-                  fontFamily: 'inherit',
-                }}
-              />
+              <label style={fieldStyle}>
+                <span style={labelStyle}>Notes</span>
+                <textarea value={formData.notes} onChange={(e) => handleInputChange('notes', e.target.value)} placeholder="Optional" style={textareaStyle} />
+              </label>
 
               {/* Reservation guests: add / edit / check in, guest link, text link to member */}
               <div style={{ borderTop: '1px solid #D1D5DB', paddingTop: '1.25rem' }}>
@@ -807,7 +720,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
 
               {/* Send Message Section */}
               <div style={{ borderTop: '1px solid #D1D5DB', paddingTop: '1.25rem' }}>
-                <p style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', color: '#1F1F1F' }}>Send Message</p>
+                <p style={{ fontSize: '0.875rem', fontWeight: '600', marginBottom: '0.75rem', color: TEXT_COLOR }}>Send Message</p>
 
                 {messageError && (
                   <div style={{
@@ -849,7 +762,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     borderRadius: '10px',
                     fontSize: '0.875rem',
                     backgroundColor: 'white',
-                    outline: 'none',
+                    color: TEXT_COLOR,
                     resize: 'vertical',
                     fontFamily: 'inherit',
                     marginBottom: '0.75rem',
@@ -921,7 +834,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                   borderRadius: '8px',
                   border: '1px solid #E5E7EB',
                 }}>
-                  <p style={{ fontSize: '0.875rem', fontWeight: '600', color: '#1F1F1F', margin: '0 0 0.5rem 0' }}>
+                  <p style={{ fontSize: '0.875rem', fontWeight: '600', color: TEXT_COLOR, margin: '0 0 0.5rem 0' }}>
                     Payment Information
                   </p>
                   <div style={{ fontSize: '0.75rem', color: '#6B7280', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
@@ -954,7 +867,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
         <div style={{ borderTop: '1px solid #D1D5DB', padding: isMobile ? '1rem 1rem calc(1rem + env(safe-area-inset-bottom, 0px)) 1rem' : '1rem 1.5rem', display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'stretch' : 'center', gap: isMobile ? '0.5rem' : '0', flexShrink: 0 }}>
           {isConfirmingDelete ? (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-              <p style={{ fontWeight: '600', fontSize: '0.875rem', color: '#1F1F1F', margin: 0 }}>Are you sure?</p>
+              <p style={{ fontWeight: '600', fontSize: '0.875rem', color: TEXT_COLOR, margin: 0 }}>Are you sure?</p>
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
                   onClick={() => setIsConfirmingDelete(false)}
@@ -963,7 +876,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     minHeight: '44px',
                     padding: '0 1rem',
                     backgroundColor: 'white',
-                    color: '#1F1F1F',
+                    color: TEXT_COLOR,
                     border: '1px solid #D1D5DB',
                     borderRadius: '6px',
                     fontSize: '0.875rem',
@@ -1102,7 +1015,7 @@ const ReservationEditModal: React.FC<ReservationEditModalProps> = ({
                     minHeight: '44px',
                     padding: '0 1rem',
                     backgroundColor: 'white',
-                    color: '#1F1F1F',
+                    color: TEXT_COLOR,
                     border: '1px solid #D1D5DB',
                     borderRadius: '6px',
                     fontSize: '0.875rem',
