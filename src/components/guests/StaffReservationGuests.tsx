@@ -155,7 +155,7 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
     <section className="flex flex-col gap-3 rounded-lg border border-gray-200 bg-white p-3 text-gray-900" aria-label="Guests">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-text-primary">
-          Guests {guests.length > 0 && <span className="font-normal text-gray-600">({guests.length})</span>}
+          Guests {guests.length > 0 && <span className="font-normal text-gray-700">({guests.length})</span>}
         </h3>
       </div>
 
@@ -166,7 +166,7 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
       )}
       {error && <p className="text-sm text-error-red">{error}</p>}
 
-      {!loading && !error && guests.length === 0 && <p className="text-sm text-gray-600">No guests added.</p>}
+      {!loading && !error && guests.length === 0 && <p className="text-sm text-gray-700">No guests added.</p>}
 
       {!loading && guests.length > 0 && (
         <ul className="flex flex-col divide-y divide-gray-200">
@@ -204,12 +204,12 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
                       {g.first_name} {g.last_name || ''}
                     </p>
                     <div className="mt-0.5 flex flex-wrap items-center gap-1">
-                      <span className="text-xs text-gray-600">{g.phone_display}</span>
+                      <span className="text-xs text-gray-700">{g.phone_display}</span>
                       {g.is_member && <Badge variant="secondary">member</Badge>}
                       {g.opted_out && <Badge variant="outline">opted out</Badge>}
                     </div>
                   </div>
-                  <label className="flex h-11 items-center gap-2 text-xs text-gray-600">
+                  <label className="flex h-11 items-center gap-2 text-xs text-gray-700">
                     <Switch
                       checked={!!g.checked_in_at}
                       disabled={busy === g.id}
@@ -243,7 +243,7 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
         </ul>
       )}
 
-      {canAdd && !adding && spotsLeft === 0 && <p className="py-2 text-center text-sm font-medium text-gray-700">Party is full</p>}
+      {canAdd && !adding && spotsLeft === 0 && <p className="py-2 text-center text-sm font-semibold text-gray-900">Party is full</p>}
       {canAdd && !adding && spotsLeft > 0 && (
         <Button variant="outline" className="h-11 w-full border-[#1F1F1F] text-[#1F1F1F] hover:bg-[#1F1F1F]" onClick={() => setAdding(true)}>
           Add guest
@@ -272,7 +272,7 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
 
       {canAdd && (
         <div className="flex flex-col gap-2 border-t border-gray-200 pt-3">
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-700">
             Guest link: the member adds guests without logging in. If they text you names instead, add them above.
           </p>
           <Button className={`h-11 w-full ${darkButton}`} onClick={textLinkToMember} disabled={texting || !hasHostPhone}>
@@ -323,7 +323,7 @@ function GuestTextsControl({
     return (
       <div className="mt-2 rounded-md border border-gray-200 p-3">
         <p className="text-sm text-text-primary">Stop all texts to {guest.first_name}?</p>
-        <p className="mt-1 text-xs text-gray-600">
+        <p className="mt-1 text-xs text-gray-700">
           Queued and future guest texts to this number won&rsquo;t send, on any reservation. Only {guest.first_name} can turn them back on, by texting START.
         </p>
         <div className="mt-3 flex gap-2">
@@ -338,7 +338,7 @@ function GuestTextsControl({
     );
   }
   return (
-    <label className="mt-1 flex h-11 items-center gap-2 text-xs text-gray-600">
+    <label className="mt-1 flex h-11 items-center gap-2 text-xs text-gray-700">
       <Switch
         checked={!guest.opted_out}
         disabled={busy || guest.opted_out}
