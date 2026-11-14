@@ -203,13 +203,17 @@ async function executeAddToWaitlist(
   const nowIso = new Date().toISOString();
 
   if (existing) {
-    const { error } = await supabaseAdmin
+    const { data: updated, error } = await supabaseAdmin
       .from('waitlist')
       .update({ status: 'review', submitted_at: nowIso })
       .eq('id', existing.id)
       // Never downgrade an entry approved between the lookup and this update
-      .neq('status', 'approved');
+      .neq('status', 'approved')
+      .select('id');
     if (error) throw new Error('Failed to re-open waitlist entry');
+    if (!updated || updated.length === 0) {
+      throw new Error('Waitlist entry was approved before it could be re-opened');
+    }
     return { waitlist_id: existing.id, reopened: true };
   }
 
@@ -466,8 +470,16 @@ export async function enrollPhone(params: {
     console.warn(`Campaign ${campaignData.trigger_word} has both Add to Waitlist and Create Onboarding Link enabled — skipping Add to Waitlist`);
   }
 
+  let waitlistLookupFailed = false;
+
   if (runAddToWaitlist) {
-    waitlistEntry = await findLatestWaitlistEntry(phone);
+    try {
+      waitlistEntry = await findLatestWaitlistEntry(phone);
+    } catch (err: unknown) {
+      // Degrade like other actions: enrollment still happens, failure is recorded below
+      console.error('Error looking up waitlist entry:', err);
+      waitlistLookupFailed = true;
+    }
 
     if (waitlistEntry?.status === 'approved') {
       if (campaignData.trigger_word.trim().toUpperCase() === INVITATION_TRIGGER_WORD) {
@@ -524,7 +536,9 @@ export async function enrollPhone(params: {
   }
 
   // Action: Add to Waitlist (skipped if onboarding link ran — that approves the entry)
-  if (runAddToWaitlist) {
+  if (runAddToWaitlist && waitlistLookupFailed) {
+    actionResults.push({ action: 'add_to_waitlist', success: false, error: 'Failed to look up waitlist entry' });
+  } else if (runAddToWaitlist) {
     try {
       await executeAddToWaitlist(phone, waitlistEntry);
       actionResults.push({ action: 'add_to_waitlist', success: true });

@@ -23,6 +23,8 @@ interface World {
   campaigns: Row[];
   waitlist: Row | null; // latest entry for the phone
   member: Row | null;
+  waitlistLookupError?: boolean;
+  reopenMatches?: number; // rows the reopen update matches (default 1)
 }
 
 /** Records every write; returns canned reads per table. */
@@ -41,6 +43,7 @@ function setup(world: World) {
         record();
         if (table === 'sms_intake_enrollments') return { data: { id: `e-${filters.length}-${Math.random()}` }, error: null };
         if (table === 'waitlist' && op === 'insert') return { data: { id: 'w-new' }, error: null };
+        if (table === 'waitlist' && op === 'update') return { data: Array(world.reopenMatches ?? 1).fill({ id: 'w' }), error: null };
         return { data: null, error: null };
       }
       if (table === 'sms_intake_campaigns') {
@@ -49,7 +52,9 @@ function setup(world: World) {
         const hit = world.campaigns.find(c => (word && c.trigger_word.toLowerCase() === word.toLowerCase() && c.status === 'active') || (id && c.id === id));
         return { data: hit || null, error: null };
       }
-      if (table === 'waitlist') return { data: world.waitlist, error: null };
+      if (table === 'waitlist') {
+        return world.waitlistLookupError ? { data: null, error: { message: 'boom' } } : { data: world.waitlist, error: null };
+      }
       if (table === 'members') return { data: world.member, error: null };
       if (table === 'sms_intake_campaign_messages') return { data: [], error: null };
       return { data: single ? null : [], error: null };
@@ -136,5 +141,20 @@ describe('Add to Waitlist action', () => {
     await enrollPhone({ trigger_word: 'INVITATION', phone: '8165550100', source: 'trigger' });
 
     expect(enrollmentsFor(writes)).toEqual(['c-inv']);
+  });
+  it('reports failure when the entry was approved before the reopen landed', async () => {
+    setup({ campaigns: [WAITLIST], waitlist: { id: 'w2', status: 'waitlisted' }, member: null, reopenMatches: 0 });
+    const result = await enrollPhone({ trigger_word: 'WAITLIST', phone: '8165550100', source: 'trigger' });
+
+    expect(result.body.action_results).toEqual([expect.objectContaining({ action: 'add_to_waitlist', success: false })]);
+  });
+
+  it('still enrolls, recording the failure, when the waitlist lookup errors', async () => {
+    const writes = setup({ campaigns: [WAITLIST], waitlist: null, member: null, waitlistLookupError: true });
+    const result = await enrollPhone({ trigger_word: 'WAITLIST', phone: '8165550100', source: 'trigger' });
+
+    expect(enrollmentsFor(writes)).toEqual(['c-wait']);
+    expect(writes.some(w => w.table === 'waitlist')).toBe(false);
+    expect(result.body.action_results).toEqual([expect.objectContaining({ action: 'add_to_waitlist', success: false })]);
   });
 });
