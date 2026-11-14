@@ -62,7 +62,7 @@ export async function textGuestLinkToMember(
   const phone = toE164(r.phone);
   if (!phone) return { ok: false, status: 400, error: 'This reservation has no valid mobile number.' };
 
-  const links = await guestLinksForReservation(reservationId, db);
+  const links = await guestLinksForReservation(reservationId, db, now);
   if (!links.guestLink) return { ok: false, status: 409, error: 'This reservation is over or cancelled, so it has no guest link.' };
   if (messages.some((m) => m.content.includes('{{guest_join_link}}')) && !links.guestJoinLink) {
     return { ok: false, status: 500, error: 'Could not make the guest self-register link.' };

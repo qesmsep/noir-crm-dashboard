@@ -151,11 +151,11 @@ export interface ReservationLinks {
  * token as staff "Text link to member"; the join link is derived from it).
  * Both empty when the reservation is cancelled or over, or the link can't be made.
  */
-export async function guestLinksForReservation(reservationId: string, db?: typeof supabaseAdmin): Promise<ReservationLinks> {
+export async function guestLinksForReservation(reservationId: string, db?: typeof supabaseAdmin, now?: DateTime): Promise<ReservationLinks> {
   try {
     const { ensureGuestLink, guestJoinToken } = await import('@/lib/guestLink');
     const { guestLinkUrl, guestJoinUrl } = await import('@/lib/guestApi');
-    const link = await ensureGuestLink(reservationId, db ? { db } : {});
+    const link = await ensureGuestLink(reservationId, { ...(db ? { db } : {}), ...(now ? { now } : {}) });
     if (!link.ok) return { guestLink: '', guestJoinLink: '' };
     const join = guestJoinToken(reservationId, link.token);
     return { guestLink: guestLinkUrl(link.token), guestJoinLink: join ? guestJoinUrl(join) : '' };

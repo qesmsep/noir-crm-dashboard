@@ -8,6 +8,9 @@
 BEGIN;
 UPDATE public.guest_message_templates SET is_active = true WHERE kind IN ('day_of', 'time_changed', 'cancelled');
 DELETE FROM public.scheduled_guest_messages WHERE campaign_message_id IS NOT NULL AND status = 'pending';
+-- Keep the sent/failed history: detach it before the campaign messages go,
+-- since the column cascades on delete.
+UPDATE public.scheduled_guest_messages SET campaign_message_id = NULL WHERE campaign_message_id IS NOT NULL;
 DELETE FROM public.campaign_messages WHERE campaign_id IN (
   SELECT id FROM public.campaigns WHERE trigger_type IN ('reservation_moved', 'reservation_cancelled', 'member_guest_link')
 );
