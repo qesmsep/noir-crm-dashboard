@@ -104,6 +104,14 @@ describe('timing relative to the reservation', () => {
     const t = guestAddedSendTime(msg({ relative_quantity: 1, relative_unit: 'day', relative_proximity: 'after', relative_time: '11:00' }), added, TZ, START)!;
     expect(t.setZone(TZ).toFormat('yyyy-LL-dd HH:mm')).toBe('2026-11-20 11:00');
   });
+  it('"1 day before the reservation" with no clock time is exactly 24 hours before', () => {
+    const t = guestAddedSendTime(msg({ relative_quantity: 1, relative_unit: 'day', relative_proximity: 'before', relative_time: null }), added, TZ, START)!;
+    expect(t.toUTC().toISO()).toBe(DateTime.fromISO(START, { zone: 'utc' }).minus({ days: 1 }).toUTC().toISO());
+  });
+  it('"2 days after the guest is added" with no clock time is exact', () => {
+    const t = guestAddedSendTime(msg({ relative_anchor: null, relative_quantity: 2, relative_unit: 'day', relative_proximity: 'after', relative_time: null }), added, TZ, START)!;
+    expect(t.toUTC().toISO()).toBe('2026-11-14T18:00:00.000Z');
+  });
   it('default anchor is still when the guest was added', () => {
     expect(guestAddedSendTime(msg({ relative_anchor: null, relative_quantity: 30, relative_unit: 'minute', relative_proximity: 'after' }), added, TZ, START)!.toUTC().toISO()).toBe(
       '2026-11-12T18:30:00.000Z',
@@ -157,5 +165,14 @@ describe('cron: reservation-anchored Guest Registration messages', () => {
     expect(await processGuestAddedCampaignMessage(msg({}), at('2026-11-19T23:02:00Z'))).toBe(0);
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend.mock.calls[0][0]).toEqual({ to: '+19135550101', content: 'Hi Ava, see you at 8:00 PM. Garage on 13th. Reply STOP to opt out.' });
+  });
+
+  it('{{calendar_link}} sends the add-to-calendar link for the reservation', async () => {
+    const id = '44444444-4444-4444-8444-444444444444';
+    db.rows('reservations')[0].id = id;
+    db.rows('reservation_guests')[0].reservation_id = id;
+    const m = msg({ content: 'Add it to your calendar: {{calendar_link}}' });
+    expect(await processGuestAddedCampaignMessage(m, { now: () => DateTime.fromISO('2026-11-19T23:01:00Z', { zone: 'utc' }) })).toBe(1);
+    expect(mockSend.mock.calls[0][0].content).toMatch(/^Add it to your calendar: \S*\/r\/[A-Za-z0-9_-]{44}\/cal\.ics$/);
   });
 });

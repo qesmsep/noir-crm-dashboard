@@ -26,7 +26,9 @@ jest.mock('@/lib/admin-auth', () => ({ resolveAdmin: jest.fn().mockResolvedValue
 import guestsHandler from '../../pages/api/member/reservations/[id]/guests/index';
 import guestLinkHandler from '../../pages/api/guest-link/[token]';
 import guestJoinHandler from '../../pages/api/guest-join/[token]';
-import { guestDisplayName, guestJoinToken, lookupGuestJoin, lookupGuestLink } from '../../lib/guestLink';
+import { guestDisplayName, guestJoinToken, lookupCalendar, lookupGuestJoin, lookupGuestLink } from '../../lib/guestLink';
+import { reservationIcs } from '../../lib/reservationIcs';
+import { GET as calendarGet } from '../../app/r/[token]/cal.ics/route';
 import { memberOwnsReservation, tokenExpired, newGuestLinkToken } from '../../lib/guestApi';
 
 const R_MINE = '11111111-1111-4111-8111-111111111111';
@@ -51,7 +53,7 @@ function seed() {
         { id: R_THEIRS, member_id: 'm-them', phone: '+19135550200', email: null, status: 'confirmed', start_time: future.toISO(), end_time: future.plus({ hours: 2 }).toISO(), party_size: 4, first_name: 'Sam', location_id: 'loc' },
         { id: R_OLD_MINE, member_id: null, phone: '9135550100', email: null, status: 'confirmed', start_time: future.toISO(), end_time: future.plus({ hours: 2 }).toISO(), party_size: 2, first_name: 'Tim', location_id: 'loc' },
       ],
-      locations: [{ id: 'loc', name: 'Noir KC', timezone: 'America/Chicago' }],
+      locations: [{ id: 'loc', name: 'Noir KC', slug: 'noirkc', timezone: 'America/Chicago', address: '1234 Main St, Kansas City, MO', parking_instructions: 'Garage on 13th' }],
       guest_contacts: [{ id: 'c1', phone: '+19135550111', first_name: 'Ava', last_name: 'Stone', sms_opted_out_at: null }],
       reservation_guests: [{ id: 'g1', reservation_id: R_MINE, guest_contact_id: 'c1', status: 'active', first_name_snapshot: 'Ava', added_via: 'portal', created_at: '2026-01-01' }],
       guest_message_templates: [],
@@ -146,8 +148,8 @@ describe('guest link tokens', () => {
     const link = await lookupGuestLink(TOKEN);
     expect(link.ok).toBe(true);
     if (!link.ok) return;
-    expect(Object.keys(link.summary).sort()).toEqual(['date', 'guests', 'host_first_name', 'join_path', 'location_name', 'max_more', 'party_size', 'spots_left', 'time']);
-    expect(link.summary).toMatchObject({ location_name: 'Noir KC', host_first_name: 'Tim', spots_left: 2 });
+    expect(Object.keys(link.summary).sort()).toEqual(['date', 'guests', 'host_first_name', 'join_path', 'location_name', 'location_slug', 'max_more', 'party_size', 'spots_left', 'time']);
+    expect(link.summary).toMatchObject({ location_name: 'Noir KC', location_slug: 'noirkc', host_first_name: 'Tim', spots_left: 2 });
   });
 
   it('guest names are first name and last initial only', async () => {
@@ -211,7 +213,7 @@ describe('guest self-register (join) link', () => {
   it('shows only location, date, time and host first name (no guest list)', async () => {
     const join = await lookupGuestJoin(JOIN());
     if (!join.ok) throw new Error('join not ok');
-    expect(Object.keys(join.summary).sort()).toEqual(['date', 'host_first_name', 'location_name', 'time']);
+    expect(Object.keys(join.summary).sort()).toEqual(['date', 'host_first_name', 'location_name', 'location_slug', 'time']);
     const res = await call(guestJoinHandler, { method: 'GET', query: { token: JOIN() } });
     expect(res.statusCode).toBe(200);
     expect(JSON.stringify(res.body)).not.toMatch(/Ava|555|phone|member_id/);
@@ -253,5 +255,48 @@ describe('guest self-register (join) link', () => {
     const capped = await call(guestJoinHandler, { method: 'POST', query: { token: JOIN() }, body: { first_name: 'Cy', phone: '9135550123' } });
     expect(capped.statusCode).toBe(429);
     expect(capped.body.code).toBe('GUEST_LINK_CAP');
+  });
+});
+
+describe('add-to-calendar link', () => {
+  const JOIN = () => guestJoinToken(R_MINE, TOKEN)!;
+
+  it('returns an .ics with location, times and party; no phones or guest names', async () => {
+    const res = await calendarGet(new Request('http://x'), { params: Promise.resolve({ token: JOIN() }) });
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toMatch(/^text\/calendar/);
+    const body = await res.text();
+    expect(body).toMatch(/^BEGIN:VCALENDAR\r\n/);
+    expect(body).toContain(`UID:${R_MINE}@noirkc.com`);
+    expect(body).toContain('SUMMARY:Noir KC reservation');
+    expect(body).toContain('LOCATION:Noir KC\\, 1234 Main St\\, Kansas City\\, MO');
+    expect(body).toContain(`DTSTART:${future.toUTC().toFormat("yyyyMMdd'T'HHmmss'Z'")}`);
+    expect(body).toContain(`DTEND:${future.plus({ hours: 2 }).toUTC().toFormat("yyyyMMdd'T'HHmmss'Z'")}`);
+    expect(body).toContain('Party of 4\\, hosted by Tim.');
+    expect(body).not.toMatch(/555|Ava|me@example|m-me/);
+  });
+
+  it('refuses the member token, forged, expired and cancelled with 404', async () => {
+    const t = JOIN();
+    expect(await lookupCalendar(TOKEN)).toEqual({ ok: false, reason: 'invalid' });
+    expect(await lookupCalendar(t.slice(0, 22) + (t[22] === 'A' ? 'B' : 'A') + t.slice(23))).toEqual({ ok: false, reason: 'invalid' });
+    expect(await lookupCalendar(t, { now: future.plus({ hours: 3 }) })).toEqual({ ok: false, reason: 'expired' });
+    db.rows('reservations')[0].status = 'cancelled';
+    const res = await calendarGet(new Request('http://x'), { params: Promise.resolve({ token: t }) });
+    expect(res.status).toBe(404);
+  });
+
+  it('escapes text and folds long lines', () => {
+    const ics = reservationIcs({
+      reservationId: R_MINE,
+      start: future.toISO()!,
+      end: future.plus({ hours: 2 }).toISO()!,
+      partySize: 2,
+      hostFirstName: '',
+      location: { name: 'Noir; OP', address: null, parkingInstructions: 'Lot A, then\nwalk '.repeat(10) },
+    });
+    expect(ics).toContain('SUMMARY:Noir\\; OP reservation');
+    expect(ics.split('\r\n').every((l) => Buffer.byteLength(l) <= 75)).toBe(true);
+    expect(ics).toContain('Party of 2.');
   });
 });

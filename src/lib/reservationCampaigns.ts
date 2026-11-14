@@ -110,7 +110,7 @@ export function renderReservationMessage(
   content: string,
   reservation: Pick<CampaignReservation, 'first_name' | 'last_name' | 'email' | 'phone' | 'party_size' | 'start_time'>,
   location: { name?: string | null; timezone?: string | null; address?: string | null; parking_instructions?: string | null } | null,
-  extras: { guestLink?: string | null; guestJoinLink?: string | null } = {},
+  extras: { guestLink?: string | null; guestJoinLink?: string | null; calendarLink?: string | null } = {},
 ): string {
   const tz = location?.timezone || DEFAULT_VENUE_TIMEZONE;
   const start = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(tz);
@@ -130,20 +130,27 @@ export function renderReservationMessage(
     .replace(/\{\{parking_instructions\}\}/g, () => (location?.parking_instructions || '').trim())
     .replace(/\{\{guest_link\}\}/g, () => extras.guestLink || '')
     .replace(/\{\{guest_join_link\}\}/g, () => extras.guestJoinLink || '')
+    .replace(/\{\{calendar_link\}\}/g, () => extras.calendarLink || '')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
 
-/** True when the message uses either reservation link placeholder. */
+/** True when the message uses the add-to-calendar link. */
+export function usesCalendarLink(content: string): boolean {
+  return content.includes('{{calendar_link}}');
+}
+
+/** True when the message uses any reservation link placeholder (guest links or the calendar link). */
 export function usesGuestLink(content: string): boolean {
-  return content.includes('{{guest_link}}') || content.includes('{{guest_join_link}}');
+  return content.includes('{{guest_link}}') || content.includes('{{guest_join_link}}') || usesCalendarLink(content);
 }
 
 /** True when the message uses a link placeholder whose link couldn't be made, so it must not send. */
-export function missingRequiredLink(content: string, links: { guestLink?: string; guestJoinLink?: string }): boolean {
+export function missingRequiredLink(content: string, links: { guestLink?: string; guestJoinLink?: string; calendarLink?: string }): boolean {
   if (!usesGuestLink(content)) return false;
   if (!links.guestLink) return true;
-  return content.includes('{{guest_join_link}}') && !links.guestJoinLink;
+  if (content.includes('{{guest_join_link}}') && !links.guestJoinLink) return true;
+  return usesCalendarLink(content) && !links.calendarLink;
 }
 
 export interface ReservationLinks {
@@ -151,6 +158,8 @@ export interface ReservationLinks {
   guestLink: string;
   /** {{guest_join_link}}: the link the booker shares so a guest adds themselves. */
   guestJoinLink: string;
+  /** {{calendar_link}}: the reservation's add-to-calendar file (same token as the join link). */
+  calendarLink: string;
 }
 
 /**
@@ -161,14 +170,14 @@ export interface ReservationLinks {
 export async function guestLinksForReservation(reservationId: string, db?: typeof supabaseAdmin, now?: DateTime): Promise<ReservationLinks> {
   try {
     const { ensureGuestLink, guestJoinToken } = await import('@/lib/guestLink');
-    const { guestLinkUrl, guestJoinUrl } = await import('@/lib/guestApi');
+    const { guestLinkUrl, guestJoinUrl, guestCalendarUrl } = await import('@/lib/guestApi');
     const link = await ensureGuestLink(reservationId, { ...(db ? { db } : {}), ...(now ? { now } : {}) });
-    if (!link.ok) return { guestLink: '', guestJoinLink: '' };
+    if (!link.ok) return { guestLink: '', guestJoinLink: '', calendarLink: '' };
     const join = guestJoinToken(reservationId, link.token);
-    return { guestLink: guestLinkUrl(link.token), guestJoinLink: join ? guestJoinUrl(join) : '' };
+    return { guestLink: guestLinkUrl(link.token), guestJoinLink: join ? guestJoinUrl(join) : '', calendarLink: join ? guestCalendarUrl(join) : '' };
   } catch (err) {
     console.error('[reservation campaigns] could not create guest link', reservationId, err);
-    return { guestLink: '', guestJoinLink: '' };
+    return { guestLink: '', guestJoinLink: '', calendarLink: '' };
   }
 }
 
@@ -396,7 +405,7 @@ export async function sendReservationCreatedMessages(
         continue;
       }
       const needsLink = usesGuestLink(message.content);
-      const links = needsLink ? await guestLinksForReservation(r.id, db) : { guestLink: '', guestJoinLink: '' };
+      const links = needsLink ? await guestLinksForReservation(r.id, db) : { guestLink: '', guestJoinLink: '', calendarLink: '' };
       const content = renderReservationMessage(message.content, r, location, links);
       const scheduledTime = now.toISO()!;
       const claim = await claimReservationSend(db, {

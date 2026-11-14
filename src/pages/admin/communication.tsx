@@ -41,7 +41,7 @@ interface CampaignTemplate {
   recurring_monthly_day?: 'day' | 'weekday';
   recurring_monthly_value?: number;
   recurring_yearly_date?: string;
-  relative_time?: string;
+  relative_time?: string | null;
   relative_quantity?: number;
   relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
   relative_proximity?: 'before' | 'after';
@@ -251,10 +251,12 @@ export default function CommunicationPage() {
       return display;
     } else if (template.timing_type === 'relative') {
       const unit = template.relative_quantity === 1 ? template.relative_unit : template.relative_unit + 's';
+      const noClock = !template.relative_time && (selectedCampaign?.trigger_type as string | undefined) === 'guest_registration';
       if (template.relative_anchor === 'reservation_start') {
-        const exact = template.relative_unit === 'minute' || template.relative_unit === 'hour';
+        const exact = template.relative_unit === 'minute' || template.relative_unit === 'hour' || noClock;
         return `Send ${exact ? '' : `at ${template.relative_time} `}${template.relative_quantity} ${unit} ${template.relative_proximity} the reservation`;
       }
+      if (noClock) return `Send ${template.relative_quantity} ${unit} ${template.relative_proximity} trigger`;
       return `Send at ${template.relative_time} ${template.relative_quantity} ${unit} ${template.relative_proximity} trigger`;
     }
     return 'Timing not configured';

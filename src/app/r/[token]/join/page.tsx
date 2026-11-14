@@ -9,9 +9,11 @@ import React, { use, useEffect, useState } from 'react';
 import { CheckCircle2 } from 'lucide-react';
 import { Spinner } from '@/components/ui/spinner';
 import AddGuestsForm, { toSubmitResult } from '@/components/guests/AddGuestsForm';
+import LocationLogo from '@/components/guests/LocationLogo';
 
 interface Summary {
   location_name: string;
+  location_slug?: string | null;
   date: string;
   time: string;
   host_first_name: string;
@@ -62,6 +64,7 @@ export default function GuestJoinPage({ params }: { params: Promise<{ token: str
 
         {!loading && summary && (
           <>
+            <LocationLogo slug={summary.location_slug} />
             <header className="rounded-2xl border border-border-cream-1 bg-white p-5">
               <p className="text-sm text-text-muted">You&apos;re invited by {summary.host_first_name}</p>
               <h1 className="mt-1 text-xl font-semibold text-text-primary">{summary.location_name}</h1>

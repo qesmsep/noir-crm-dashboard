@@ -15,6 +15,8 @@ type Db = typeof supabaseAdmin;
 
 export interface GuestLinkSummary {
   location_name: string;
+  /** Location slug (noirkc, noirop, rooftopkc), used to pick the logo shown on the form. */
+  location_slug: string | null;
   date: string;
   time: string;
   host_first_name: string;
@@ -33,6 +35,7 @@ export interface GuestLinkSummary {
 /** What a guest sees on the self-register page: no guest list, no member data. */
 export interface GuestJoinSummary {
   location_name: string;
+  location_slug: string | null;
   date: string;
   time: string;
   host_first_name: string;
@@ -67,7 +70,7 @@ const RESERVATION_COLUMNS = 'id, status, start_time, end_time, party_size, first
 async function summarize(db: Db, r: ReservationRow): Promise<GuestLinkSummary> {
   const [{ data: loc }, { data: member }, { data: guests }] = await Promise.all([
     r.location_id
-      ? db.from('locations').select('name, timezone').eq('id', r.location_id).maybeSingle()
+      ? db.from('locations').select('name, slug, timezone').eq('id', r.location_id).maybeSingle()
       : Promise.resolve({ data: null }),
     !r.first_name && r.member_id
       ? db.from('members').select('first_name').eq('member_id', r.member_id).maybeSingle()
@@ -90,6 +93,7 @@ async function summarize(db: Db, r: ReservationRow): Promise<GuestLinkSummary> {
   const join = r.guest_link_token ? guestJoinToken(r.id, r.guest_link_token) : null;
   return {
     location_name: (loc as { name?: string } | null)?.name || 'Noir',
+    location_slug: (loc as { slug?: string } | null)?.slug || null,
     date: start.toFormat('cccc, LLLL d'),
     time: start.toFormat('h:mm a'),
     host_first_name: host.split(' ')[0] || 'Your host',
@@ -177,7 +181,60 @@ export async function lookupGuestJoin(token: unknown, deps: { db?: Db; now?: Dat
     reservationId: r.id,
     partySize: r.party_size || 1,
     guestCount: full.guests.length,
-    summary: { location_name: full.location_name, date: full.date, time: full.time, host_first_name: full.host_first_name },
+    summary: { location_name: full.location_name, location_slug: full.location_slug, date: full.date, time: full.time, host_first_name: full.host_first_name },
+  };
+}
+
+/** What the add-to-calendar file shows: no phones, no member data beyond the host's first name. */
+export interface CalendarDetails {
+  reservationId: string;
+  start: string;
+  end: string;
+  partySize: number;
+  hostFirstName: string;
+  location: { name: string; address: string | null; parkingInstructions: string | null };
+}
+
+export type CalendarLookup = { ok: true; details: CalendarDetails } | { ok: false; reason: 'invalid' | 'expired' | 'closed' };
+
+/** Add-to-calendar lookup by join token: same checks as the self-register link. */
+export async function lookupCalendar(token: unknown, deps: { db?: Db; now?: DateTime } = {}): Promise<CalendarLookup> {
+  const db = deps.db ?? supabaseAdmin;
+  const now = deps.now ?? DateTime.utc();
+  const parsed = parseJoinToken(token);
+  if (!parsed) return { ok: false, reason: 'invalid' };
+
+  const { data: r } = await db.from('reservations').select(RESERVATION_COLUMNS).eq('id', parsed.reservationId).maybeSingle();
+  if (!r || !r.guest_link_token || !isValidTokenShape(r.guest_link_token)) return { ok: false, reason: 'invalid' };
+  const expected = Buffer.from(joinSignature(r.guest_link_token));
+  const given = Buffer.from(parsed.signature);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return { ok: false, reason: 'invalid' };
+  if (tokenExpired(r.guest_link_expires_at, now)) return { ok: false, reason: 'expired' };
+  if (isReservationClosed(r, now)) return { ok: false, reason: 'closed' };
+
+  const row = r as ReservationRow;
+  const [{ data: loc }, { data: member }] = await Promise.all([
+    row.location_id
+      ? db.from('locations').select('name, address, parking_instructions').eq('id', row.location_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    !row.first_name && row.member_id
+      ? db.from('members').select('first_name').eq('member_id', row.member_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const l = (loc as { name?: string | null; address?: string | null; parking_instructions?: string | null } | null) || null;
+  const host = (row.first_name || (member as { first_name?: string } | null)?.first_name || '').trim().split(' ')[0];
+  const start = DateTime.fromISO(row.start_time, { zone: 'utc' });
+  const end = row.end_time ? DateTime.fromISO(row.end_time, { zone: 'utc' }) : start.plus({ hours: 2 });
+  return {
+    ok: true,
+    details: {
+      reservationId: row.id,
+      start: start.toISO()!,
+      end: (end.isValid && end > start ? end : start.plus({ hours: 2 })).toISO()!,
+      partySize: row.party_size || 1,
+      hostFirstName: host,
+      location: { name: l?.name || 'Noir', address: (l?.address || '').trim() || null, parkingInstructions: (l?.parking_instructions || '').trim() || null },
+    },
   };
 }
 

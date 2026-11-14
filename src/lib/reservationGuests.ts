@@ -11,9 +11,9 @@
  *
  * Texts:
  *   intro + follow-ups  Campaigns, trigger "Guest Registration"
- *                 (src/lib/guestCampaigns.ts). The immediate intro is skipped
- *                 when the reservation starts within 2 hours and day_of is on,
- *                 because day_of goes out right away and covers it.
+ *                 (src/lib/guestCampaigns.ts). The immediate intro always
+ *                 goes when a guest is added; a "before the reservation" text
+ *                 whose time has passed goes right after it.
  *   day of        a Guest Registration message timed from the reservation
  *                 ("Relative to: The reservation time"); a guest added after
  *                 that time but before the start gets it right away
@@ -956,9 +956,16 @@ export interface EventCampaignMessage {
 type DeliverResult = { status: 'sent'; messageId?: string } | { status: 'skipped'; reason: string } | { status: 'failed'; error: string };
 
 /** Fill a campaign message with the same placeholders as Guest Registration messages. */
-async function renderEventCampaignMessage(content: string, a: DeliverArgs, contact: ContactRow): Promise<string> {
+async function renderEventCampaignMessage(content: string, a: DeliverArgs, contact: ContactRow, db: Db): Promise<string> {
   const { renderGuestCampaignMessage } = await import('@/lib/guestCampaigns');
+  // {{calendar_link}}: a cancelled reservation has no calendar file, so it renders empty there.
+  let calendarLink = '';
+  if (a.kind !== 'cancelled' && content.includes('{{calendar_link}}')) {
+    const { guestLinksForReservation } = await import('@/lib/reservationCampaigns');
+    calendarLink = (await guestLinksForReservation(a.reservation.id, db)).calendarLink;
+  }
   return renderGuestCampaignMessage(content, {
+    calendarLink,
     guestFirstName: a.guest.first_name_snapshot || contact.first_name,
     guestLastName: contact.last_name,
     hostFirstName: a.host.first,
@@ -1005,7 +1012,7 @@ async function deliver(db: Db, deps: GuestDeps, a: DeliverArgs): Promise<Deliver
   }
 
   const content = a.campaignMessage
-    ? await renderEventCampaignMessage(a.campaignMessage.content, a, contact)
+    ? await renderEventCampaignMessage(a.campaignMessage.content, a, contact, db)
     : renderGuestMessage(a.template!.body, {
     guestFirstName: a.guest.first_name_snapshot || contact.first_name,
     hostFirstName: a.host.first,

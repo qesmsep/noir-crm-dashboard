@@ -360,14 +360,15 @@ describe('guest added → campaign intro', () => {
     expect(db.rows('scheduled_guest_messages').map((m) => m.kind)).toEqual(['day_of']);
   });
 
-  it('within 2 hours of start: intro skipped, day_of goes now', async () => {
+  it('within 2 hours of start: the intro still goes at once, then day_of', async () => {
     seed({ intro: true });
     clock = DateTime.fromISO('2026-11-20T00:30:00.000Z', { zone: 'utc' });
     await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
-    expect(db.rows('scheduled_messages')).toHaveLength(0);
+    expect(db.rows('scheduled_messages')).toHaveLength(1);
+    expect(mockSend.mock.calls[0][0].content).toMatch(/^Hi Ava, Tim put you on their reservation/);
     await processDueGuestMessages({}, deps());
-    expect(mockSend).toHaveBeenCalledTimes(1);
-    expect(mockSend.mock.calls[0][0].content).toMatch(/^Tonight 8:00 PM with Tim/);
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    expect(mockSend.mock.calls[1][0].content).toMatch(/^Tonight 8:00 PM with Tim/);
   });
 
   it('guest who is already a member still gets the intro', async () => {
@@ -642,26 +643,27 @@ describe('guest texts from Campaigns', () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it('a guest added after the day-of time gets it right away, instead of the intro', async () => {
+  it('a guest added after the day-of time gets the intro first, then the day-of right away', async () => {
     seed({ intro: true, templates: TEMPLATES_OFF, messages: [DAY_OF] });
     clock = DateTime.fromISO('2026-11-20T01:30:00.000Z', { zone: 'utc' }); // 30 minutes before the start
     await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
-    expect(mockSend).toHaveBeenCalledTimes(1);
-    expect(mockSend.mock.calls[0][0].content).toBe('See you at 8:00 PM, Ava.');
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    expect(mockSend.mock.calls[0][0].content).toMatch(/^Hi Ava, Tim put you on their reservation/);
+    expect(mockSend.mock.calls[1][0].content).toBe('See you at 8:00 PM, Ava.');
   });
 
   it('the cron does not send the day-of again after the catch-up sent it', async () => {
     seed({ intro: true, templates: TEMPLATES_OFF, messages: [DAY_OF] });
     clock = DateTime.fromISO('2026-11-20T01:30:00.000Z', { zone: 'utc' });
     await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
-    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend).toHaveBeenCalledTimes(2);
     const { processGuestAddedCampaignMessage } = await import('../guestCampaigns');
     clock = DateTime.fromISO('2026-11-20T01:35:00.000Z', { zone: 'utc' });
     expect(await processGuestAddedCampaignMessage(DAY_OF as never, deps())).toBe(0);
-    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend).toHaveBeenCalledTimes(2);
   });
 
-  it('a late day-of for members only does not replace the intro for a guest who is not a member', async () => {
+  it('a late day-of for members only goes only to members; a guest who is not a member gets just the intro', async () => {
     seed({ intro: true, templates: TEMPLATES_OFF, messages: [{ ...DAY_OF, recipient_type: 'reservation_guest_member' }] });
     clock = DateTime.fromISO('2026-11-20T01:30:00.000Z', { zone: 'utc' });
     await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
