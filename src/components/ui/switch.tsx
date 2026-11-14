@@ -5,6 +5,8 @@ import * as SwitchPrimitives from "@radix-ui/react-switch"
 
 import { cn } from "@/lib/utils"
 
+// min-h-0/min-w-0 opt out of the global 44px mobile minimum on buttons in
+// globals.css, which squashed the track; the surrounding label keeps the touch target.
 const Switch = React.forwardRef<
   React.ElementRef<typeof SwitchPrimitives.Root>,
   React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root>
