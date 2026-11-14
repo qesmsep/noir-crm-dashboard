@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { rateLimiters } from '@/lib/rate-limiter';
 import { addGuests } from '@/lib/reservationGuests';
-import { guestLinkAddCap, guestLinkAddsUsed, lookupGuestLink } from '@/lib/guestLink';
+import { guestLinkCanAdd, lookupGuestLink } from '@/lib/guestLink';
 import { sendGuestError } from '@/lib/guestApi';
 
 /**
@@ -11,7 +11,7 @@ import { sendGuestError } from '@/lib/guestApi';
  *        location has room at that time (capacity trigger) and it stays ≤ 20.
  *
  * Auth: the token itself (≥32 random bytes, unexpired, reservation active).
- * Rate-limited per IP and per link; total adds through one link are capped
+ * Rate-limited per IP and per link; adds through one link are capped
  * (see guestLinkAddCap). Responses never include guests' phones or member data.
  */
 const MESSAGES = {
@@ -44,11 +44,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   try {
     const guests = Array.isArray(req.body?.guests) ? req.body.guests : [];
-    const used = await guestLinkAddsUsed(link.reservationId);
     // The cap follows the party size these guests would make, since adding can raise it.
     const currentGuests = link.summary.guests.length;
     const sizeAfter = Math.max(link.partySize, currentGuests + guests.length + 1);
-    if (used + guests.length > guestLinkAddCap(sizeAfter)) {
+    if (!(await guestLinkCanAdd(link.reservationId, guests.length, sizeAfter))) {
       return res.status(429).json({
         error: "This link can't add any more guests. Reply to our text with their names and numbers and we'll add them.",
         code: 'GUEST_LINK_CAP',

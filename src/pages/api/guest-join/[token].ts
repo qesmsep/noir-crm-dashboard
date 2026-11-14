@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { rateLimiters } from '@/lib/rate-limiter';
 import { addGuests, GuestServiceError } from '@/lib/reservationGuests';
-import { guestLinkAddCap, guestLinkAddsUsed, lookupGuestJoin } from '@/lib/guestLink';
+import { guestLinkCanAdd, lookupGuestJoin } from '@/lib/guestLink';
 import { sendGuestError } from '@/lib/guestApi';
 
 /**
@@ -66,9 +66,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     const b = req.body || {};
     const guest = { first_name: b.first_name, last_name: b.last_name, phone: b.phone };
-    const used = await guestLinkAddsUsed(link.reservationId);
     const sizeAfter = Math.max(link.partySize, link.guestCount + 2);
-    if (used + 1 > guestLinkAddCap(sizeAfter)) {
+    if (!(await guestLinkCanAdd(link.reservationId, 1, sizeAfter))) {
       return res.status(429).json({
         error: `This link can't add any more guests. Ask ${host} to add you.`,
         code: 'GUEST_LINK_CAP',

@@ -177,13 +177,20 @@ describe('guest link tokens', () => {
     expect(JSON.stringify(ok.body)).not.toMatch(/555|phone|member_id/);
   });
 
-  it('API: caps total adds through one link (removed guests still count)', async () => {
-    // party of 4 → 3 guests + 2 corrections = 5 adds through the link, ever
+  it('API: removing a guest frees their spot on the link', async () => {
+    // Tim's case: party of 3, four link guests added and all removed
+    db.rows('reservations')[0].party_size = 3;
     db.rows('reservation_guests').push(
       ...[1, 2, 3, 4].map((i) => ({ id: `gl-${i}`, reservation_id: R_MINE, guest_contact_id: 'c1', status: 'removed', added_via: 'guest_link', created_at: '2026-01-02' })),
     );
     const ok = await call(guestLinkHandler, { method: 'POST', query: { token: TOKEN }, body: { guests: [{ first_name: 'Bo', phone: '9135550122' }] } });
     expect(ok.statusCode).toBe(201);
+  });
+
+  it('API: remove-and-re-add loops stop at the hard cap of 20 adds', async () => {
+    db.rows('reservation_guests').push(
+      ...Array.from({ length: 20 }, (_, i) => ({ id: `gl-${i}`, reservation_id: R_MINE, guest_contact_id: 'c1', status: 'removed', added_via: 'guest_link', created_at: '2026-01-02' })),
+    );
     const capped = await call(guestLinkHandler, { method: 'POST', query: { token: TOKEN }, body: { guests: [{ first_name: 'Cy', phone: '9135550123' }] } });
     expect(capped.statusCode).toBe(429);
     expect(capped.body.code).toBe('GUEST_LINK_CAP');
@@ -250,7 +257,7 @@ describe('guest self-register (join) link', () => {
 
   it('API: shares the per-reservation add cap with the member link', async () => {
     db.rows('reservation_guests').push(
-      ...[1, 2, 3, 4, 5].map((i) => ({ id: `gl-${i}`, reservation_id: R_MINE, guest_contact_id: 'c1', status: 'removed', added_via: 'guest_link', created_at: '2026-01-02' })),
+      ...Array.from({ length: 20 }, (_, i) => ({ id: `gl-${i}`, reservation_id: R_MINE, guest_contact_id: 'c1', status: 'removed', added_via: 'guest_link', created_at: '2026-01-02' })),
     );
     const capped = await call(guestJoinHandler, { method: 'POST', query: { token: JOIN() }, body: { first_name: 'Cy', phone: '9135550123' } });
     expect(capped.statusCode).toBe(429);

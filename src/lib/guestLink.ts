@@ -268,11 +268,13 @@ export async function ensureGuestLink(reservationId: string, deps: { db?: Db; no
 }
 
 /**
- * Abuse cap for the public link: total guests ever added through this
- * reservation's link (removed ones included, so remove-and-re-add loops count)
- * may not exceed party size − 1 plus a small allowance for corrections, and
- * never more than GUEST_LINK_HARD_CAP. Every add can trigger texts, so this
- * bounds how many numbers a leaked link can make us text.
+ * Abuse cap for the public link. Guests on the list through this
+ * reservation's link may not exceed party size − 1 plus a small allowance for
+ * corrections; removing a guest frees their spot. Adds through the link ever
+ * (removed ones included, so remove-and-re-add loops count) never go past
+ * GUEST_LINK_HARD_CAP, the same bound a link already had by growing the party
+ * to the 20-person maximum. Every add can trigger texts, so this bounds how
+ * many numbers a leaked link can make us text.
  */
 export const GUEST_LINK_CORRECTION_ALLOWANCE = 2;
 export const GUEST_LINK_HARD_CAP = 20;
@@ -281,8 +283,16 @@ export function guestLinkAddCap(partySize: number): number {
   return Math.min(GUEST_LINK_HARD_CAP, Math.max(0, (partySize || 1) - 1) + GUEST_LINK_CORRECTION_ALLOWANCE);
 }
 
-export async function guestLinkAddsUsed(reservationId: string, deps: { db?: Db } = {}): Promise<number> {
+/** Whether `adding` more guests fit through the link at a party of `sizeAfter`. */
+export async function guestLinkCanAdd(
+  reservationId: string,
+  adding: number,
+  sizeAfter: number,
+  deps: { db?: Db } = {},
+): Promise<boolean> {
   const db = deps.db ?? supabaseAdmin;
-  const { data } = await db.from('reservation_guests').select('id').eq('reservation_id', reservationId).eq('added_via', 'guest_link');
-  return ((data as unknown[]) || []).length;
+  const { data } = await db.from('reservation_guests').select('id, status').eq('reservation_id', reservationId).eq('added_via', 'guest_link');
+  const rows = ((data as { status?: string }[]) || []);
+  const onList = rows.filter((r) => r.status === 'active').length;
+  return onList + adding <= guestLinkAddCap(sizeAfter) && rows.length + adding <= GUEST_LINK_HARD_CAP;
 }
