@@ -8,6 +8,7 @@ import {
   isCancelled,
   guestLinksForReservation,
   usesGuestLink,
+  missingRequiredLink,
   renderReservationMessage,
   reservationMatchesRecipientType,
   type LocationInfo,
@@ -889,7 +890,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 ? await guestLinksForReservation(member.reservation_id)
                 : { guestLink: '', guestJoinLink: '' };
             // Never send a guest-link message without the link.
-            if (usesGuestLink(message.content) && (!links.guestLink || (message.content.includes('{{guest_join_link}}') && !links.guestJoinLink))) {
+            if (missingRequiredLink(message.content, links)) {
               console.error(`❌ No guest link for reservation ${member.reservation_id}; skipping message ${message.id}`);
               continue;
             }

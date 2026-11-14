@@ -22,6 +22,15 @@ DELETE FROM public.campaign_messages WHERE campaign_id IN (
   SELECT id FROM public.campaigns WHERE trigger_type IN ('reservation_moved', 'reservation_cancelled', 'member_guest_link')
 );
 DELETE FROM public.campaigns WHERE trigger_type IN ('reservation_moved', 'reservation_cancelled', 'member_guest_link');
+-- The day-of copy (step 3c), found by the description the migration gave it.
+DELETE FROM public.campaign_messages WHERE campaign_id IN (
+  SELECT id FROM public.campaigns
+   WHERE trigger_type = 'guest_registration'
+     AND description = 'Copied from the built-in guest day-of text (migration 20261114000000).'
+);
+DELETE FROM public.campaigns
+ WHERE trigger_type = 'guest_registration'
+   AND description = 'Copied from the built-in guest day-of text (migration 20261114000000).';
 DROP INDEX IF EXISTS public.scheduled_guest_messages_one_pending_kind;
 ALTER TABLE public.scheduled_guest_messages DROP COLUMN IF EXISTS campaign_message_id;
 CREATE UNIQUE INDEX IF NOT EXISTS scheduled_guest_messages_one_pending_kind

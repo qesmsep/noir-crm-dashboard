@@ -6,6 +6,9 @@
  * always means a reservation guest; the campaign engine's "guest" (any
  * non-member reservation phone) is a different thing and is never touched here.
  *
+ * guestCampaigns.ts imports from this module, so this module loads it with
+ * await import() inside functions to avoid a circular import at load time.
+ *
  * Texts:
  *   intro + follow-ups  Campaigns, trigger "Guest Registration"
  *                 (src/lib/guestCampaigns.ts). The immediate intro is skipped

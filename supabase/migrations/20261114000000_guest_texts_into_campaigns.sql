@@ -3,7 +3,8 @@
 -- ========================================
 -- The built-in "Reservation guests" texts become ordinary campaign messages:
 --   day of          -> Guest Registration messages timed from the reservation
---                      ("Relative to: The reservation time")
+--                      ("Relative to: The reservation time"); its wording is
+--                      copied only if no such message exists yet (step 3c)
 --   time changed    -> new trigger 'reservation_moved'
 --   cancelled       -> new trigger 'reservation_cancelled'
 --   member guest link (staff "Text link to member") -> new trigger 'member_guest_link'
@@ -102,6 +103,48 @@ BEGIN
   END IF;
 END $$;
 
+-- 3c) Day-of wording into a Guest Registration message (only once), timed
+-- from the reservation. Skipped when a "before" Guest Registration message
+-- already exists (step 5 times it from the reservation), so guests never get
+-- two day-of texts.
+DO $$
+DECLARE
+  t RECORD;
+  new_campaign UUID;
+BEGIN
+  SELECT body, is_active, send_offset_minutes INTO t FROM public.guest_message_templates WHERE kind = 'day_of';
+  IF NOT FOUND THEN
+    RETURN;
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM public.campaign_messages m JOIN public.campaigns c ON c.id = m.campaign_id
+     WHERE c.trigger_type = 'guest_registration'
+       AND m.timing_type = 'relative'
+       AND m.relative_proximity = 'before'
+       AND (m.relative_anchor IS NULL OR m.relative_anchor = 'reservation_start')
+  ) THEN
+    RETURN;
+  END IF;
+  INSERT INTO public.campaigns (name, description, trigger_type, is_active, applies_to_all_locations)
+  VALUES ('Guest day-of text', 'Copied from the built-in guest day-of text (migration 20261114000000).', 'guest_registration', t.is_active, true)
+  RETURNING id INTO new_campaign;
+  INSERT INTO public.campaign_messages (
+    campaign_id, name, content, recipient_type, timing_type,
+    relative_quantity, relative_unit, relative_proximity, relative_anchor, is_active
+  ) VALUES (
+    new_campaign,
+    'Guest: day of',
+    replace(replace(t.body, '{{date}}', '{{reservation_date}}'), '{{time}}', '{{reservation_time}}'),
+    'reservation_guest',
+    'relative',
+    CASE WHEN COALESCE(t.send_offset_minutes, 120) % 60 = 0 THEN COALESCE(t.send_offset_minutes, 120) / 60 ELSE t.send_offset_minutes END,
+    CASE WHEN COALESCE(t.send_offset_minutes, 120) % 60 = 0 THEN 'hour' ELSE 'minute' END,
+    'before',
+    'reservation_start',
+    true
+  );
+END $$;
+
 -- 4) Built-in guest texts off (the templates stay for rollback)
 UPDATE public.guest_message_templates SET is_active = false WHERE kind IN ('day_of', 'time_changed', 'cancelled');
 
@@ -120,6 +163,16 @@ COMMIT;
 -- ========================================
 -- VERIFICATION
 -- ========================================
+-- Before applying: how many Guest Registration messages step 5 will re-time,
+-- and whether step 3c will copy the day-of text (0 rows here = it will).
+-- SELECT count(*) AS step5_rows FROM campaign_messages m JOIN campaigns c ON c.id = m.campaign_id
+--  WHERE c.trigger_type = 'guest_registration' AND m.timing_type = 'relative'
+--    AND m.relative_proximity = 'before' AND m.relative_anchor IS NULL;
+-- SELECT m.name FROM campaign_messages m JOIN campaigns c ON c.id = m.campaign_id
+--  WHERE c.trigger_type = 'guest_registration' AND m.timing_type = 'relative'
+--    AND m.relative_proximity = 'before'
+--    AND (m.relative_anchor IS NULL OR m.relative_anchor = 'reservation_start');
+-- After applying:
 -- SELECT c.name, c.trigger_type, c.is_active, m.name, m.recipient_type, m.timing_type
 --   FROM campaigns c JOIN campaign_messages m ON m.campaign_id = c.id
 --  WHERE c.trigger_type IN ('reservation_moved', 'reservation_cancelled', 'guest_registration');

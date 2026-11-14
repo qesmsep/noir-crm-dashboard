@@ -139,6 +139,13 @@ export function usesGuestLink(content: string): boolean {
   return content.includes('{{guest_link}}') || content.includes('{{guest_join_link}}');
 }
 
+/** True when the message uses a link placeholder whose link couldn't be made, so it must not send. */
+export function missingRequiredLink(content: string, links: { guestLink?: string; guestJoinLink?: string }): boolean {
+  if (!usesGuestLink(content)) return false;
+  if (!links.guestLink) return true;
+  return content.includes('{{guest_join_link}}') && !links.guestJoinLink;
+}
+
 export interface ReservationLinks {
   /** {{guest_link}}: the booker's no-login "add your guests" link. */
   guestLink: string;
@@ -390,7 +397,6 @@ export async function sendReservationCreatedMessages(
       }
       const needsLink = usesGuestLink(message.content);
       const links = needsLink ? await guestLinksForReservation(r.id, db) : { guestLink: '', guestJoinLink: '' };
-      const guestLink = links.guestLink;
       const content = renderReservationMessage(message.content, r, location, links);
       const scheduledTime = now.toISO()!;
       const claim = await claimReservationSend(db, {
@@ -412,7 +418,7 @@ export async function sendReservationCreatedMessages(
       }
       // A message that uses a guest link never goes out without it:
       // record a failed attempt instead, so the retry pass tries again.
-      if (needsLink && (!guestLink || (message.content.includes('{{guest_join_link}}') && !links.guestJoinLink))) {
+      if (missingRequiredLink(message.content, links)) {
         await finishReservationSend(
           db,
           claim.rowId,

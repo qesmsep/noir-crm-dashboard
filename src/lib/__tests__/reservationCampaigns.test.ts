@@ -25,6 +25,7 @@ jest.mock('@/lib/sms', () => ({ sendSMS: (...args: unknown[]) => mockSend(...arg
 
 import {
   claimReservationSend,
+  missingRequiredLink,
   renderReservationMessage,
   reservationMatchesRecipientType,
   sendReservationCreatedMessages,
@@ -300,5 +301,22 @@ describe('helpers', () => {
       { name: 'Noir KC', timezone: 'America/Chicago' },
     );
     expect(text).toBe('July 3, 2026 8:30 PM');
+  });
+});
+
+describe('missingRequiredLink', () => {
+  const both = { guestLink: 'https://x/r/a/guests', guestJoinLink: 'https://x/r/b/join' };
+  it('is false when no link placeholder is used', () => {
+    expect(missingRequiredLink('See you soon', { guestLink: '', guestJoinLink: '' })).toBe(false);
+  });
+  it('is true when the guest link is missing', () => {
+    expect(missingRequiredLink('Add guests: {{guest_link}}', { guestLink: '', guestJoinLink: '' })).toBe(true);
+  });
+  it('is true when only the join link is missing and it is used', () => {
+    expect(missingRequiredLink('Share: {{guest_join_link}}', { ...both, guestJoinLink: '' })).toBe(true);
+    expect(missingRequiredLink('Add guests: {{guest_link}}', { ...both, guestJoinLink: '' })).toBe(false);
+  });
+  it('is false when every used link exists', () => {
+    expect(missingRequiredLink('{{guest_link}} {{guest_join_link}}', both)).toBe(false);
   });
 });

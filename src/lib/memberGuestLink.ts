@@ -9,7 +9,7 @@ import { DateTime } from 'luxon';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { toE164 } from '@/lib/phone';
-import { guestLinksForReservation, renderReservationMessage } from '@/lib/reservationCampaigns';
+import { guestLinksForReservation, missingRequiredLink, renderReservationMessage } from '@/lib/reservationCampaigns';
 import { type GuestDeps } from '@/lib/reservationGuests';
 
 export const MEMBER_GUEST_LINK_TRIGGER = 'member_guest_link';
@@ -64,7 +64,7 @@ export async function textGuestLinkToMember(
 
   const links = await guestLinksForReservation(reservationId, db, now);
   if (!links.guestLink) return { ok: false, status: 409, error: 'This reservation is over or cancelled, so it has no guest link.' };
-  if (messages.some((m) => m.content.includes('{{guest_join_link}}')) && !links.guestJoinLink) {
+  if (messages.some((m) => missingRequiredLink(m.content, links))) {
     return { ok: false, status: 500, error: 'Could not make the guest self-register link.' };
   }
 
