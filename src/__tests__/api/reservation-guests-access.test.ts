@@ -25,7 +25,8 @@ jest.mock('@/lib/admin-auth', () => ({ resolveAdmin: jest.fn().mockResolvedValue
 
 import guestsHandler from '../../pages/api/member/reservations/[id]/guests/index';
 import guestLinkHandler from '../../pages/api/guest-link/[token]';
-import { guestDisplayName, lookupGuestLink } from '../../lib/guestLink';
+import guestJoinHandler from '../../pages/api/guest-join/[token]';
+import { guestDisplayName, guestJoinToken, lookupGuestJoin, lookupGuestLink } from '../../lib/guestLink';
 import { memberOwnsReservation, tokenExpired, newGuestLinkToken } from '../../lib/guestApi';
 
 const R_MINE = '11111111-1111-4111-8111-111111111111';
@@ -145,7 +146,7 @@ describe('guest link tokens', () => {
     const link = await lookupGuestLink(TOKEN);
     expect(link.ok).toBe(true);
     if (!link.ok) return;
-    expect(Object.keys(link.summary).sort()).toEqual(['date', 'guests', 'host_first_name', 'location_name', 'max_more', 'party_size', 'spots_left', 'time']);
+    expect(Object.keys(link.summary).sort()).toEqual(['date', 'guests', 'host_first_name', 'join_path', 'location_name', 'max_more', 'party_size', 'spots_left', 'time']);
     expect(link.summary).toMatchObject({ location_name: 'Noir KC', host_first_name: 'Tim', spots_left: 2 });
   });
 
@@ -192,5 +193,65 @@ describe('guest link tokens', () => {
     expect(res.body.reservation.spots_left).toBe(1);
     expect(JSON.stringify(res.body)).not.toMatch(/555/);
     expect(db.rows('reservation_guests').find((g) => g.first_name_snapshot === 'Bo')?.added_via).toBe('guest_link');
+  });
+});
+
+describe('guest self-register (join) link', () => {
+  const JOIN = () => guestJoinToken(R_MINE, TOKEN)!;
+
+  it('member link carries the join path; the join token is not the member token', async () => {
+    const link = await lookupGuestLink(TOKEN);
+    if (!link.ok) throw new Error('link not ok');
+    expect(link.summary.join_path).toBe(`/r/${JOIN()}/join`);
+    expect(JOIN()).toHaveLength(44);
+    expect(JOIN()).not.toContain(TOKEN);
+    expect(await lookupGuestLink(JOIN())).toEqual({ ok: false, reason: 'invalid' });
+  });
+
+  it('shows only location, date, time and host first name (no guest list)', async () => {
+    const join = await lookupGuestJoin(JOIN());
+    if (!join.ok) throw new Error('join not ok');
+    expect(Object.keys(join.summary).sort()).toEqual(['date', 'host_first_name', 'location_name', 'time']);
+    const res = await call(guestJoinHandler, { method: 'GET', query: { token: JOIN() } });
+    expect(res.statusCode).toBe(200);
+    expect(JSON.stringify(res.body)).not.toMatch(/Ava|555|phone|member_id/);
+  });
+
+  it('refuses forged, member-token, rotated, expired and cancelled', async () => {
+    const t = JOIN();
+    const forged = t.slice(0, 22) + (t[22] === 'A' ? 'B' : 'A') + t.slice(23);
+    expect(await lookupGuestJoin(forged)).toEqual({ ok: false, reason: 'invalid' });
+    expect(await lookupGuestJoin(guestJoinToken(R_THEIRS, TOKEN))).toEqual({ ok: false, reason: 'invalid' });
+    expect(await lookupGuestJoin(TOKEN)).toEqual({ ok: false, reason: 'invalid' });
+    expect(await lookupGuestJoin(t, { now: future.plus({ hours: 3 }) })).toEqual({ ok: false, reason: 'expired' });
+    db.rows('reservations')[0].guest_link_token = 'c'.repeat(43);
+    expect(await lookupGuestJoin(t)).toEqual({ ok: false, reason: 'invalid' });
+    db.rows('reservations')[0].guest_link_token = TOKEN;
+    db.rows('reservations')[0].status = 'cancelled';
+    expect(await lookupGuestJoin(t)).toEqual({ ok: false, reason: 'closed' });
+  });
+
+  it('API: a guest adds exactly themselves, via the guest link', async () => {
+    const res = await call(guestJoinHandler, { method: 'POST', query: { token: JOIN() }, body: { first_name: 'Bo', phone: '9135550122', guests: [{ first_name: 'X', phone: '9135550199' }] } });
+    expect(res.statusCode).toBe(201);
+    expect(JSON.stringify(res.body)).not.toMatch(/555|Ava/);
+    const added = db.rows('reservation_guests').filter((g) => g.reservation_id === R_MINE && g.status === 'active');
+    expect(added.map((g) => g.first_name_snapshot).sort()).toEqual(['Ava', 'Bo']);
+    expect(added.find((g) => g.first_name_snapshot === 'Bo')?.added_via).toBe('guest_link');
+  });
+
+  it('API: says "already on the list" in guest words', async () => {
+    const res = await call(guestJoinHandler, { method: 'POST', query: { token: JOIN() }, body: { first_name: 'Ava', phone: '9135550111' } });
+    expect(res.statusCode).toBe(400);
+    expect(res.body.rowErrors[0].error).toBe("You're already on the list.");
+  });
+
+  it('API: shares the per-reservation add cap with the member link', async () => {
+    db.rows('reservation_guests').push(
+      ...[1, 2, 3, 4, 5].map((i) => ({ id: `gl-${i}`, reservation_id: R_MINE, guest_contact_id: 'c1', status: 'removed', added_via: 'guest_link', created_at: '2026-01-02' })),
+    );
+    const capped = await call(guestJoinHandler, { method: 'POST', query: { token: JOIN() }, body: { first_name: 'Cy', phone: '9135550123' } });
+    expect(capped.statusCode).toBe(429);
+    expect(capped.body.code).toBe('GUEST_LINK_CAP');
   });
 });

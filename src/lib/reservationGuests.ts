@@ -389,7 +389,7 @@ export async function addGuests(
   opts: { via: AddedVia; actorMemberId?: string | null; growParty?: boolean },
   deps: GuestDeps = {},
 ): Promise<GuestViewForStaff[]> {
-  const { db, now } = resolve(deps);
+  const { db, now, send } = resolve(deps);
   if (!Array.isArray(guests) || guests.length === 0) {
     throw new GuestServiceError('no_guests', 'Add at least one guest.');
   }
@@ -477,6 +477,7 @@ export async function addGuests(
   }
 
   const created: GuestRow[] = [];
+  const createdNames: string[] = [];
   for (const g of clean) {
     const contact = await upsertContact(db, g, opts.via);
     const matched = await findMemberIdByPhone(db, contact.phone);
@@ -501,9 +502,13 @@ export async function addGuests(
       throw new GuestServiceError('save_failed', 'Could not save guest.', 500);
     }
     created.push({ id: (row as { id: string }).id } as GuestRow);
+    createdNames.push(g.first_name);
   }
   // Everyone was already on it (added concurrently): don't keep the bigger party.
-  await shrinkGrownParty(db, reservation.id, grewFrom, reservation.party_size, existing.length + created.length);
+  const finalSize = await shrinkGrownParty(db, reservation.id, grewFrom, reservation.party_size, existing.length + created.length);
+  if (grewFrom !== null && finalSize > grewFrom && created.length > 0) {
+    await alertStaffPartyGrew(db, send, reservation, grewFrom, finalSize, createdNames, opts.via);
+  }
 
   // Built-in day-of text, then the "Guest Registration" campaign intro.
   // (Imported lazily: guestCampaigns builds on this module.)
@@ -521,12 +526,61 @@ export async function addGuests(
  * actually saved (never below where it started). Guarded on the size we set,
  * so a later edit by someone else is left alone.
  */
-async function shrinkGrownParty(db: Db, reservationId: string, grewFrom: number | null, grownTo: number | null, guestCount: number): Promise<void> {
-  if (grewFrom === null || !grownTo) return;
+async function shrinkGrownParty(db: Db, reservationId: string, grewFrom: number | null, grownTo: number | null, guestCount: number): Promise<number> {
+  if (grewFrom === null || !grownTo) return grownTo || 0;
   const fit = Math.max(grewFrom, guestCount + 1);
-  if (fit >= grownTo) return;
+  if (fit >= grownTo) return grownTo;
   const { error } = await db.from('reservations').update({ party_size: fit }).eq('id', reservationId).eq('party_size', grownTo);
-  if (error) console.error('[reservation guests] could not shrink party size back after a failed add', reservationId, error.message);
+  if (error) {
+    console.error('[reservation guests] could not shrink party size back after a failed add', reservationId, error.message);
+    return grownTo;
+  }
+  return fit;
+}
+
+/**
+ * Text staff right away when an add raised the party size. Goes to the
+ * location's admin notification phone, else the one in Settings (the same
+ * number reservation alerts use). Never throws: the guest is already added.
+ */
+async function alertStaffPartyGrew(
+  db: Db,
+  send: SendFn,
+  reservation: ReservationRow,
+  from: number,
+  to: number,
+  addedNames: string[],
+  via: AddedVia,
+): Promise<void> {
+  try {
+    const { data: loc } = reservation.location_id
+      ? await db.from('locations').select('name, timezone, admin_notification_phone').eq('id', reservation.location_id).maybeSingle()
+      : { data: null };
+    const location = loc as { name?: string | null; timezone?: string | null; admin_notification_phone?: string | null } | null;
+    let phone = (location?.admin_notification_phone || '').trim();
+    if (!phone) {
+      const { data: settings } = await db.from('settings').select('admin_notification_phone').limit(1).maybeSingle();
+      phone = ((settings as { admin_notification_phone?: string | null } | null)?.admin_notification_phone || '').trim();
+    }
+    if (!phone) {
+      console.warn('[reservation guests] party grew but no admin notification phone is set', reservation.id);
+      return;
+    }
+    const to164 = toE164(phone) || phone;
+    const host = await hostName(db, reservation);
+    const hostLabel = [host.first, host.last ? `${host.last.charAt(0)}.` : ''].filter(Boolean).join(' ');
+    const when = DateTime.fromISO(reservation.start_time, { zone: 'utc' })
+      .setZone(location?.timezone || DEFAULT_TIMEZONE)
+      .toFormat('ccc L/d h:mm a');
+    const how = via === 'guest_link' ? 'guest link' : via === 'portal' ? 'member portal' : 'staff';
+    const content =
+      `Noir: party grew ${from} → ${to} for ${hostLabel}, ${when}${location?.name ? `, ${location.name}` : ''}. ` +
+      `Added via ${how}: ${addedNames.join(', ')}. Please make room.`;
+    const result = await send({ to: to164, content });
+    if (!result.success) console.error('[reservation guests] party-grew alert failed', reservation.id, result.error);
+  } catch (err) {
+    console.error('[reservation guests] party-grew alert failed', reservation.id, err);
+  }
 }
 
 export async function removeGuest(reservationId: string, guestId: string, deps: GuestDeps = {}): Promise<void> {

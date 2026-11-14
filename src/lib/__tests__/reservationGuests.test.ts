@@ -171,6 +171,27 @@ describe('addGuests rules', () => {
     expect(db.rows('reservation_guests').filter((g) => g.status === 'active')).toHaveLength(3);
   });
 
+  it('growParty texts staff right away at the location admin number', async () => {
+    db.rows('locations')[0].admin_notification_phone = '9135559999';
+    await addGuests('r-1', [
+      { first_name: 'A', phone: '9135550101' },
+      { first_name: 'B', phone: '9135550102' },
+      { first_name: 'C', phone: '9135550103' },
+    ], { via: 'guest_link', growParty: true }, deps());
+    const alerts = mockSend.mock.calls.map((c) => c[0]).filter((m) => m.to === '+19135559999');
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].content).toContain('party grew 3 → 4 for Tim');
+    expect(alerts[0].content).toContain('Added via guest link: A, B, C');
+  });
+
+  it('party-grew alert falls back to the Settings number; no growth, no alert', async () => {
+    db.rows('settings').push({ id: 1, admin_notification_phone: '8165550000' });
+    await addGuests('r-1', [{ first_name: 'A', phone: '9135550101' }], { via: 'guest_link', growParty: true }, deps());
+    expect(mockSend.mock.calls.some((c) => c[0].to === '+18165550000')).toBe(false);
+    await addGuests('r-1', [{ first_name: 'B', phone: '9135550102' }, { first_name: 'C', phone: '9135550103' }], { via: 'guest_link', growParty: true }, deps());
+    expect(mockSend.mock.calls.filter((c) => c[0].to === '+18165550000')).toHaveLength(1);
+  });
+
   it('growParty refuses when the location is at capacity and adds no one', async () => {
     const realFrom = db.from.bind(db);
     jest.spyOn(db, 'from').mockImplementation(((table: string) => {
