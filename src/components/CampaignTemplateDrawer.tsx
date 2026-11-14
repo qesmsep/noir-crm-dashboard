@@ -1262,6 +1262,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                   className="min-h-[180px]"
                   placeholder="Enter your message template here. Use placeholders like {{first_name}}, {{last_name}}, etc."
                 />
+                {isGuestTrigger && formData.recipient_type === 'reservation_guest' && formData.content.trim() !== '' && !/reply stop/i.test(formData.content) && (
+                  <p className="mt-1 text-xs text-error-red">Guest texts should end with &ldquo;Reply STOP to opt out.&rdquo;</p>
+                )}
               </Field>
 
               {/* Placeholder reference. Was a native alert() before, which is
