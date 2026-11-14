@@ -208,6 +208,8 @@ export function renderGuestCampaignMessage(
     partySize: number | null;
     timezone: string;
     arrivalInstructions?: string | null;
+    /** {{calendar_link}}: the reservation's add-to-calendar file. */
+    calendarLink?: string | null;
   },
 ): string {
   const start = DateTime.fromISO(ctx.start, { zone: 'utc' }).setZone(ctx.timezone);
@@ -224,6 +226,7 @@ export function renderGuestCampaignMessage(
     .replace(/\{\{reservation_time\}\}/g, () => start.isValid ? start.toFormat('h:mm a') : '')
     .replace(/\{\{party_size\}\}/g, () => ctx.partySize != null ? String(ctx.partySize) : '')
     .replace(/\{\{arrival_instructions\}\}/g, () => arrival)
+    .replace(/\{\{calendar_link\}\}/g, () => ctx.calendarLink || '')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
@@ -307,6 +310,14 @@ async function deliver(
   }
   if (!phone) return 'skipped:no_phone';
 
+  // {{calendar_link}} never goes out empty: skip this text if the link can't be made.
+  let calendarLink = '';
+  if (message.content.includes('{{calendar_link}}')) {
+    const { guestLinksForReservation } = await import('@/lib/reservationCampaigns');
+    calendarLink = (await guestLinksForReservation(reservation.id, db)).calendarLink;
+    if (!calendarLink) return 'skipped:no_calendar_link';
+  }
+
   const content = renderGuestCampaignMessage(message.content, {
     guestFirstName: guest.first_name_snapshot || contact.first_name,
     guestLastName: contact.last_name,
@@ -319,6 +330,7 @@ async function deliver(
     partySize: reservation.party_size,
     timezone: location?.timezone || DEFAULT_TIMEZONE,
     arrivalInstructions: location?.guest_arrival_instructions,
+    calendarLink,
   });
 
   // Stop after MAX_SEND_ATTEMPTS failed tries for this (message, guest).

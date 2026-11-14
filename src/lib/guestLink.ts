@@ -185,6 +185,59 @@ export async function lookupGuestJoin(token: unknown, deps: { db?: Db; now?: Dat
   };
 }
 
+/** What the add-to-calendar file shows: no phones, no member data beyond the host's first name. */
+export interface CalendarDetails {
+  reservationId: string;
+  start: string;
+  end: string;
+  partySize: number;
+  hostFirstName: string;
+  location: { name: string; address: string | null; parkingInstructions: string | null };
+}
+
+export type CalendarLookup = { ok: true; details: CalendarDetails } | { ok: false; reason: 'invalid' | 'expired' | 'closed' };
+
+/** Add-to-calendar lookup by join token: same checks as the self-register link. */
+export async function lookupCalendar(token: unknown, deps: { db?: Db; now?: DateTime } = {}): Promise<CalendarLookup> {
+  const db = deps.db ?? supabaseAdmin;
+  const now = deps.now ?? DateTime.utc();
+  const parsed = parseJoinToken(token);
+  if (!parsed) return { ok: false, reason: 'invalid' };
+
+  const { data: r } = await db.from('reservations').select(RESERVATION_COLUMNS).eq('id', parsed.reservationId).maybeSingle();
+  if (!r || !r.guest_link_token || !isValidTokenShape(r.guest_link_token)) return { ok: false, reason: 'invalid' };
+  const expected = Buffer.from(joinSignature(r.guest_link_token));
+  const given = Buffer.from(parsed.signature);
+  if (expected.length !== given.length || !timingSafeEqual(expected, given)) return { ok: false, reason: 'invalid' };
+  if (tokenExpired(r.guest_link_expires_at, now)) return { ok: false, reason: 'expired' };
+  if (isReservationClosed(r, now)) return { ok: false, reason: 'closed' };
+
+  const row = r as ReservationRow;
+  const [{ data: loc }, { data: member }] = await Promise.all([
+    row.location_id
+      ? db.from('locations').select('name, address, parking_instructions').eq('id', row.location_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    !row.first_name && row.member_id
+      ? db.from('members').select('first_name').eq('member_id', row.member_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const l = (loc as { name?: string | null; address?: string | null; parking_instructions?: string | null } | null) || null;
+  const host = (row.first_name || (member as { first_name?: string } | null)?.first_name || '').trim().split(' ')[0];
+  const start = DateTime.fromISO(row.start_time, { zone: 'utc' });
+  const end = row.end_time ? DateTime.fromISO(row.end_time, { zone: 'utc' }) : start.plus({ hours: 2 });
+  return {
+    ok: true,
+    details: {
+      reservationId: row.id,
+      start: start.toISO()!,
+      end: (end.isValid && end > start ? end : start.plus({ hours: 2 })).toISO()!,
+      partySize: row.party_size || 1,
+      hostFirstName: host,
+      location: { name: l?.name || 'Noir', address: (l?.address || '').trim() || null, parkingInstructions: (l?.parking_instructions || '').trim() || null },
+    },
+  };
+}
+
 export type EnsureLinkResult =
   | { ok: true; token: string; expiresAt: string; created: boolean }
   | { ok: false; status: number; error: string };

@@ -956,9 +956,16 @@ export interface EventCampaignMessage {
 type DeliverResult = { status: 'sent'; messageId?: string } | { status: 'skipped'; reason: string } | { status: 'failed'; error: string };
 
 /** Fill a campaign message with the same placeholders as Guest Registration messages. */
-async function renderEventCampaignMessage(content: string, a: DeliverArgs, contact: ContactRow): Promise<string> {
+async function renderEventCampaignMessage(content: string, a: DeliverArgs, contact: ContactRow, db: Db): Promise<string> {
   const { renderGuestCampaignMessage } = await import('@/lib/guestCampaigns');
+  // {{calendar_link}}: a cancelled reservation has no calendar file, so it renders empty there.
+  let calendarLink = '';
+  if (a.kind !== 'cancelled' && content.includes('{{calendar_link}}')) {
+    const { guestLinksForReservation } = await import('@/lib/reservationCampaigns');
+    calendarLink = (await guestLinksForReservation(a.reservation.id, db)).calendarLink;
+  }
   return renderGuestCampaignMessage(content, {
+    calendarLink,
     guestFirstName: a.guest.first_name_snapshot || contact.first_name,
     guestLastName: contact.last_name,
     hostFirstName: a.host.first,
@@ -1005,7 +1012,7 @@ async function deliver(db: Db, deps: GuestDeps, a: DeliverArgs): Promise<Deliver
   }
 
   const content = a.campaignMessage
-    ? await renderEventCampaignMessage(a.campaignMessage.content, a, contact)
+    ? await renderEventCampaignMessage(a.campaignMessage.content, a, contact, db)
     : renderGuestMessage(a.template!.body, {
     guestFirstName: a.guest.first_name_snapshot || contact.first_name,
     hostFirstName: a.host.first,

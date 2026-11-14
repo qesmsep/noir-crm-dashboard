@@ -158,4 +158,13 @@ describe('cron: reservation-anchored Guest Registration messages', () => {
     expect(mockSend).toHaveBeenCalledTimes(1);
     expect(mockSend.mock.calls[0][0]).toEqual({ to: '+19135550101', content: 'Hi Ava, see you at 8:00 PM. Garage on 13th. Reply STOP to opt out.' });
   });
+
+  it('{{calendar_link}} sends the add-to-calendar link for the reservation', async () => {
+    const id = '44444444-4444-4444-8444-444444444444';
+    db.rows('reservations')[0].id = id;
+    db.rows('reservation_guests')[0].reservation_id = id;
+    const m = msg({ content: 'Add it to your calendar: {{calendar_link}}' });
+    expect(await processGuestAddedCampaignMessage(m, { now: () => DateTime.fromISO('2026-11-19T23:01:00Z', { zone: 'utc' }) })).toBe(1);
+    expect(mockSend.mock.calls[0][0].content).toMatch(/^Add it to your calendar: \S*\/r\/[A-Za-z0-9_-]{44}\/cal\.ics$/);
+  });
 });

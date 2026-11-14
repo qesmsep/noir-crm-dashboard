@@ -114,3 +114,8 @@ export function guestLinkUrl(token: string): string {
 export function guestJoinUrl(joinToken: string): string {
   return guestLinkUrl(joinToken).replace(/\/guests$/, '/join');
 }
+
+/** The reservation's add-to-calendar file (.ics), opened with the same join token. */
+export function guestCalendarUrl(joinToken: string): string {
+  return guestLinkUrl(joinToken).replace(/\/guests$/, '/cal.ics');
+}

@@ -884,11 +884,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // location timezone. For reservation_created the date/time is the
           // reservation start, not the moment it was booked.
           if (isReservationTrigger) {
-            // {{guest_link}} / {{guest_join_link}}: the reservation's no-login guest links.
+            // {{guest_link}} / {{guest_join_link}} / {{calendar_link}}: the reservation's no-login links.
             const links =
               member.reservation_id && usesGuestLink(message.content)
                 ? await guestLinksForReservation(member.reservation_id)
-                : { guestLink: '', guestJoinLink: '' };
+                : { guestLink: '', guestJoinLink: '', calendarLink: '' };
             // Never send a guest-link message without the link.
             if (missingRequiredLink(message.content, links)) {
               console.error(`❌ No guest link for reservation ${member.reservation_id}; skipping message ${message.id}`);

@@ -320,3 +320,21 @@ describe('missingRequiredLink', () => {
     expect(missingRequiredLink('{{guest_link}} {{guest_join_link}}', both)).toBe(false);
   });
 });
+
+describe('{{calendar_link}}', () => {
+  const links = { guestLink: 'https://x/r/a/guests', guestJoinLink: 'https://x/r/b/join', calendarLink: 'https://x/r/b/cal.ics' };
+  it('renders the add-to-calendar link', () => {
+    const out = renderReservationMessage(
+      'Add it to your calendar: {{calendar_link}}',
+      { first_name: 'Tim', last_name: null, email: null, phone: null, party_size: 2, start_time: '2026-12-01T02:00:00Z' },
+      { name: 'Noir KC', timezone: 'America/Chicago' },
+      links,
+    );
+    expect(out).toBe('Add it to your calendar: https://x/r/b/cal.ics');
+  });
+  it('never sends without the calendar link', () => {
+    expect(missingRequiredLink('{{calendar_link}}', { ...links, calendarLink: '' })).toBe(true);
+    expect(missingRequiredLink('{{calendar_link}}', links)).toBe(false);
+    expect(missingRequiredLink('{{guest_link}}', { ...links, calendarLink: '' })).toBe(false);
+  });
+});

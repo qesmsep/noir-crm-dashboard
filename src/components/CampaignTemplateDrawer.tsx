@@ -549,7 +549,8 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         .replace(/\{\{reservation_date\}\}/g, 'Friday, March 15')
         .replace(/\{\{reservation_time\}\}/g, '8:00 PM')
         .replace(/\{\{party_size\}\}/g, '4')
-        .replace(/\{\{arrival_instructions\}\}/g, "Give your name at the door and we'll take it from there.");
+        .replace(/\{\{arrival_instructions\}\}/g, "Give your name at the door and we'll take it from there.")
+        .replace(/\{\{calendar_link\}\}/g, 'https://noirkc.com/r/abc123/cal.ics');
     }
 
     // Add reservation-specific placeholders if this is a reservation campaign
@@ -562,6 +563,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         .replace(/\{\{parking_instructions\}\}/g, 'Free parking in the garage on 13th St.')
         .replace(/\{\{guest_link\}\}/g, 'https://noirkc.com/r/abc123/guests')
         .replace(/\{\{guest_join_link\}\}/g, 'https://noirkc.com/r/abc123/join')
+        .replace(/\{\{calendar_link\}\}/g, 'https://noirkc.com/r/abc123/cal.ics')
         .replace(/\{\{party_size\}\}/g, '4');
     }
 
@@ -795,6 +797,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         { name: '{{reservation_time}}', description: 'e.g. 8:00 PM' },
         { name: '{{party_size}}', description: 'Reservation party size' },
         { name: '{{arrival_instructions}}', description: 'How guests get in (Settings → location)' },
+        { name: '{{calendar_link}}', description: 'Add-to-calendar link for the reservation (not in cancelled texts)' },
       ];
     }
     const placeholders = [
@@ -811,6 +814,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       { name: '{{parking_instructions}}', description: 'Parking at the location (Settings → location)' },
       { name: '{{guest_link}}', description: 'Link for the booker to add their guests (no login; reservation triggers)' },
       { name: '{{guest_join_link}}', description: 'Link the booker shares so each guest adds themselves (reservation triggers)' },
+      { name: '{{calendar_link}}', description: 'Add-to-calendar link for the reservation (reservation triggers)' },
       { name: '{{event_name}}', description: 'Private event name' },
       { name: '{{event_date}}', description: 'Private event date' },
       { name: '{{event_time}}', description: 'Private event time' },
