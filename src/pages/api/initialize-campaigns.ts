@@ -1,7 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { requireAdmin } from '../../lib/admin-auth';
 import { initializeCommonCampaigns } from '../../lib/campaign-utils';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Admin (or internal) only: this route reads or writes sent texts / campaign messages.
+  if (!(await requireAdmin(req, res))) return;
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
     return res.status(405).end(`Method ${req.method} Not Allowed`);

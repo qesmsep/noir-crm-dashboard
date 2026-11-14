@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminRequestHeaders } from '../../../lib/adminRequestHeaders';
 import {
   Box,
   VStack,
@@ -46,9 +47,9 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest' | 'reservation_guest_member' | 'reservation_guest_nonmember';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'recurring' | 'relative';
+  timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   specific_time?: string;
   specific_date?: string;
   recurring_type?: 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -62,6 +63,7 @@ interface CampaignTemplate {
   relative_quantity?: number;
   relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
   relative_proximity?: 'before' | 'after';
+  relative_anchor?: 'trigger' | 'reservation_start' | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -130,7 +132,7 @@ export default function CampaignEditPage() {
   const fetchTemplates = async () => {
     try {
       console.log('Fetching templates for campaign_id:', campaign?.id);
-      const response = await fetch(`/api/campaign-messages?campaign_id=${campaign?.id}`);
+      const response = await fetch(`/api/campaign-messages?campaign_id=${campaign?.id}`, { headers: await adminRequestHeaders() });
       if (!response.ok) {
         throw new Error('Failed to fetch templates');
       }
@@ -231,6 +233,7 @@ export default function CampaignEditPage() {
     try {
       const response = await fetch(`/api/campaign-messages/${templateId}`, {
         method: 'DELETE',
+        headers: await adminRequestHeaders(),
       });
 
       if (!response.ok) {
@@ -261,9 +264,7 @@ export default function CampaignEditPage() {
     try {
       const response = await fetch(`/api/campaign-messages/${template.id}`, {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await adminRequestHeaders(),
         body: JSON.stringify({ is_active: !template.is_active }),
       });
 
@@ -300,6 +301,7 @@ export default function CampaignEditPage() {
   };
 
   const formatTiming = (template: CampaignTemplate) => {
+    if (template.timing_type === 'immediate') return 'Immediately';
     if (template.timing_type === 'specific_time') {
       // Convert 24-hour format to 12-hour format with AM/PM
       const time = template.specific_time || '10:00';
@@ -349,6 +351,10 @@ export default function CampaignEditPage() {
         return `${displayTime} on trigger date`;
       } else {
         const unitText = quantity === 1 ? unit : unit + 's';
+        if (template.relative_anchor === 'reservation_start') {
+          const exact = unit === 'minute' || unit === 'hour';
+          return `${exact ? '' : `${displayTime} `}${quantity} ${unitText} ${proximity} the reservation`;
+        }
         return `${displayTime} ${quantity} ${unitText} ${proximity} trigger`;
       }
     }
@@ -361,6 +367,16 @@ export default function CampaignEditPage() {
         return (campaign?.trigger_type === 'reservation' || campaign?.trigger_type === 'reservation_time' || campaign?.trigger_type === 'reservation_created') ? 'Phone number on reservation' : 'Primary Member';
       case 'all_members':
         return 'All Members';
+      case 'reservation_guest':
+        return 'All guests';
+      case 'reservation_guest_member':
+        return 'Guests who are members';
+      case 'reservation_guest_nonmember':
+        return "Guests who aren't members";
+      case 'member_only':
+        return "Members' reservations";
+      case 'guest_only':
+        return 'Non-member reservations';
       case 'specific_phone':
         return template.specific_phone || 'Custom Phone Number';
       default:
@@ -620,6 +636,10 @@ export default function CampaignEditPage() {
                           <option value="recurring">Recurring</option>
                           <option value="reservation">Reservation</option>
                           <option value="reservation_created">Reservation Created</option>
+                          <option value="guest_registration">Guest Registration</option>
+                          <option value="reservation_moved">Reservation Moved (guests)</option>
+                          <option value="reservation_cancelled">Reservation Cancelled (guests)</option>
+                          <option value="member_guest_link">Staff Texts Guest Link</option>
                           <option value="reservation_range">Reservation Range</option>
                           <option value="reservation_time">Reservation Time</option>
                         </Select>

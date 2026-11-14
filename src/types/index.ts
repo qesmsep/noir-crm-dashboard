@@ -167,11 +167,21 @@ export type CampaignTriggerType =
   | 'recurring'
   | 'reservation_range'
   | 'private_event'
-  | 'all_members';
+  | 'all_members'
+  | 'guest_registration'
+  | 'reservation_moved'
+  | 'reservation_cancelled'
+  | 'member_guest_link';
+
+/** When a campaign message is sent. 'immediate' = at the trigger (reservation_created: at booking). */
+export type CampaignTimingType = 'specific_time' | 'recurring' | 'relative' | 'immediate';
 
 export type CampaignRecipientType =
   | 'member_only'
   | 'guest_only'
+  | 'reservation_guest'
+  | 'reservation_guest_member'
+  | 'reservation_guest_nonmember'
   | 'both_members'
   | 'specific_number'
   | 'reservation_phones'

@@ -1,4 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
+import { verifyAdmin } from '@/lib/admin-auth';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { chargeAccount, logPaymentToLedger, handlePaymentFailure, addMonths, addYears } from '@/lib/billing';
@@ -32,6 +33,10 @@ const supabase = createClient(
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (!(await verifyAdmin(req))) {
+    return res.status(401).json({ error: 'Unauthorized' });
   }
 
   const { member_id, plan_id, payment_method_id, charge_immediately } = req.body;

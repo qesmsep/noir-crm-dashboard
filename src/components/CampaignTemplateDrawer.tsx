@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { adminRequestHeaders } from '@/lib/adminRequestHeaders';
+import { isGuestRecipient } from '@/lib/guestRecipients';
 import { Info } from 'lucide-react';
 
 import { useToast } from '@/hooks/useToast';
@@ -37,9 +39,9 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest' | 'reservation_guest_member' | 'reservation_guest_nonmember';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'recurring' | 'relative';
+  timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   // Specific time fields
   specific_time?: string; // HH:MM format
   specific_date?: string; // YYYY-MM-DD format
@@ -56,6 +58,7 @@ interface CampaignTemplate {
   relative_quantity?: number;
   relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
   relative_proximity?: 'before' | 'after';
+  relative_anchor?: 'trigger' | 'reservation_start' | null;
   include_ledger_pdf?: boolean; // Whether to include ledger PDF link
   is_active: boolean;
   created_at?: string;
@@ -116,9 +119,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     name: '',
     description: '',
     content: '',
-    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members',
+    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest' | 'reservation_guest_member' | 'reservation_guest_nonmember',
     specific_phone: '',
-    timing_type: 'specific_time' as 'specific_time' | 'recurring' | 'relative',
+    timing_type: 'specific_time' as 'specific_time' | 'recurring' | 'relative' | 'immediate',
     specific_time: '10:00',
     specific_date: '',
     recurring_type: undefined as 'daily' | 'weekly' | 'monthly' | 'yearly' | undefined,
@@ -132,6 +135,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     relative_quantity: 1,
     relative_unit: 'day' as 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year',
     relative_proximity: 'after' as 'before' | 'after',
+    relative_anchor: 'trigger' as 'trigger' | 'reservation_start',
     include_ledger_pdf: false,
     is_active: true,
     // New fields for reservation range campaigns
@@ -154,6 +158,11 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   const { toast } = useToast();
   const { settings } = useSettings();
 
+  // Moved / cancelled: sent to guests the moment the reservation changes.
+  const isGuestEventTrigger = campaignTriggerType === 'reservation_moved' || campaignTriggerType === 'reservation_cancelled';
+  // Triggers whose messages go to reservation guests (same placeholders).
+  const isGuestTrigger = campaignTriggerType === 'guest_registration' || isGuestEventTrigger;
+
   useEffect(() => {
     if (isOpen) {
       if (isCreateMode) {
@@ -163,9 +172,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           name: '',
           description: '',
           content: '',
-          recipient_type: 'member',
+          recipient_type: isGuestEventTrigger ? 'reservation_guest' : 'member',
           specific_phone: '',
-          timing_type: 'specific_time',
+          timing_type: isGuestEventTrigger || campaignTriggerType === 'member_guest_link' ? 'immediate' : 'specific_time',
           specific_time: '10:00',
           specific_date: '',
           recurring_type: undefined,
@@ -179,6 +188,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           relative_quantity: 1,
           relative_unit: 'day',
           relative_proximity: 'after',
+          relative_anchor: 'trigger',
           include_ledger_pdf: false,
           is_active: true,
           // New fields for reservation range campaigns
@@ -217,7 +227,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
     setIsLoading(true);
     try {
-      const response = await fetch(`/api/campaign-messages/${templateId}`);
+      const response = await fetch(`/api/campaign-messages/${templateId}`, { headers: await adminRequestHeaders() });
       if (!response.ok) {
         const errorData = await response.json();
         if (response.status === 500 && errorData.error?.includes('relation "campaign_messages" does not exist')) {
@@ -255,6 +265,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         relative_quantity: data.relative_quantity || 1,
         relative_unit: data.relative_unit || 'day',
         relative_proximity: data.relative_proximity || 'after',
+        relative_anchor: data.relative_anchor || 'trigger',
         include_ledger_pdf: data.include_ledger_pdf || false,
         is_active: data.is_active !== undefined ? data.is_active : true,
         // New fields for reservation range campaigns
@@ -395,7 +406,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         'specific_phone', 'timing_type', 'specific_time', 'specific_date',
         'recurring_type', 'recurring_time', 'recurring_weekdays', 'recurring_monthly_type',
         'recurring_monthly_day', 'recurring_monthly_value', 'recurring_yearly_date',
-        'relative_time', 'relative_quantity', 'relative_unit', 'relative_proximity',
+        'relative_time', 'relative_quantity', 'relative_unit', 'relative_proximity', 'relative_anchor',
         'include_ledger_pdf', 'is_active', 'selected_private_event_id'
       ];
 
@@ -413,9 +424,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
       const response = await fetch(url, {
         method,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: await adminRequestHeaders(),
         body: JSON.stringify(dataToSend),
       });
 
@@ -492,6 +501,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     try {
       const response = await fetch(`/api/campaign-messages/${templateId}`, {
         method: 'DELETE',
+        headers: await adminRequestHeaders(),
       });
 
       if (!response.ok) {
@@ -527,10 +537,31 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       .replace(/\{\{phone\}\}/g, '(555) 123-4567')
       .replace(/\{\{email\}\}/g, 'john.doe@example.com');
 
+    if (isGuestTrigger) {
+      return formData.content
+        .replace(/\{\{(guest_first_name|first_name)\}\}/g, 'Ava')
+        .replace(/\{\{(guest_last_name|last_name)\}\}/g, 'Stone')
+        .replace(/\{\{host_first_name\}\}/g, 'Tim')
+        .replace(/\{\{host_last_name\}\}/g, 'Wirick')
+        .replace(/\{\{location_name\}\}/g, 'Noir KC')
+        .replace(/\{\{location_address\}\}/g, '1234 Main St, Kansas City, MO')
+        .replace(/\{\{parking_instructions\}\}/g, 'Free parking in the garage on 13th St.')
+        .replace(/\{\{reservation_date\}\}/g, 'Friday, March 15')
+        .replace(/\{\{reservation_time\}\}/g, '8:00 PM')
+        .replace(/\{\{party_size\}\}/g, '4')
+        .replace(/\{\{arrival_instructions\}\}/g, "Give your name at the door and we'll take it from there.");
+    }
+
     // Add reservation-specific placeholders if this is a reservation campaign
-    if (campaignTriggerType === 'reservation' || campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
+    if (campaignTriggerType === 'reservation' || campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created' || campaignTriggerType === 'member_guest_link') {
       previewContent = previewContent
         .replace(/\{\{reservation_time\}\}/g, '7:30 PM')
+        .replace(/\{\{reservation_date\}\}/g, 'March 15, 2026')
+        .replace(/\{\{location_name\}\}/g, 'Noir KC')
+        .replace(/\{\{location_address\}\}/g, '1234 Main St, Kansas City, MO')
+        .replace(/\{\{parking_instructions\}\}/g, 'Free parking in the garage on 13th St.')
+        .replace(/\{\{guest_link\}\}/g, 'https://noirkc.com/r/abc123/guests')
+        .replace(/\{\{guest_join_link\}\}/g, 'https://noirkc.com/r/abc123/join')
         .replace(/\{\{party_size\}\}/g, '4');
     }
 
@@ -554,8 +585,18 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     return previewContent;
   };
 
+  // Guest Registration messages can count from when the guest was added or
+  // from the reservation start. From the reservation, minute and hour offsets
+  // are exact (no clock time); days and longer land on the clock time.
+  const usesReservationAnchor = () =>
+    campaignTriggerType === 'guest_registration' && formData.timing_type === 'relative' && formData.relative_anchor === 'reservation_start';
+  const showsClockTime = () =>
+    formData.relative_unit !== 'minute' && !(usesReservationAnchor() && formData.relative_unit === 'hour');
+
   const formatTimingDisplay = () => {
-    if (formData.timing_type === 'specific_time') {
+    if (formData.timing_type === 'immediate') {
+      return 'Send immediately';
+    } else if (formData.timing_type === 'specific_time') {
       return `Send at ${formData.specific_time} on ${formData.specific_date || 'trigger date'}`;
     } else if (formData.timing_type === 'recurring') {
       let display = `Send ${formData.recurring_type} at ${formData.recurring_time || '10:00'}`;
@@ -569,14 +610,15 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       }
       return display;
     } else if (formData.timing_type === 'relative') {
+      const anchor = usesReservationAnchor() ? 'the reservation' : campaignTriggerType === 'guest_registration' ? 'the guest is added' : 'trigger';
       if (formData.relative_quantity === 0) {
-        return `Send at ${formData.relative_time} ON trigger date`;
+        return usesReservationAnchor() ? 'Send at the reservation time' : `Send at ${formData.relative_time} ON trigger date`;
       } else {
         const unit = formData.relative_quantity === 1 ? formData.relative_unit : formData.relative_unit + 's';
-        if (formData.relative_unit === 'minute') {
-          return `Send ${formData.relative_quantity} ${unit} ${formData.relative_proximity} trigger`;
+        if (!showsClockTime()) {
+          return `Send ${formData.relative_quantity} ${unit} ${formData.relative_proximity} ${anchor}`;
         } else {
-          return `Send at ${formData.relative_time} ${formData.relative_quantity} ${unit} ${formData.relative_proximity} trigger`;
+          return `Send at ${formData.relative_time} ${formData.relative_quantity} ${unit} ${formData.relative_proximity} ${anchor}`;
         }
       }
     } else {
@@ -620,7 +662,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
     // Add location context hint if campaign is location-specific
     const validLocationCount = campaignData?.campaign_locations?.filter((cl: any) => cl.location != null).length || 0;
-    const locationHint = campaignData?.applies_to_all_locations
+    // Campaign data is only loaded for all-members campaigns; without it, no hint
+    // (it used to read "filtered by 0 location(s)" on every other trigger).
+    const locationHint = !campaignData || campaignData.applies_to_all_locations
       ? ''
       : ` (filtered by ${validLocationCount} location(s))`;
 
@@ -637,7 +681,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       case 'reservation_time':
       case 'reservation_created':
         return [
-          { value: 'member', label: `Phone number on reservation${locationHint}` },
+          { value: 'member', label: `Phone number on the reservation${locationHint}` },
+          { value: 'member_only', label: `Members' reservations${locationHint}` },
+          { value: 'guest_only', label: `Non-member reservations${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
 
@@ -646,6 +692,25 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           { value: 'member', label: `Member${locationHint}` },
           { value: 'all_members', label: `All Members${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number' }
+        ];
+
+      case 'member_guest_link':
+        return [{ value: 'member', label: `The person who booked${locationHint}` }];
+
+      case 'reservation_moved':
+      case 'reservation_cancelled':
+        return [
+          { value: 'reservation_guest', label: `All guests already texted about the reservation${locationHint}` },
+          { value: 'reservation_guest_member', label: `Guests who are members${locationHint}` },
+          { value: 'reservation_guest_nonmember', label: `Guests who aren't members${locationHint}` },
+        ];
+
+      case 'guest_registration':
+        return [
+          { value: 'reservation_guest', label: `All guests${locationHint}` },
+          { value: 'reservation_guest_member', label: `Guests who are members${locationHint}` },
+          { value: 'reservation_guest_nonmember', label: `Guests who aren't members${locationHint}` },
+          { value: 'specific_phone', label: 'Custom phone number (e.g. a staff alert)' }
         ];
 
       case 'reservation_range':
@@ -680,6 +745,18 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   const getTimingOptions = () => {
     if (!campaignTriggerType) return ['specific_time', 'recurring', 'relative'];
 
+    // "Send immediately" = at the moment of the trigger. It only means
+    // something for event triggers sent at booking time.
+    if (campaignTriggerType === 'reservation_created') {
+      return ['immediate', 'specific_time', 'recurring', 'relative'];
+    }
+    if (campaignTriggerType === 'guest_registration') {
+      return ['immediate', 'specific_time', 'relative'];
+    }
+    if (campaignTriggerType === 'reservation_moved' || campaignTriggerType === 'reservation_cancelled' || campaignTriggerType === 'member_guest_link') {
+      return ['immediate'];
+    }
+
     switch (campaignTriggerType) {
       case 'recurring':
         return ['specific_time', 'recurring', 'relative'];
@@ -701,10 +778,25 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     if (!campaignTriggerType) return false;
 
     // Only show relative option for triggers that have specific dates/times
-    return ['member_signup', 'member_birthday', 'reservation_time', 'reservation_created', 'private_event'].includes(campaignTriggerType);
+    return ['member_signup', 'member_birthday', 'reservation_time', 'reservation_created', 'guest_registration', 'private_event'].includes(campaignTriggerType);
   };
 
   const getAvailablePlaceholders = () => {
+    if (isGuestTrigger) {
+      return [
+        { name: '{{guest_first_name}}', description: 'Guest first name' },
+        { name: '{{guest_last_name}}', description: 'Guest last name (may be blank)' },
+        { name: '{{host_first_name}}', description: 'Member who added them' },
+        { name: '{{host_last_name}}', description: "Host's last name (may be blank)" },
+        { name: '{{location_name}}', description: 'Reservation location' },
+        { name: '{{location_address}}', description: 'Location address (Settings → location)' },
+        { name: '{{parking_instructions}}', description: 'Parking (Settings → location)' },
+        { name: '{{reservation_date}}', description: 'e.g. Friday, March 15' },
+        { name: '{{reservation_time}}', description: 'e.g. 8:00 PM' },
+        { name: '{{party_size}}', description: 'Reservation party size' },
+        { name: '{{arrival_instructions}}', description: 'How guests get in (Settings → location)' },
+      ];
+    }
     const placeholders = [
       { name: '{{first_name}}', description: 'Member first name' },
       { name: '{{last_name}}', description: 'Member last name' },
@@ -713,6 +805,12 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       { name: '{{email}}', description: 'Member email address' },
       { name: '{{reservation_time}}', description: 'Reservation date and time' },
       { name: '{{reservation_date}}', description: 'Reservation date only' },
+      { name: '{{party_size}}', description: 'Reservation party size' },
+      { name: '{{location_name}}', description: 'Reservation location name' },
+      { name: '{{location_address}}', description: 'Reservation location address (Settings → location)' },
+      { name: '{{parking_instructions}}', description: 'Parking at the location (Settings → location)' },
+      { name: '{{guest_link}}', description: 'Link for the booker to add their guests (no login; reservation triggers)' },
+      { name: '{{guest_join_link}}', description: 'Link the booker shares so each guest adds themselves (reservation triggers)' },
       { name: '{{event_name}}', description: 'Private event name' },
       { name: '{{event_date}}', description: 'Private event date' },
       { name: '{{event_time}}', description: 'Private event time' },
@@ -729,6 +827,17 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   };
 
   const timingTypeOptions = [
+    {
+      value: 'immediate',
+      label:
+        campaignTriggerType === 'member_guest_link'
+          ? 'Send when staff tap "Text link to member"'
+          : campaignTriggerType === 'reservation_moved'
+            ? 'Send when the reservation time changes'
+            : campaignTriggerType === 'reservation_cancelled'
+              ? 'Send when the reservation is cancelled'
+              : 'Send immediately',
+    },
     { value: 'specific_time', label: 'Send at specific time' },
     { value: 'recurring', label: 'Send on recurring schedule' },
     ...(shouldShowRelativeOption()
@@ -1064,7 +1173,20 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
               {formData.timing_type === 'relative' && (
                 <div className="space-y-4">
-                  {formData.relative_unit !== 'minute' && (
+                  {campaignTriggerType === 'guest_registration' && (
+                    <Field label="Relative to" htmlFor="relative-anchor">
+                      <SelectField
+                        id="relative-anchor"
+                        value={formData.relative_anchor || 'trigger'}
+                        onChange={(e) => handleInputChange('relative_anchor', e.target.value)}
+                      >
+                        <option value="trigger">When the guest is added</option>
+                        <option value="reservation_start">The reservation time</option>
+                      </SelectField>
+                    </Field>
+                  )}
+
+                  {showsClockTime() && (
                     <Field label="Time" htmlFor="relative-time">
                       <TextField
                         id="relative-time"
@@ -1149,6 +1271,14 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                   className="min-h-[180px]"
                   placeholder="Enter your message template here. Use placeholders like {{first_name}}, {{last_name}}, etc."
                 />
+                {isGuestTrigger && isGuestRecipient(formData.recipient_type) && formData.content.trim() !== '' && !/reply stop/i.test(formData.content) && (
+                  <p className="mt-1 text-xs text-error-red">Guest texts should end with &ldquo;Reply STOP to opt out.&rdquo;</p>
+                )}
+                {(isGuestTrigger || campaignTriggerType === 'member_guest_link') && formData.content.length > 480 && (
+                  <p className="mt-1 text-xs text-error-red">
+                    {formData.content.length} characters. Keep guest texts under 480, since links and addresses make them longer when sent.
+                  </p>
+                )}
               </Field>
 
               {/* Placeholder reference. Was a native alert() before, which is

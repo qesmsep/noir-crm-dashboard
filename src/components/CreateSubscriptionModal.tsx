@@ -3,6 +3,7 @@ import { useToast } from '@/hooks/useToast';
 import { X } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import styles from '../styles/UpdatePlanModal.module.css';
+import { getAuthHeaders } from '@/lib/client-auth';
 
 interface Plan {
   id: string;
@@ -107,7 +108,7 @@ export default function CreateSubscriptionModal({ accountId, onSuccess, onClose 
     try {
       const response = await fetch('/api/subscriptions/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         body: JSON.stringify({
           member_id: primaryMemberId,
           plan_id: selectedPlanId,

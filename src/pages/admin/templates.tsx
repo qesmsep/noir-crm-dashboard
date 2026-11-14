@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminRequestHeaders } from '../../lib/adminRequestHeaders';
 import {
   Box,
   Button,
@@ -200,7 +201,7 @@ export default function TemplatesPage() {
 
   const fetchPendingCampaignMessages = async () => {
     try {
-      const response = await fetch('/api/pending-campaign-messages');
+      const response = await fetch('/api/pending-campaign-messages', { headers: await adminRequestHeaders() });
       const data = await response.json();
       if (response.ok) {
         setPendingCampaignMessages(data.pendingMessages || []);
@@ -283,7 +284,7 @@ export default function TemplatesPage() {
 
   const fetchStats = async () => {
     try {
-      const response = await fetch('/api/process-scheduled-messages?days=7');
+      const response = await fetch('/api/process-scheduled-messages?days=7', { headers: await adminRequestHeaders() });
       const data = await response.json();
       if (response.ok) {
         setStats(data.stats || { total: 0, pending: 0, sent: 0, failed: 0, cancelled: 0 });
@@ -298,7 +299,7 @@ export default function TemplatesPage() {
     try {
       const response = await fetch('/api/pending-campaign-messages', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await adminRequestHeaders(),
         body: JSON.stringify({ message_id: id })
       });
       const data = await response.json();

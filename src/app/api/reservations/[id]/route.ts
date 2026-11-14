@@ -4,6 +4,8 @@ import { DateTime } from 'luxon';
 import Stripe from 'stripe';
 import { resolveAdmin } from '../../../../lib/admin-auth';
 import { isCapacityError, CAPACITY_ERROR_MESSAGE } from '../../../../lib/capacity';
+import { supabaseAdmin } from '../../../../lib/supabase';
+import { onReservationCancelled, onReservationRescheduled } from '../../../../lib/reservationGuests';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2025-08-27.basil',
@@ -221,6 +223,13 @@ export async function PATCH(request: Request, { params }: any) {
       updateFields.capacity_override = true;
     }
 
+    // Reservation guests need to know when the start time actually moves.
+    let previousStart: string | null = null;
+    if (start_time !== undefined) {
+      const { data: before } = await supabaseAdmin.from('reservations').select('start_time').eq('id', reservationId).maybeSingle();
+      previousStart = before?.start_time ?? null;
+    }
+
     const { data, error } = await supabase
       .from('reservations')
       .update(updateFields)
@@ -241,6 +250,15 @@ export async function PATCH(request: Request, { params }: any) {
     }
 
     console.log('Reservation updated successfully:', data);
+
+    if (
+      start_time !== undefined &&
+      previousStart &&
+      data?.start_time &&
+      new Date(previousStart).getTime() !== new Date(data.start_time).getTime()
+    ) {
+      await onReservationRescheduled(reservationId);
+    }
 
     // Send admin notification for reservation modification
     try {
@@ -366,6 +384,9 @@ export async function DELETE(request: Request, { params }: any) {
   const { id } = await params;
   try {
     const reservationId = id.endsWith('.js') ? id.slice(0, -3) : id;
+
+    // Deleting cascades the guest queue away, so tell already-texted guests now.
+    await onReservationCancelled(reservationId, { sendNow: true });
 
     const { error } = await supabase
       .from('reservations')

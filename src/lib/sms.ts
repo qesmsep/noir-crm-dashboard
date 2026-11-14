@@ -10,7 +10,7 @@ interface SendSMSParams {
 /**
  * Send an SMS message via OpenPhone
  */
-export async function sendSMS({ to, content, memberId, accountId }: SendSMSParams): Promise<{ success: boolean; error?: string }> {
+export async function sendSMS({ to, content, memberId, accountId }: SendSMSParams): Promise<{ success: boolean; error?: string; messageId?: string }> {
   if (!process.env.OPENPHONE_API_KEY) {
     console.error('OpenPhone API key not configured');
     return { success: false, error: 'SMS service not configured' };
@@ -81,7 +81,7 @@ export async function sendSMS({ to, content, memberId, accountId }: SendSMSParam
         });
     }
 
-    return { success: true };
+    return { success: true, messageId: data?.data?.id ?? data?.id };
   } catch (error: any) {
     console.error('Error sending SMS:', error);
 

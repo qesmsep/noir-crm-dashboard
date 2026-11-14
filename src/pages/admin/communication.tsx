@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { adminRequestHeaders } from '../../lib/adminRequestHeaders';
 import { useRouter } from 'next/router';
 import { supabase } from '../../lib/supabase';
 import AdminLayout from '../../components/layouts/AdminLayout';
@@ -28,9 +29,9 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest' | 'reservation_guest_member' | 'reservation_guest_nonmember';
   specific_phone?: string;
-  timing_type: 'specific_time' | 'recurring' | 'relative';
+  timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   specific_time?: string;
   specific_date?: string;
   recurring_type?: 'daily' | 'weekly' | 'monthly' | 'yearly';
@@ -44,6 +45,7 @@ interface CampaignTemplate {
   relative_quantity?: number;
   relative_unit?: 'minute' | 'hour' | 'day' | 'week' | 'month' | 'year';
   relative_proximity?: 'before' | 'after';
+  relative_anchor?: 'trigger' | 'reservation_start' | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -126,7 +128,7 @@ export default function CommunicationPage() {
 
   const fetchCampaignTemplates = async (campaignId: string) => {
     try {
-      const response = await fetch(`/api/campaign-messages?campaign_id=${campaignId}`);
+      const response = await fetch(`/api/campaign-messages?campaign_id=${campaignId}`, { headers: await adminRequestHeaders() });
       if (!response.ok) throw new Error('Failed to fetch campaign templates');
 
       const data = await response.json();
@@ -203,7 +205,7 @@ export default function CommunicationPage() {
     if (!confirm('Are you sure you want to delete this template?')) return;
 
     try {
-      const response = await fetch(`/api/campaign-messages/${id}`, { method: 'DELETE' });
+      const response = await fetch(`/api/campaign-messages/${id}`, { method: 'DELETE', headers: await adminRequestHeaders() });
       if (!response.ok) throw new Error('Failed to delete template');
 
       showToast('Success', 'Template deleted successfully', 'success');
@@ -218,7 +220,7 @@ export default function CommunicationPage() {
     try {
       const response = await fetch(`/api/campaign-messages/${template.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await adminRequestHeaders(),
         body: JSON.stringify({ is_active: !template.is_active }),
       });
 
@@ -233,6 +235,7 @@ export default function CommunicationPage() {
   };
 
   const formatTimingDisplay = (template: CampaignTemplate) => {
+    if (template.timing_type === 'immediate') return 'Send immediately';
     if (template.timing_type === 'specific_time') {
       return `Send at ${template.specific_time} on ${template.specific_date || 'trigger date'}`;
     } else if (template.timing_type === 'recurring') {
@@ -248,6 +251,10 @@ export default function CommunicationPage() {
       return display;
     } else if (template.timing_type === 'relative') {
       const unit = template.relative_quantity === 1 ? template.relative_unit : template.relative_unit + 's';
+      if (template.relative_anchor === 'reservation_start') {
+        const exact = template.relative_unit === 'minute' || template.relative_unit === 'hour';
+        return `Send ${exact ? '' : `at ${template.relative_time} `}${template.relative_quantity} ${unit} ${template.relative_proximity} the reservation`;
+      }
       return `Send at ${template.relative_time} ${template.relative_quantity} ${unit} ${template.relative_proximity} trigger`;
     }
     return 'Timing not configured';
@@ -259,6 +266,16 @@ export default function CommunicationPage() {
         return (selectedCampaign?.trigger_type === 'reservation_time' || selectedCampaign?.trigger_type === 'reservation_created') ? 'Phone number on reservation' : 'Primary Member';
       case 'all_members':
         return 'All Members';
+      case 'reservation_guest':
+        return 'All guests';
+      case 'reservation_guest_member':
+        return 'Guests who are members';
+      case 'reservation_guest_nonmember':
+        return "Guests who aren't members";
+      case 'member_only':
+        return "Members' reservations";
+      case 'guest_only':
+        return 'Non-member reservations';
       case 'specific_phone':
         return template.specific_phone || 'Custom Phone Number';
       default:
@@ -277,7 +294,11 @@ export default function CommunicationPage() {
       'recurring': 'Recurring',
       'reservation_range': 'Reservation Range',
       'private_event': 'Private Event',
-      'all_members': 'All Members'
+      'all_members': 'All Members',
+      'guest_registration': 'Guest Registration',
+      'reservation_moved': 'Reservation Moved (guests)',
+      'reservation_cancelled': 'Reservation Cancelled (guests)',
+      'member_guest_link': 'Staff Texts Guest Link'
     };
     return labels[triggerType] || triggerType;
   };
@@ -484,6 +505,7 @@ export default function CommunicationPage() {
             )}
           </>
         )}
+
 
         <CampaignDrawer
           isOpen={isCampaignDrawerOpen}

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { onReservationCancelled } from '@/lib/reservationGuests';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,6 +25,9 @@ export async function POST(request: Request, { params }: any) {
         { status: 404 }
       );
     }
+
+    // Deleting cascades the guest queue away, so tell already-texted guests now.
+    await onReservationCancelled(reservationId, { sendNow: true });
 
     // Delete the reservation (keep the charge - no refund)
     const { error: deleteError } = await supabase

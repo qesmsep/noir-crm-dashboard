@@ -66,22 +66,112 @@ export async function getDefaultPaymentMethod(stripe_customer_id: string): Promi
 }
 
 /**
+ * Stripe is the source of truth for "was this account already charged by the
+ * app since <time>": a succeeded or processing PaymentIntent created by
+ * chargeAccount (metadata.source = billing_cron) for this account. Manual
+ * dashboard charges don't carry that metadata and are ignored.
+ * Throws if Stripe can't be read — callers must not charge without an answer.
+ */
+export async function findAppChargeSince(
+  stripe_customer_id: string,
+  account_id: string,
+  sinceIso: string
+): Promise<string | null> {
+  const list = await stripe.paymentIntents.list({
+    customer: stripe_customer_id,
+    created: { gte: Math.floor(Date.parse(sinceIso) / 1000) },
+    limit: 100,
+  });
+  const hit = list.data.find(
+    (pi) =>
+      (pi.status === 'succeeded' || pi.status === 'processing') &&
+      pi.metadata?.account_id === account_id &&
+      pi.metadata?.source === 'billing_cron'
+  );
+  return hit?.id || null;
+}
+
+/**
+ * Short description of the payment method chargeAccount would use, for display.
+ * Returns null when there is none.
+ */
+export async function describeDefaultPaymentMethod(
+  stripe_customer_id: string | null | undefined
+): Promise<{ type: string; brand: string | null; last4: string | null } | null> {
+  if (!stripe_customer_id) return null;
+  const id = await getDefaultPaymentMethod(stripe_customer_id);
+  if (!id) return null;
+  try {
+    const pm = await stripe.paymentMethods.retrieve(id);
+    if (pm.type === 'us_bank_account') {
+      return { type: 'bank', brand: pm.us_bank_account?.bank_name || null, last4: pm.us_bank_account?.last4 || null };
+    }
+    return { type: pm.type, brand: pm.card?.brand || null, last4: pm.card?.last4 || null };
+  } catch (error) {
+    console.error(`Failed to retrieve payment method ${id}:`, error);
+    return null;
+  }
+}
+
+/**
+ * Fee percentage from a settings value. A configured 0 means no fee; only a
+ * missing or unparseable value falls back to 4%. (Was `|| 4.0`, which turned
+ * a configured 0% into 4%.)
+ */
+export function parseFeePercentage(value: unknown): number {
+  if (value === null || value === undefined || value === '') return 4.0;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : 4.0;
+}
+
+/**
+ * Read the dues fee percentage from settings (default 4% only when unset).
+ */
+export async function getCreditCardFeePercentage(): Promise<number> {
+  const { data: settings } = await supabase
+    .from('settings')
+    .select('credit_card_fee_percentage')
+    .single();
+  return parseFeePercentage(settings?.credit_card_fee_percentage);
+}
+
+/**
+ * What a dues charge will total. Single source of truth for chargeAccount and
+ * for anything that shows the amount before charging (e.g. the resume prompt).
+ * Fee = the greater of the settings percentage or Stripe's 2.9% + $0.30.
+ * A 0% setting means no fee at all — the business absorbs Stripe's cost.
+ */
+export function computeDuesCharge(
+  dues: number,
+  creditCardFeeEnabled: boolean,
+  feePercentage: number
+): { dues: number; creditCardFee: number; totalAmount: number } {
+  let creditCardFee = 0;
+  if (creditCardFeeEnabled && dues > 0 && feePercentage > 0) {
+    const flatRate = dues * (feePercentage / 100);
+    const stripeFee = dues * 0.029 + 0.30;
+    creditCardFee = Math.round(Math.max(flatRate, stripeFee) * 100) / 100;
+  }
+  return { dues, creditCardFee, totalAmount: Math.round((dues + creditCardFee) * 100) / 100 };
+}
+
+/**
  * Charge an account for their monthly dues
  * Returns { success: boolean, paymentIntent?: Stripe.PaymentIntent, error?: any }
  */
-export async function chargeAccount(account: any): Promise<{
+export async function chargeAccount(
+  account: any,
+  // Fee percentage the caller already showed and verified (resume); avoids a
+  // settings change between the check and the charge. Defaults to settings.
+  opts: { feePercentage?: number } = {}
+): Promise<{
   success: boolean;
   paymentIntent?: Stripe.PaymentIntent;
   error?: any;
 }> {
   try {
-    // 1. Get settings for dynamic CC fee percentage
-    const { data: settings } = await supabase
-      .from('settings')
-      .select('credit_card_fee_percentage')
-      .single();
-
-    const ccFeePercentage = (settings?.credit_card_fee_percentage || 4.0) / 100;
+    // 1. Get settings for dynamic CC fee percentage (same source as the resume preview)
+    const feePercentage = opts.feePercentage ?? (await getCreditCardFeePercentage());
 
     // 2. Get amount to charge
     const amount = account.monthly_dues || 0;
@@ -104,16 +194,11 @@ export async function chargeAccount(account: any): Promise<{
     const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
 
     // 4. Add credit card fee if enabled
-    let totalAmount = amount;
-    let creditCardFee = 0;
-
-    if (account.credit_card_fee_enabled) {
-      // Use dynamic percentage from settings
-      const flatRate = amount * ccFeePercentage;
-      const stripeFee = amount * 0.029 + 0.30;
-      creditCardFee = Math.round(Math.max(flatRate, stripeFee) * 100) / 100;
-      totalAmount = amount + creditCardFee;
-    }
+    const { creditCardFee, totalAmount } = computeDuesCharge(
+      amount,
+      !!account.credit_card_fee_enabled,
+      feePercentage
+    );
 
     // 4. Create payment intent
     const paymentIntentParams: any = {
@@ -639,6 +724,31 @@ export function nextBillingDateAfterPayment(
   const base = currentBillingDate ? currentBillingDate.slice(0, 10) : today;
   const next = add(base);
   return next > today ? next : add(today);
+}
+
+/**
+ * The member's next regular billing date strictly after `today`, keeping their
+ * billing day (the anchor). Steps are counted from the anchor, clamped to month
+ * end, so a 31st anchor bills Feb 28 then Mar 31 — no drift.
+ * All dates are YYYY-MM-DD.
+ */
+export function nextCycleDate(anchor: string, interval: string, today: string): string {
+  // A malformed anchor falls back to today rather than writing "NaN-NaN-NaN".
+  const valid = (v: unknown) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(v);
+  const base = valid(anchor) ? anchor : today;
+  const [ay, am, ad] = base.slice(0, 10).split('-').map(Number);
+  const stepMonths = interval === 'year' ? 12 : 1;
+  const at = (k: number): string => {
+    const total = (am - 1) + k * stepMonths;
+    const y = ay + Math.floor(total / 12);
+    const m = total % 12; // 0-based
+    const lastDay = new Date(Date.UTC(y, m + 1, 0)).getUTCDate();
+    const d = Math.min(ad, lastDay);
+    return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  };
+  let k = 0;
+  while (at(k) <= today) k++;
+  return at(k);
 }
 
 /**

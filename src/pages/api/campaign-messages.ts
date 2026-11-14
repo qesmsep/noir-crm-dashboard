@@ -1,7 +1,11 @@
 import { NextApiRequest, NextApiResponse } from 'next';
+import { requireAdmin } from '../../lib/admin-auth';
 import { supabase, supabaseAdmin } from '../../lib/supabase';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+  // Admin (or internal) only: this route reads or writes sent texts / campaign messages.
+  if (!(await requireAdmin(req, res))) return;
+
   if (req.method === 'GET') {
     try {
       const { campaign_id } = req.query;
@@ -61,7 +65,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       // Validate recipient_type
       const validRecipientTypes = [
         'member', 'all_members', 'specific_phone', 'both_members',
-        'reservation_phones', 'private_event_rsvps', 'all_primary_members'
+        'reservation_phones', 'private_event_rsvps', 'all_primary_members',
+        'member_only', 'guest_only', 'reservation_guest', 'reservation_guest_member', 'reservation_guest_nonmember'
       ];
       if (message.recipient_type && !validRecipientTypes.includes(message.recipient_type)) {
         res.status(400).json({ 
@@ -72,12 +77,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       // Validate timing_type
-      const validTimingTypes = ['specific_time', 'recurring', 'relative'];
+      const validTimingTypes = ['specific_time', 'recurring', 'relative', 'immediate'];
       if (message.timing_type && !validTimingTypes.includes(message.timing_type)) {
         res.status(400).json({ 
           error: 'Invalid timing_type', 
           details: `Must be one of: ${validTimingTypes.join(', ')}` 
         });
+        return;
+      }
+
+      if (message.relative_anchor != null && !['trigger', 'reservation_start'].includes(message.relative_anchor)) {
+        res.status(400).json({ error: 'Invalid relative_anchor', details: 'Must be trigger or reservation_start' });
         return;
       }
 

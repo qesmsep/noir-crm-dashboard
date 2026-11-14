@@ -99,8 +99,27 @@ export default async function handler(
       return res.status(500).json({ error: 'Failed to fetch reservations' });
     }
 
+    // Reservation guests per reservation (0 if the guests table isn't there yet).
+    const guestCounts = new Map<string, number>();
+    if (reservations.length > 0) {
+      const { data: guestRows, error: guestError } = await supabaseAdmin
+        .from('reservation_guests')
+        .select('reservation_id')
+        .in('reservation_id', reservations.map((r: any) => r.id))
+        .eq('status', 'active');
+      if (!guestError) {
+        (guestRows || []).forEach((g: { reservation_id: string }) =>
+          guestCounts.set(g.reservation_id, (guestCounts.get(g.reservation_id) || 0) + 1)
+        );
+      }
+    }
+
     res.status(200).json({
-      reservations: reservations || [],
+      reservations: (reservations || []).map((r: any) => {
+        // The guest-link token is staff-issued; it isn't needed in the portal.
+        const { guest_link_token: _token, guest_link_expires_at: _exp, ...rest } = r;
+        return { ...rest, guest_count: guestCounts.get(r.id) || 0 };
+      }),
     });
   } catch (error) {
     console.error('Reservations error:', error);

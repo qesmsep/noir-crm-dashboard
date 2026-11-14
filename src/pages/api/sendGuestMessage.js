@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { requireAdmin } from '../../lib/admin-auth';
 import fetch from 'node-fetch';
 
 const supabase = createClient(
@@ -7,6 +8,9 @@ const supabase = createClient(
 );
 
 export default async function handler(req, res) {
+  // Admin (or internal) only: this route reads or writes sent texts / campaign messages.
+  if (!(await requireAdmin(req, res))) return;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

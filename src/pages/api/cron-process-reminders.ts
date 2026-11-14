@@ -1,5 +1,5 @@
 import { NextApiRequest, NextApiResponse } from 'next';
-import { supabase } from '../../lib/supabase';
+import { supabase, supabaseAdmin } from '../../lib/supabase';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   // Allow POST and GET requests (GET for testing)
@@ -61,11 +61,43 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       processed: 0,
       successful: 0,
       failed: 0,
+      skippedCancelled: 0,
       errors: [] as string[]
     };
 
+    // Never remind a cancelled (or deleted) reservation: mark those reminders
+    // cancelled instead of texting them.
+    const reservationIds = [...new Set(pendingReminders.map((r) => r.reservation_id).filter(Boolean))];
+    const liveReservationIds = new Set<string>();
+    if (reservationIds.length > 0) {
+      const { data: reservationRows, error: statusError } = await supabaseAdmin
+        .from('reservations')
+        .select('id, status')
+        .in('id', reservationIds);
+      if (statusError) {
+        console.error('Error checking reservation status for reminders:', statusError);
+        return res.status(500).json({ error: 'Failed to check reservation status' });
+      }
+      (reservationRows || []).forEach((r: { id: string; status: string | null }) => {
+        if (r.status !== 'cancelled') liveReservationIds.add(r.id);
+      });
+    }
+    const cancelledReminderIds = pendingReminders
+      .filter((r) => !liveReservationIds.has(r.reservation_id))
+      .map((r) => r.id);
+    if (cancelledReminderIds.length > 0) {
+      const { error: cancelError } = await supabaseAdmin
+        .from('scheduled_reservation_reminders')
+        .update({ status: 'cancelled', error_message: 'Reservation cancelled or deleted', updated_at: new Date().toISOString() })
+        .in('id', cancelledReminderIds)
+        .eq('status', 'pending');
+      if (cancelError) console.error('Error cancelling reminders for cancelled reservations:', cancelError);
+      results.skippedCancelled = cancelledReminderIds.length;
+    }
+
     // Process each pending reminder
     for (const reminder of pendingReminders) {
+      if (!liveReservationIds.has(reminder.reservation_id)) continue;
       try {
         // Format phone number
         let formattedPhone = reminder.customer_phone;

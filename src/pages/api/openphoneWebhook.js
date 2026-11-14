@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { createClient } from '@supabase/supabase-js';
 import { DateTime } from 'luxon';
 import { enrollPhone } from './membership/intake-enroll';
+import { handleGuestOptKeyword } from '../../lib/reservationGuests';
 
 // A hung OpenAI call would hold the webhook until the function times out and the provider redelivers
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY, timeout: 10000, maxRetries: 0 });
@@ -991,6 +992,19 @@ export async function handler(req, res) {
   console.log('Message starts with "reservation"?', text.toLowerCase().startsWith('reservation'));
   console.log('Message lowercase:', text.toLowerCase());
   console.log('Message trimmed:', text.toLowerCase().trim());
+
+  // Reservation guests opt-out: STOP / STOPALL / UNSUBSCRIBE / CANCEL / END /
+  // QUIT marks the guest contact opted out and cancels its pending texts;
+  // START / UNSTOP clears it. Only touches guest_contacts — members and every
+  // other flow below see the message exactly as before (we fall through).
+  try {
+    const optResult = await handleGuestOptKeyword(from, text);
+    if (optResult === 'opted_out' || optResult === 'opted_in') {
+      console.log('Reservation guest opt keyword applied:', optResult);
+    }
+  } catch (optError) {
+    console.error('Guest opt keyword handling failed (continuing):', optError?.message || optError);
+  }
 
   // Check for intake campaign trigger words from the database
   // This runs before hardcoded triggers so DB-managed campaigns take priority

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createClient } from '@supabase/supabase-js';
+import { verifyAdmin } from '@/lib/admin-auth';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -7,7 +8,7 @@ const supabase = createClient(
 );
 
 /**
- * POST /api/subscriptions/pause
+ * POST /api/subscriptions/pause — admin only (Bearer token).
  *
  * Pauses an account's subscription (app-managed, no Stripe subscription)
  * When paused, billing is stopped until resumed
@@ -24,6 +25,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  if (!(await verifyAdmin(req))) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   const { account_id, reason } = req.body;
 
   if (!account_id) {
@@ -34,7 +39,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     // Fetch account
     const { data: account, error: accountError } = await supabase
       .from('accounts')
-      .select('account_id, subscription_status, monthly_dues')
+      .select('account_id, subscription_status, monthly_dues, next_billing_date')
       .eq('account_id', account_id)
       .single();
 
@@ -72,8 +77,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       .eq('account_id', account_id)
       .in('status', ['active', 'paused']);
 
-    // Log pause event
-    await supabase.from('subscription_events').insert({
+    // Log pause event — resume reads the billing date back from it
+    const { error: eventError } = await supabase.from('subscription_events').insert({
       account_id,
       event_type: 'pause',
       previous_mrr: Number(account.monthly_dues) || 0,
@@ -82,8 +87,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       metadata: {
         reason: reason || 'No reason provided',
         paused_by: 'admin',
+        // Cleared on the account below; resume reads it back to keep the billing day
+        next_billing_date: account.next_billing_date || null,
       },
     });
+    if (eventError) {
+      console.error(`Failed to log pause event for ${account_id} (billing date ${account.next_billing_date} not recorded):`, eventError);
+    }
 
     console.log(`⏸️  Subscription paused for account ${account_id}`);
 
@@ -91,6 +101,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       success: true,
       account: updatedAccount,
       message: 'Subscription paused successfully. Billing will not occur until resumed.',
+      warnings: eventError
+        ? ['Paused, but the billing date could not be saved — resume will estimate the billing day.']
+        : [],
     });
 
   } catch (error: any) {

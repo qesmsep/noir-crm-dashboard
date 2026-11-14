@@ -1,0 +1,49 @@
+-- Rollback for 20261114000000_guest_texts_into_campaigns.sql
+-- Turns the built-in guest texts back on and removes the moved/cancelled and
+-- staff guest-link campaigns. The member_link template was never turned off.
+-- Guest Registration messages switched to "from the reservation" are left as
+-- they are (that setting existed before this migration).
+-- Note: this deletes every campaign on the three new triggers, including any
+-- messages staff created or edited after the forward migration ran.
+BEGIN;
+-- day_of had no campaign copy, so it goes back on. time_changed and cancelled
+-- take the on/off state of the campaigns that replaced them, so a text staff
+-- had turned off stays off.
+UPDATE public.guest_message_templates SET is_active = true WHERE kind = 'day_of';
+-- A built-in goes back on only if some active campaign on its trigger still
+-- has an active message, so the result doesn't depend on which row is read.
+UPDATE public.guest_message_templates t SET is_active = EXISTS (
+  SELECT 1 FROM public.campaigns c
+    JOIN public.campaign_messages m ON m.campaign_id = c.id
+   WHERE c.is_active AND m.is_active
+     AND c.trigger_type = CASE t.kind WHEN 'time_changed' THEN 'reservation_moved' ELSE 'reservation_cancelled' END)
+ WHERE t.kind IN ('time_changed', 'cancelled');
+DELETE FROM public.scheduled_guest_messages WHERE campaign_message_id IS NOT NULL AND status = 'pending';
+-- Keep the sent/failed history: detach it before the campaign messages go,
+-- since the column cascades on delete.
+UPDATE public.scheduled_guest_messages SET campaign_message_id = NULL WHERE campaign_message_id IS NOT NULL;
+DELETE FROM public.campaign_messages WHERE campaign_id IN (
+  SELECT id FROM public.campaigns WHERE trigger_type IN ('reservation_moved', 'reservation_cancelled', 'member_guest_link')
+);
+DELETE FROM public.campaigns WHERE trigger_type IN ('reservation_moved', 'reservation_cancelled', 'member_guest_link');
+-- The day-of copy (step 3c), found by the description the migration gave it.
+DELETE FROM public.campaign_messages WHERE campaign_id IN (
+  SELECT id FROM public.campaigns
+   WHERE trigger_type = 'guest_registration'
+     AND description = 'Copied from the built-in guest day-of text (migration 20261114000000).'
+);
+DELETE FROM public.campaigns
+ WHERE trigger_type = 'guest_registration'
+   AND description = 'Copied from the built-in guest day-of text (migration 20261114000000).';
+DROP INDEX IF EXISTS public.scheduled_guest_messages_one_pending_kind;
+ALTER TABLE public.scheduled_guest_messages DROP COLUMN IF EXISTS campaign_message_id;
+CREATE UNIQUE INDEX IF NOT EXISTS scheduled_guest_messages_one_pending_kind
+  ON public.scheduled_guest_messages (reservation_guest_id, kind) WHERE status = 'pending';
+ALTER TABLE public.campaigns DROP CONSTRAINT IF EXISTS campaigns_trigger_type_check;
+ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_trigger_type_check
+  CHECK (trigger_type = ANY (ARRAY[
+    'member_signup'::text, 'member_birthday'::text, 'member_renewal'::text, 'reservation_time'::text,
+    'reservation_created'::text, 'reservation'::text, 'recurring'::text, 'reservation_range'::text,
+    'private_event'::text, 'all_members'::text, 'guest_registration'::text
+  ]));
+COMMIT;
