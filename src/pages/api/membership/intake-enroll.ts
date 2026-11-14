@@ -206,7 +206,9 @@ async function executeAddToWaitlist(
     const { error } = await supabaseAdmin
       .from('waitlist')
       .update({ status: 'review', submitted_at: nowIso })
-      .eq('id', existing.id);
+      .eq('id', existing.id)
+      // Never downgrade an entry approved between the lookup and this update
+      .neq('status', 'approved');
     if (error) throw new Error('Failed to re-open waitlist entry');
     return { waitlist_id: existing.id, reopened: true };
   }
@@ -459,6 +461,10 @@ export async function enrollPhone(params: {
   const runAddToWaitlist =
     actions.add_to_waitlist?.enabled && !actions.create_onboarding_link?.enabled;
   let waitlistEntry: { id: string; status: string } | null = null;
+
+  if (actions.add_to_waitlist?.enabled && actions.create_onboarding_link?.enabled) {
+    console.warn(`Campaign ${campaignData.trigger_word} has both Add to Waitlist and Create Onboarding Link enabled — skipping Add to Waitlist`);
+  }
 
   if (runAddToWaitlist) {
     waitlistEntry = await findLatestWaitlistEntry(phone);
