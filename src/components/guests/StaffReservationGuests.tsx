@@ -245,7 +245,7 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
 
       {canAdd && !adding && spotsLeft === 0 && <p className="py-2 text-center text-sm font-semibold text-gray-900">Party is full</p>}
       {canAdd && !adding && spotsLeft > 0 && (
-        <Button variant="outline" className="h-11 w-full border-[#1F1F1F] text-[#1F1F1F] hover:bg-[#1F1F1F]" onClick={() => setAdding(true)}>
+        <Button variant="outline" className="h-11 w-full border-[#1F1F1F] text-[#1F1F1F] hover:bg-[#1F1F1F] hover:text-white" onClick={() => setAdding(true)}>
           Add guest
         </Button>
       )}
