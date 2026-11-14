@@ -319,7 +319,7 @@ function GuestTextsControl({
       <div className="mt-2 rounded-md border border-border-cream-1 p-3">
         <p className="text-sm text-text-primary">Stop all texts to {guest.first_name}?</p>
         <p className="mt-1 text-xs text-text-muted">
-          Queued and future guest texts won&rsquo;t send. Only {guest.first_name} can turn them back on, by texting START.
+          Queued and future guest texts to this number won&rsquo;t send, on any reservation. Only {guest.first_name} can turn them back on, by texting START.
         </p>
         <div className="mt-3 flex gap-2">
           <Button variant="destructive" className="h-11 flex-1" disabled={busy} onClick={onStop}>
