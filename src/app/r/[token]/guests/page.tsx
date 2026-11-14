@@ -2,11 +2,12 @@
 
 /**
  * No-login "add your guests" page, for members who reply to a text. Shows the
- * location, date, time and host's first name only — never other guests' phones
- * or any member data.
+ * location, date, time, host's first name and who's already on the list (first
+ * name and last initial) — never guests' phones or any member data.
  */
 import React, { use, useEffect, useState } from 'react';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, Link2, Share2, UserRound } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import AddGuestsForm, { toSubmitResult } from '@/components/guests/AddGuestsForm';
 
@@ -16,6 +17,48 @@ interface Summary {
   time: string;
   host_first_name: string;
   spots_left: number;
+  guests?: string[];
+  party_size?: number;
+  max_more?: number;
+  join_path?: string | null;
+}
+
+/** "Send this link to your guests" card: native share sheet where there is one, copy otherwise. */
+function ShareJoinLink({ path, host }: { path: string; host: string }) {
+  const [copied, setCopied] = useState(false);
+  const url = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path;
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+  const share = async () => {
+    if (canShare) {
+      try {
+        await navigator.share({ title: 'Add yourself to the list', text: `Add yourself to ${host}'s reservation:`, url });
+        return;
+      } catch {
+        // Cancelled, or the share sheet isn't allowed here: fall back to copying.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    } catch {
+      // Clipboard blocked; the link is still shown to copy by hand.
+    }
+  };
+  return (
+    <section className="rounded-2xl border border-border-cream-1 bg-white p-5">
+      <h2 className="text-lg font-semibold text-text-primary">Let guests add themselves</h2>
+      <p className="mt-1 text-sm text-text-muted">Send them this link. Each guest enters their own name and number.</p>
+      <div className="mt-3 flex items-center gap-2 rounded-lg border border-border-cream-1 bg-bg-cream-1 px-3 py-2">
+        <Link2 className="h-4 w-4 shrink-0 text-text-muted" aria-hidden />
+        <span className="truncate text-sm text-text-primary" data-testid="join-link">{url}</span>
+      </div>
+      <Button type="button" className="mt-3 h-11 w-full" onClick={share}>
+        <Share2 className="mr-2 h-4 w-4" aria-hidden />
+        {copied ? 'Link copied' : canShare ? 'Share link' : 'Copy link'}
+      </Button>
+    </section>
+  );
 }
 
 export default function GuestLinkPage({ params }: { params: Promise<{ token: string }> }) {
@@ -24,6 +67,7 @@ export default function GuestLinkPage({ params }: { params: Promise<{ token: str
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [done, setDone] = useState<number | null>(null);
+  const [grewTo, setGrewTo] = useState<number | null>(null);
   const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
@@ -72,25 +116,47 @@ export default function GuestLinkPage({ params }: { params: Promise<{ token: str
               </p>
             </header>
 
+            {summary.guests && summary.guests.length > 0 && (
+              <div className="rounded-2xl border border-border-cream-1 bg-white p-4">
+                <p className="text-sm font-medium text-text-primary">On the list</p>
+                <ul className="mt-2 flex flex-col gap-2">
+                  {summary.guests.map((name, i) => (
+                    <li key={`${name}-${i}`} className="flex items-center gap-2 text-base text-text-primary">
+                      <UserRound className="h-4 w-4 shrink-0 text-text-muted" aria-hidden />
+                      {name}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {summary.join_path && <ShareJoinLink path={summary.join_path} host={summary.host_first_name} />}
+
             {done !== null && (
               <div role="status" className="flex items-start gap-3 rounded-2xl border border-border-cream-1 bg-white p-4">
                 <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-cork" aria-hidden />
                 <p className="text-sm text-text-primary">
                   {done === 1 ? 'Guest added.' : 'Guests added.'} We&apos;ll text them how to get in.
+                  {grewTo !== null && <> Your reservation is now for {grewTo}, including you, and we&apos;ll make room.</>}
                 </p>
               </div>
             )}
 
             <section className="flex flex-col gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-text-primary">Who&apos;s coming?</h2>
+                <h2 className="text-lg font-semibold text-text-primary">Or add them yourself</h2>
                 <p className="text-sm text-text-muted">We&apos;ll text them how to get in and greet them by name.</p>
               </div>
+              {summary.spots_left === 0 && (summary.max_more ?? 0) > 0 && (
+                <p className="text-sm text-text-muted">
+                  Your reservation is for {summary.party_size}, including you. You can still add guests. We&apos;ll make room and let our team know.
+                </p>
+              )}
               <AddGuestsForm
                 key={formKey}
                 idPrefix="link-guest"
                 allowContacts
-                maxGuests={summary.spots_left}
+                maxGuests={summary.max_more ?? summary.spots_left}
                 submitLabel="Send"
                 onSubmit={async (guests) => {
                   const response = await fetch(`/api/guest-link/${encodeURIComponent(token)}`, {
@@ -101,6 +167,9 @@ export default function GuestLinkPage({ params }: { params: Promise<{ token: str
                   const result = await toSubmitResult(response.clone());
                   if (result.ok) {
                     const data = await response.json();
+                    const before = summary.party_size ?? 0;
+                    const after = data.reservation?.party_size ?? before;
+                    setGrewTo(after > before ? after : null);
                     setSummary(data.reservation);
                     setDone(guests.length);
                     setFormKey((k) => k + 1);

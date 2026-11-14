@@ -37,6 +37,8 @@ interface Props {
   /** Offer "Choose from contacts" where the Contact Picker API exists. */
   allowContacts?: boolean;
   idPrefix?: string;
+  /** Heading for each row; defaults to "Guest 1", "Guest 2"… */
+  rowLabel?: (index: number) => string;
 }
 
 const emptyRow = (): GuestRowInput => ({ first_name: '', last_name: '', phone: '' });
@@ -63,6 +65,7 @@ export default function AddGuestsForm({
   skipLabel = 'Skip',
   allowContacts = true,
   idPrefix = 'guest',
+  rowLabel = (i: number) => `Guest ${i + 1}`,
 }: Props) {
   const [rows, setRows] = useState<GuestRowInput[]>([emptyRow()]);
   const [rowErrors, setRowErrors] = useState<RowError[]>([]);
@@ -164,7 +167,7 @@ export default function AddGuestsForm({
         return (
           <fieldset key={i} className="flex flex-col gap-3 rounded-lg border border-border-cream-1 bg-white p-3">
             <div className="flex items-center justify-between">
-              <legend className="text-sm font-semibold text-text-primary">Guest {i + 1}</legend>
+              <legend className="text-sm font-semibold text-text-primary">{rowLabel(i)}</legend>
               {rows.length > 1 && (
                 <Button
                   type="button"

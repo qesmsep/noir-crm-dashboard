@@ -31,6 +31,7 @@ import {
   processDueGuestMessages,
   removeGuest,
   renderGuestMessage,
+  stopGuestTexts,
   updateGuest,
 } from '../reservationGuests';
 
@@ -153,6 +154,101 @@ describe('addGuests rules', () => {
     await expectError(p, 'over_party_size');
     await p.catch((e: GuestServiceError) => expect(e.message).toMatch(/Raise the party size/));
     expect(db.rows('reservations')[0].party_size).toBe(3); // never changed automatically
+  });
+
+  it('growParty raises the party size to fit new guests', async () => {
+    await addGuests(
+      'r-1',
+      [
+        { first_name: 'A', phone: '9135550101' },
+        { first_name: 'B', phone: '9135550102' },
+        { first_name: 'C', phone: '9135550103' },
+      ],
+      { via: 'guest_link', growParty: true },
+      deps(),
+    );
+    expect(db.rows('reservations')[0].party_size).toBe(4);
+    expect(db.rows('reservation_guests').filter((g) => g.status === 'active')).toHaveLength(3);
+  });
+
+  it('growParty texts staff right away at the location admin number', async () => {
+    db.rows('locations')[0].admin_notification_phone = '9135559999';
+    await addGuests('r-1', [
+      { first_name: 'A', phone: '9135550101' },
+      { first_name: 'B', phone: '9135550102' },
+      { first_name: 'C', phone: '9135550103' },
+    ], { via: 'guest_link', growParty: true }, deps());
+    const alerts = mockSend.mock.calls.map((c) => c[0]).filter((m) => m.to === '+19135559999');
+    expect(alerts).toHaveLength(1);
+    expect(alerts[0].content).toContain('party grew from 3 to 4 for Tim');
+    expect(alerts[0].content).toContain('Added via guest link: A, B, C');
+  });
+
+  it('party-grew alert falls back to the Settings number; no growth, no alert', async () => {
+    db.rows('settings').push({ id: 1, admin_notification_phone: '8165550000' });
+    await addGuests('r-1', [{ first_name: 'A', phone: '9135550101' }], { via: 'guest_link', growParty: true }, deps());
+    expect(mockSend.mock.calls.some((c) => c[0].to === '+18165550000')).toBe(false);
+    await addGuests('r-1', [{ first_name: 'B', phone: '9135550102' }, { first_name: 'C', phone: '9135550103' }], { via: 'guest_link', growParty: true }, deps());
+    expect(mockSend.mock.calls.filter((c) => c[0].to === '+18165550000')).toHaveLength(1);
+  });
+
+  it('growParty refuses when the location is at capacity and adds no one', async () => {
+    const realFrom = db.from.bind(db);
+    jest.spyOn(db, 'from').mockImplementation(((table: string) => {
+      const q = realFrom(table);
+      if (table !== 'reservations') return q;
+      return new Proxy(q, {
+        get(target, prop) {
+          if (prop === 'update') {
+            const refused = { data: null, error: { message: 'CAPACITY_EXCEEDED: over cap' } };
+            const chain: any = { eq: () => chain, select: async () => refused, then: (r: any) => Promise.resolve(refused).then(r) };
+            return () => chain;
+          }
+          const v = (target as any)[prop];
+          return typeof v === 'function' ? v.bind(target) : v;
+        },
+      });
+    }) as any);
+    const p = addGuests(
+      'r-1',
+      [
+        { first_name: 'A', phone: '9135550101' },
+        { first_name: 'B', phone: '9135550102' },
+        { first_name: 'C', phone: '9135550103' },
+      ],
+      { via: 'guest_link', growParty: true },
+      deps(),
+    );
+    await expectError(p, 'capacity_exceeded');
+    expect(db.rows('reservations')[0].party_size).toBe(3);
+    expect(db.rows('reservation_guests')).toHaveLength(0);
+  });
+
+  it('growParty shrinks the party back if saving a guest throws mid-way', async () => {
+    const realFrom = db.from.bind(db);
+    jest.spyOn(db, 'from').mockImplementation(((table: string) => {
+      if (table === 'guest_contacts') throw new Error('db down');
+      return realFrom(table);
+    }) as any);
+    await expect(
+      addGuests('r-1', [
+        { first_name: 'A', phone: '9135550101' },
+        { first_name: 'B', phone: '9135550102' },
+        { first_name: 'C', phone: '9135550103' },
+      ], { via: 'guest_link', growParty: true }, deps()),
+    ).rejects.toThrow('db down');
+    expect(db.rows('reservations')[0].party_size).toBe(3);
+  });
+
+  it('growParty refuses past 20 people', async () => {
+    db.rows('reservations')[0].party_size = 20;
+    const many = Array.from({ length: 19 }, (_, i) => ({ first_name: `G${i}`, phone: `91355502${String(i).padStart(2, '0')}` }));
+    await addGuests('r-1', many, { via: 'guest_link', growParty: true }, deps());
+    await expectError(
+      addGuests('r-1', [{ first_name: 'Extra', phone: '9135550299' }], { via: 'guest_link', growParty: true }, deps()),
+      'over_max_party',
+    );
+    expect(db.rows('reservations')[0].party_size).toBe(20);
   });
 
   it('a removed guest frees a slot', async () => {
@@ -416,6 +512,20 @@ describe('opt-out keywords', () => {
     expect(db.rows('scheduled_guest_messages').every((m) => m.status === 'cancelled')).toBe(true);
     expect(await handleGuestOptKeyword('9135550101', 'START', deps())).toBe('opted_in');
     expect(db.rows('guest_contacts')[0].sms_opted_out_at).toBeNull();
+  });
+
+  it('staff Stop texts opts the phone out and cancels pending, like STOP', async () => {
+    const [guest] = await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    await stopGuestTexts('r-1', guest.id, deps());
+    expect(db.rows('guest_contacts')[0].sms_opted_out_at).toBeTruthy();
+    expect(db.rows('scheduled_guest_messages').every((m) => m.status === 'cancelled')).toBe(true);
+    expect((await listGuests('r-1', 'staff', deps()))[0].opted_out).toBe(true);
+  });
+
+  it('staff Stop texts rejects a guest from another reservation', async () => {
+    const [guest] = await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    await expect(stopGuestTexts('r-other', guest.id, deps())).rejects.toMatchObject({ code: 'guest_not_found' });
+    expect(db.rows('guest_contacts')[0].sms_opted_out_at).toBeFalsy();
   });
 
   it('unknown numbers and non-keywords are left alone', async () => {

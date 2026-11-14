@@ -2,7 +2,8 @@
 
 /**
  * Staff view of a reservation's guests (inside ReservationEditDrawer): names,
- * member / opted-out badges, per-guest check-in, add / edit / remove, the
+ * member / opted-out badges, per-guest check-in, add / edit / remove, a
+ * per-guest "Texts" switch that stops all guest texts (like the guest texting STOP), the
  * no-login guest link with a Copy button, and "Text link to member" (sends the
  * "Member guest link" message from Campaigns → Reservation guests).
  *
@@ -51,6 +52,7 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
   const [link, setLink] = useState<string | null>(null);
   const [linkLoading, setLinkLoading] = useState(false);
   const [texting, setTexting] = useState(false);
+  const [confirmStop, setConfirmStop] = useState<string | null>(null);
 
   const base = `/api/admin/reservations/${reservationId}/guests`;
 
@@ -220,6 +222,18 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
                   </Button>
                 </div>
               )}
+              {editing?.id !== g.id && !g.is_member && (
+                <GuestTextsControl
+                  guest={g}
+                  busy={busy === g.id}
+                  confirming={confirmStop === g.id}
+                  onAskStop={() => setConfirmStop(g.id)}
+                  onCancel={() => setConfirmStop(null)}
+                  onStop={async () => {
+                    if (await patch(g.id, { stop_texts: true })) setConfirmStop(null);
+                  }}
+                />
+              )}
             </li>
           ))}
         </ul>
@@ -277,5 +291,58 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * "Texts" switch under a guest. On = guest texts go out. Turning it off asks
+ * first, then stops every queued and future guest text to that phone. Staff
+ * can't turn it back on: only the guest can, by texting START.
+ */
+function GuestTextsControl({
+  guest,
+  busy,
+  confirming,
+  onAskStop,
+  onCancel,
+  onStop,
+}: {
+  guest: StaffGuest;
+  busy: boolean;
+  confirming: boolean;
+  onAskStop: () => void;
+  onCancel: () => void;
+  onStop: () => void;
+}) {
+  if (confirming) {
+    return (
+      <div className="mt-2 rounded-md border border-border-cream-1 p-3">
+        <p className="text-sm text-text-primary">Stop all texts to {guest.first_name}?</p>
+        <p className="mt-1 text-xs text-text-muted">
+          Queued and future guest texts to this number won&rsquo;t send, on any reservation. Only {guest.first_name} can turn them back on, by texting START.
+        </p>
+        <div className="mt-3 flex gap-2">
+          <Button variant="destructive" className="h-11 flex-1" disabled={busy} onClick={onStop}>
+            {busy ? <Spinner size="sm" /> : 'Stop texts'}
+          </Button>
+          <Button variant="ghost" className="h-11 flex-1" disabled={busy} onClick={onCancel}>
+            Cancel
+          </Button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <label className="mt-1 flex h-11 items-center gap-2 text-xs text-text-muted">
+      <Switch
+        checked={!guest.opted_out}
+        disabled={busy || guest.opted_out}
+        onCheckedChange={(on) => {
+          if (!on) onAskStop();
+        }}
+        aria-label={`Texts to ${guest.first_name}`}
+      />
+      {guest.opted_out ? 'Texts stopped. The guest can text START to resume.' : 'Texts on'}
+    </label>
   );
 }
