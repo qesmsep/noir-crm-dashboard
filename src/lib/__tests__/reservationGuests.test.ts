@@ -267,10 +267,10 @@ describe('addGuests rules', () => {
     await expectError(addGuests('r-1', [{ first_name: 'A', phone: '9135550101' }], { via: 'portal' }, deps()), 'reservation_ended');
   });
 
-  it('marks a guest who is already a member and schedules no texts', async () => {
+  it('marks a guest who is already a member and still queues their texts', async () => {
     await addGuests('r-1', [{ first_name: 'Jo', phone: '8165550177' }], { via: 'portal' }, deps());
     expect(db.rows('reservation_guests')[0].matched_member_id).toBe('m-other');
-    expect(db.rows('scheduled_guest_messages')).toHaveLength(0);
+    expect(db.rows('scheduled_guest_messages').map((m) => m.kind)).toEqual(['day_of']);
     expect((await listGuests('r-1', 'staff', deps()))[0].is_member).toBe(true);
   });
 
@@ -370,10 +370,11 @@ describe('guest added → campaign intro', () => {
     expect(mockSend.mock.calls[0][0].content).toMatch(/^Tonight 8:00 PM with Tim/);
   });
 
-  it('guest who is already a member gets no intro', async () => {
+  it('guest who is already a member still gets the intro', async () => {
     seed({ intro: true });
     await addGuests('r-1', [{ first_name: 'Jo', phone: '8165550177' }], { via: 'portal' }, deps());
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend.mock.calls[0][0].to).toBe('+18165550177');
   });
 });
 
@@ -420,13 +421,13 @@ describe('sending cron re-checks (day_of)', () => {
     expect(mockSend).not.toHaveBeenCalled();
   });
 
-  it('skips a guest who became a member since being added', async () => {
+  it('still texts a guest who became a member since being added, and marks them', async () => {
     await addAvaThenWait();
     db.rows('members').push({ member_id: 'm-new', phone: '+19135550101', status: 'active' });
     await processDueGuestMessages({}, deps());
-    expect(db.rows('scheduled_guest_messages')[0]).toMatchObject({ status: 'skipped', skip_reason: 'matched_member' });
+    expect(db.rows('scheduled_guest_messages')[0]).toMatchObject({ status: 'sent' });
     expect(db.rows('reservation_guests')[0].matched_member_id).toBe('m-new');
-    expect(mockSend).not.toHaveBeenCalled();
+    expect(mockSend).toHaveBeenCalledTimes(1);
   });
 
   it('records a failed send without retrying', async () => {
@@ -566,6 +567,38 @@ const DAY_OF = {
 };
 
 describe('guest texts from Campaigns', () => {
+  it('intro can go to guests who are members or guests who are not', async () => {
+    const forMembers = { ...INTRO, id: 'msg-m', content: 'Member hi {{guest_first_name}}. Reply STOP to opt out.', recipient_type: 'reservation_guest_member' };
+    const forOthers = { ...INTRO, id: 'msg-n', content: 'Guest hi {{guest_first_name}}. Reply STOP to opt out.', recipient_type: 'reservation_guest_nonmember' };
+    seed({ templates: TEMPLATES_OFF, messages: [forMembers, forOthers] });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }, { first_name: 'Jo', phone: '8165550177' }], { via: 'portal' }, deps());
+    const sent = mockSend.mock.calls.map((c) => [c[0].to, c[0].content]).sort();
+    expect(sent).toEqual([
+      ['+18165550177', 'Member hi Jo. Reply STOP to opt out.'],
+      ['+19135550101', 'Guest hi Ava. Reply STOP to opt out.'],
+    ]);
+  });
+
+  it('reservation cancelled to non-members only skips a guest who is a member', async () => {
+    seed({ intro: true, templates: TEMPLATES_OFF, messages: [{ ...CANCELLED, recipient_type: 'reservation_guest_nonmember' }] });
+    await addGuests('r-1', [{ first_name: 'Jo', phone: '8165550177' }], { via: 'portal' }, deps());
+    mockSend.mockClear();
+    await onReservationCancelled('r-1', {}, deps());
+    await processDueGuestMessages({}, deps());
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(db.rows('scheduled_guest_messages').find((m) => m.kind === 'cancelled')).toMatchObject({ status: 'skipped', skip_reason: 'recipient_nonmembers_only' });
+  });
+
+  it('reservation cancelled to members only skips a guest who is not a member', async () => {
+    seed({ intro: true, templates: TEMPLATES_OFF, messages: [{ ...CANCELLED, recipient_type: 'reservation_guest_member' }] });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    mockSend.mockClear();
+    await onReservationCancelled('r-1', {}, deps());
+    await processDueGuestMessages({}, deps());
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(db.rows('scheduled_guest_messages').find((m) => m.kind === 'cancelled')).toMatchObject({ status: 'skipped', skip_reason: 'recipient_members_only' });
+  });
+
   it('reservation moved: notified guests get the campaign message', async () => {
     seed({ intro: true, templates: TEMPLATES_OFF, messages: [MOVED] });
     await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
@@ -626,6 +659,14 @@ describe('guest texts from Campaigns', () => {
     clock = DateTime.fromISO('2026-11-20T01:35:00.000Z', { zone: 'utc' });
     expect(await processGuestAddedCampaignMessage(DAY_OF as never, deps())).toBe(0);
     expect(mockSend).toHaveBeenCalledTimes(1);
+  });
+
+  it('a late day-of for members only does not replace the intro for a guest who is not a member', async () => {
+    seed({ intro: true, templates: TEMPLATES_OFF, messages: [{ ...DAY_OF, recipient_type: 'reservation_guest_member' }] });
+    clock = DateTime.fromISO('2026-11-20T01:30:00.000Z', { zone: 'utc' });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend.mock.calls[0][0].content).toMatch(/^Hi Ava, Tim put you on their reservation/);
   });
 
   it('a guest added well ahead gets the intro; the day-of waits for its time', async () => {

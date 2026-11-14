@@ -240,6 +240,8 @@ export const campaignMessageSchema = z.object({
     'member_only',
     'guest_only',
     'reservation_guest',
+    'reservation_guest_member',
+    'reservation_guest_nonmember',
     'both_members',
     'specific_number',
     'reservation_phones',

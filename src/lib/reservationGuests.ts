@@ -30,6 +30,7 @@
  * member.
  */
 import { DateTime } from 'luxon';
+import { guestRecipientMatches } from '@/lib/guestRecipients';
 import { supabaseAdmin } from '@/lib/supabase';
 import { sendSMS } from '@/lib/sms';
 import { last10, maskPhone, toE164, formatPhoneDisplay } from '@/lib/phone';
@@ -716,7 +717,7 @@ async function cancelPendingForGuests(db: Db, guestIds: string[], kinds?: GuestM
 }
 
 function guestIsTextable(g: GuestRow): boolean {
-  return g.status === 'active' && !g.matched_member_id && !g.guest_contacts?.sms_opted_out_at;
+  return g.status === 'active' && !g.guest_contacts?.sms_opted_out_at;
 }
 
 /** Queue a new guest's texts (see planGuestMessages). */
@@ -948,6 +949,8 @@ export interface EventCampaignMessage {
   content: string;
   /** Message and its campaign both on. */
   active: boolean;
+  /** All guests, guests who are members, or guests who aren't. */
+  recipient_type: string;
 }
 
 type DeliverResult = { status: 'sent'; messageId?: string } | { status: 'skipped'; reason: string } | { status: 'failed'; error: string };
@@ -983,16 +986,22 @@ async function deliver(db: Db, deps: GuestDeps, a: DeliverArgs): Promise<Deliver
   }
   if (a.guest.status !== 'active') return { status: 'skipped', reason: 'guest_removed' };
   if (contact.sms_opted_out_at) return { status: 'skipped', reason: 'opted_out' };
-  if (a.guest.matched_member_id) return { status: 'skipped', reason: 'matched_member' };
   if (a.kind !== 'cancelled') {
     const closed = isReservationClosed(a.reservation, now);
     if (closed) return { status: 'skipped', reason: closed };
   }
-  // Someone may have joined since the guest was added.
-  const memberNow = await findMemberIdByPhone(db, contact.phone);
-  if (memberNow) {
-    await db.from('reservation_guests').update({ matched_member_id: memberNow }).eq('id', a.guest.id);
-    return { status: 'skipped', reason: 'matched_member' };
+  // Members on someone else's reservation get the guest texts too. Keep the
+  // member badge current if they joined since they were added.
+  let isMember = !!a.guest.matched_member_id;
+  if (!isMember) {
+    const memberNow = await findMemberIdByPhone(db, contact.phone);
+    if (memberNow) {
+      isMember = true;
+      await db.from('reservation_guests').update({ matched_member_id: memberNow }).eq('id', a.guest.id);
+    }
+  }
+  if (a.campaignMessage && !guestRecipientMatches(a.campaignMessage.recipient_type, isMember)) {
+    return { status: 'skipped', reason: isMember ? 'recipient_nonmembers_only' : 'recipient_members_only' };
   }
 
   const content = a.campaignMessage

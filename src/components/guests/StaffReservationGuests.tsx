@@ -222,7 +222,7 @@ export default function StaffReservationGuests({ reservationId, partySize, canAd
                   </Button>
                 </div>
               )}
-              {editing?.id !== g.id && !g.is_member && (
+              {editing?.id !== g.id && (
                 <GuestTextsControl
                   guest={g}
                   busy={busy === g.id}

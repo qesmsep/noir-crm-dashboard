@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { adminRequestHeaders } from '@/lib/adminRequestHeaders';
+import { isGuestRecipient } from '@/lib/guestRecipients';
 import { Info } from 'lucide-react';
 
 import { useToast } from '@/hooks/useToast';
@@ -38,7 +39,7 @@ interface CampaignTemplate {
   name: string;
   description: string;
   content: string;
-  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest';
+  recipient_type: 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest' | 'reservation_guest_member' | 'reservation_guest_nonmember';
   specific_phone?: string;
   timing_type: 'specific_time' | 'recurring' | 'relative' | 'immediate';
   // Specific time fields
@@ -118,7 +119,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     name: '',
     description: '',
     content: '',
-    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest',
+    recipient_type: 'member' as 'member' | 'all_members' | 'specific_phone' | 'both_members' | 'reservation_phones' | 'private_event_rsvps' | 'all_primary_members' | 'member_only' | 'guest_only' | 'reservation_guest' | 'reservation_guest_member' | 'reservation_guest_nonmember',
     specific_phone: '',
     timing_type: 'specific_time' as 'specific_time' | 'recurring' | 'relative' | 'immediate',
     specific_time: '10:00',
@@ -661,7 +662,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
     // Add location context hint if campaign is location-specific
     const validLocationCount = campaignData?.campaign_locations?.filter((cl: any) => cl.location != null).length || 0;
-    const locationHint = campaignData?.applies_to_all_locations
+    // Campaign data is only loaded for all-members campaigns; without it, no hint
+    // (it used to read "filtered by 0 location(s)" on every other trigger).
+    const locationHint = !campaignData || campaignData.applies_to_all_locations
       ? ''
       : ` (filtered by ${validLocationCount} location(s))`;
 
@@ -696,11 +699,17 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
 
       case 'reservation_moved':
       case 'reservation_cancelled':
-        return [{ value: 'reservation_guest', label: `Guests already texted about the reservation${locationHint}` }];
+        return [
+          { value: 'reservation_guest', label: `All guests already texted about the reservation${locationHint}` },
+          { value: 'reservation_guest_member', label: `Guests who are members${locationHint}` },
+          { value: 'reservation_guest_nonmember', label: `Guests who aren't members${locationHint}` },
+        ];
 
       case 'guest_registration':
         return [
-          { value: 'reservation_guest', label: `The guest${locationHint}` },
+          { value: 'reservation_guest', label: `All guests${locationHint}` },
+          { value: 'reservation_guest_member', label: `Guests who are members${locationHint}` },
+          { value: 'reservation_guest_nonmember', label: `Guests who aren't members${locationHint}` },
           { value: 'specific_phone', label: 'Custom phone number (e.g. a staff alert)' }
         ];
 
@@ -1262,7 +1271,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                   className="min-h-[180px]"
                   placeholder="Enter your message template here. Use placeholders like {{first_name}}, {{last_name}}, etc."
                 />
-                {isGuestTrigger && formData.recipient_type === 'reservation_guest' && formData.content.trim() !== '' && !/reply stop/i.test(formData.content) && (
+                {isGuestTrigger && isGuestRecipient(formData.recipient_type) && formData.content.trim() !== '' && !/reply stop/i.test(formData.content) && (
                   <p className="mt-1 text-xs text-error-red">Guest texts should end with &ldquo;Reply STOP to opt out.&rdquo;</p>
                 )}
                 {(isGuestTrigger || campaignTriggerType === 'member_guest_link') && formData.content.length > 480 && (
