@@ -37,6 +37,7 @@ interface CampaignActions {
   create_onboarding_link?: { enabled: boolean; selected_membership?: string };
   add_ledger_charge?: { enabled: boolean; amount?: number; description?: string };
   create_event_rsvp?: { enabled: boolean; event_id?: string; party_size?: number };
+  add_to_waitlist?: { enabled: boolean };
 }
 
 interface IntakeCampaign {
@@ -620,6 +621,8 @@ export default function IntakeCampaignManager() {
                             ...prev.create_onboarding_link,
                             enabled: checked as boolean,
                           },
+                          // Onboarding approves the entry; waitlist puts it in review — can't do both
+                          ...(checked ? { add_to_waitlist: { enabled: false } } : {}),
                         }))
                       }
                     />
@@ -656,6 +659,36 @@ export default function IntakeCampaignManager() {
                         </Select>
                       </div>
                     </div>
+                  )}
+                </div>
+
+                {/* Add to Waitlist */}
+                <div className="border border-border-cream-1 rounded-xl p-3 bg-[#FAFAF8]">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Checkbox
+                      id="action-waitlist"
+                      checked={actions.add_to_waitlist?.enabled || false}
+                      onCheckedChange={(checked) =>
+                        setActions(prev => ({
+                          ...prev,
+                          add_to_waitlist: { enabled: checked as boolean },
+                          ...(checked && prev.create_onboarding_link
+                            ? { create_onboarding_link: { ...prev.create_onboarding_link, enabled: false } }
+                            : {}),
+                        }))
+                      }
+                    />
+                    <Label htmlFor="action-waitlist" className="text-xs font-semibold text-[#353535] cursor-pointer">
+                      Add to Waitlist
+                    </Label>
+                  </div>
+                  {actions.add_to_waitlist?.enabled && (
+                    <p className="ml-6 text-xs text-text-muted">
+                      Puts this phone back in the waitlist for review. Re-opens an existing entry
+                      (keeps their application) or creates a new one. Already-approved applicants
+                      are sent the INVITATION campaign instead of this one. Can&apos;t be combined with
+                      Create Onboarding Link.
+                    </p>
                   )}
                 </div>
 
