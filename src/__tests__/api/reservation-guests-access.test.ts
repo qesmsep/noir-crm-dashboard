@@ -51,7 +51,7 @@ function seed() {
         { id: R_THEIRS, member_id: 'm-them', phone: '+19135550200', email: null, status: 'confirmed', start_time: future.toISO(), end_time: future.plus({ hours: 2 }).toISO(), party_size: 4, first_name: 'Sam', location_id: 'loc' },
         { id: R_OLD_MINE, member_id: null, phone: '9135550100', email: null, status: 'confirmed', start_time: future.toISO(), end_time: future.plus({ hours: 2 }).toISO(), party_size: 2, first_name: 'Tim', location_id: 'loc' },
       ],
-      locations: [{ id: 'loc', name: 'Noir KC', timezone: 'America/Chicago' }],
+      locations: [{ id: 'loc', name: 'Noir KC', slug: 'noirkc', timezone: 'America/Chicago' }],
       guest_contacts: [{ id: 'c1', phone: '+19135550111', first_name: 'Ava', last_name: 'Stone', sms_opted_out_at: null }],
       reservation_guests: [{ id: 'g1', reservation_id: R_MINE, guest_contact_id: 'c1', status: 'active', first_name_snapshot: 'Ava', added_via: 'portal', created_at: '2026-01-01' }],
       guest_message_templates: [],
@@ -146,8 +146,8 @@ describe('guest link tokens', () => {
     const link = await lookupGuestLink(TOKEN);
     expect(link.ok).toBe(true);
     if (!link.ok) return;
-    expect(Object.keys(link.summary).sort()).toEqual(['date', 'guests', 'host_first_name', 'join_path', 'location_name', 'max_more', 'party_size', 'spots_left', 'time']);
-    expect(link.summary).toMatchObject({ location_name: 'Noir KC', host_first_name: 'Tim', spots_left: 2 });
+    expect(Object.keys(link.summary).sort()).toEqual(['date', 'guests', 'host_first_name', 'join_path', 'location_name', 'location_slug', 'max_more', 'party_size', 'spots_left', 'time']);
+    expect(link.summary).toMatchObject({ location_name: 'Noir KC', location_slug: 'noirkc', host_first_name: 'Tim', spots_left: 2 });
   });
 
   it('guest names are first name and last initial only', async () => {
@@ -211,7 +211,7 @@ describe('guest self-register (join) link', () => {
   it('shows only location, date, time and host first name (no guest list)', async () => {
     const join = await lookupGuestJoin(JOIN());
     if (!join.ok) throw new Error('join not ok');
-    expect(Object.keys(join.summary).sort()).toEqual(['date', 'host_first_name', 'location_name', 'time']);
+    expect(Object.keys(join.summary).sort()).toEqual(['date', 'host_first_name', 'location_name', 'location_slug', 'time']);
     const res = await call(guestJoinHandler, { method: 'GET', query: { token: JOIN() } });
     expect(res.statusCode).toBe(200);
     expect(JSON.stringify(res.body)).not.toMatch(/Ava|555|phone|member_id/);

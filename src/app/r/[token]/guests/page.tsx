@@ -10,9 +10,11 @@ import { CheckCircle2, Link2, Share2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import AddGuestsForm, { toSubmitResult } from '@/components/guests/AddGuestsForm';
+import LocationLogo from '@/components/guests/LocationLogo';
 
 interface Summary {
   location_name: string;
+  location_slug?: string | null;
   date: string;
   time: string;
   host_first_name: string;
@@ -108,6 +110,7 @@ export default function GuestLinkPage({ params }: { params: Promise<{ token: str
 
         {!loading && summary && (
           <>
+            <LocationLogo slug={summary.location_slug} />
             <header className="rounded-2xl border border-border-cream-1 bg-white p-5">
               <p className="text-sm text-text-muted">{summary.host_first_name}&apos;s reservation</p>
               <h1 className="mt-1 text-xl font-semibold text-text-primary">{summary.location_name}</h1>

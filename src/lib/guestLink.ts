@@ -15,6 +15,8 @@ type Db = typeof supabaseAdmin;
 
 export interface GuestLinkSummary {
   location_name: string;
+  /** Location slug (noirkc, noirop, rooftopkc), used to pick the logo shown on the form. */
+  location_slug: string | null;
   date: string;
   time: string;
   host_first_name: string;
@@ -33,6 +35,7 @@ export interface GuestLinkSummary {
 /** What a guest sees on the self-register page: no guest list, no member data. */
 export interface GuestJoinSummary {
   location_name: string;
+  location_slug: string | null;
   date: string;
   time: string;
   host_first_name: string;
@@ -67,7 +70,7 @@ const RESERVATION_COLUMNS = 'id, status, start_time, end_time, party_size, first
 async function summarize(db: Db, r: ReservationRow): Promise<GuestLinkSummary> {
   const [{ data: loc }, { data: member }, { data: guests }] = await Promise.all([
     r.location_id
-      ? db.from('locations').select('name, timezone').eq('id', r.location_id).maybeSingle()
+      ? db.from('locations').select('name, slug, timezone').eq('id', r.location_id).maybeSingle()
       : Promise.resolve({ data: null }),
     !r.first_name && r.member_id
       ? db.from('members').select('first_name').eq('member_id', r.member_id).maybeSingle()
@@ -90,6 +93,7 @@ async function summarize(db: Db, r: ReservationRow): Promise<GuestLinkSummary> {
   const join = r.guest_link_token ? guestJoinToken(r.id, r.guest_link_token) : null;
   return {
     location_name: (loc as { name?: string } | null)?.name || 'Noir',
+    location_slug: (loc as { slug?: string } | null)?.slug || null,
     date: start.toFormat('cccc, LLLL d'),
     time: start.toFormat('h:mm a'),
     host_first_name: host.split(' ')[0] || 'Your host',
@@ -177,7 +181,7 @@ export async function lookupGuestJoin(token: unknown, deps: { db?: Db; now?: Dat
     reservationId: r.id,
     partySize: r.party_size || 1,
     guestCount: full.guests.length,
-    summary: { location_name: full.location_name, date: full.date, time: full.time, host_first_name: full.host_first_name },
+    summary: { location_name: full.location_name, location_slug: full.location_slug, date: full.date, time: full.time, host_first_name: full.host_first_name },
   };
 }
 
