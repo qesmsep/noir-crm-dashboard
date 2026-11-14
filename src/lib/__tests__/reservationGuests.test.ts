@@ -224,6 +224,22 @@ describe('addGuests rules', () => {
     expect(db.rows('reservation_guests')).toHaveLength(0);
   });
 
+  it('growParty shrinks the party back if saving a guest throws mid-way', async () => {
+    const realFrom = db.from.bind(db);
+    jest.spyOn(db, 'from').mockImplementation(((table: string) => {
+      if (table === 'guest_contacts') throw new Error('db down');
+      return realFrom(table);
+    }) as any);
+    await expect(
+      addGuests('r-1', [
+        { first_name: 'A', phone: '9135550101' },
+        { first_name: 'B', phone: '9135550102' },
+        { first_name: 'C', phone: '9135550103' },
+      ], { via: 'guest_link', growParty: true }, deps()),
+    ).rejects.toThrow('db down');
+    expect(db.rows('reservations')[0].party_size).toBe(3);
+  });
+
   it('growParty refuses past 20 people', async () => {
     db.rows('reservations')[0].party_size = 20;
     const many = Array.from({ length: 19 }, (_, i) => ({ first_name: `G${i}`, phone: `91355502${String(i).padStart(2, '0')}` }));

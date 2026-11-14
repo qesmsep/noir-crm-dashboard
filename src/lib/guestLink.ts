@@ -61,6 +61,7 @@ type ReservationRow = {
   guest_link_token?: string | null;
   guest_link_expires_at: string | null;
 };
+// guest_link_token is read only to derive join_path; never return the row itself from an API.
 const RESERVATION_COLUMNS = 'id, status, start_time, end_time, party_size, first_name, member_id, location_id, guest_link_token, guest_link_expires_at';
 
 async function summarize(db: Db, r: ReservationRow): Promise<GuestLinkSummary> {

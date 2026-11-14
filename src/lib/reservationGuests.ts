@@ -478,31 +478,34 @@ export async function addGuests(
 
   const created: GuestRow[] = [];
   const createdNames: string[] = [];
-  for (const g of clean) {
-    const contact = await upsertContact(db, g, opts.via);
-    const matched = await findMemberIdByPhone(db, contact.phone);
-    const { data: row, error } = await db
-      .from('reservation_guests')
-      .insert({
-        reservation_id: reservation.id,
-        guest_contact_id: contact.id,
-        location_id: reservation.location_id,
-        added_by_member_id: opts.actorMemberId ?? null,
-        host_member_id: reservation.member_id,
-        added_via: opts.via,
-        first_name_snapshot: g.first_name,
-        matched_member_id: matched,
-        status: 'active',
-      })
-      .select('id')
-      .single();
-    if (error?.code === '23505') continue; // added concurrently — already on the reservation
-    if (error || !row) {
-      await shrinkGrownParty(db, reservation.id, grewFrom, reservation.party_size, existing.length + created.length);
-      throw new GuestServiceError('save_failed', 'Could not save guest.', 500);
+  try {
+    for (const g of clean) {
+      const contact = await upsertContact(db, g, opts.via);
+      const matched = await findMemberIdByPhone(db, contact.phone);
+      const { data: row, error } = await db
+        .from('reservation_guests')
+        .insert({
+          reservation_id: reservation.id,
+          guest_contact_id: contact.id,
+          location_id: reservation.location_id,
+          added_by_member_id: opts.actorMemberId ?? null,
+          host_member_id: reservation.member_id,
+          added_via: opts.via,
+          first_name_snapshot: g.first_name,
+          matched_member_id: matched,
+          status: 'active',
+        })
+        .select('id')
+        .single();
+      if (error?.code === '23505') continue; // added concurrently — already on the reservation
+      if (error || !row) throw new GuestServiceError('save_failed', 'Could not save guest.', 500);
+      created.push({ id: (row as { id: string }).id } as GuestRow);
+      createdNames.push(g.first_name);
     }
-    created.push({ id: (row as { id: string }).id } as GuestRow);
-    createdNames.push(g.first_name);
+  } catch (err) {
+    // Any failure mid-loop (contact upsert, member lookup, insert): don't leave the party inflated.
+    await shrinkGrownParty(db, reservation.id, grewFrom, reservation.party_size, existing.length + created.length);
+    throw err;
   }
   // Everyone was already on it (added concurrently): don't keep the bigger party.
   const finalSize = await shrinkGrownParty(db, reservation.id, grewFrom, reservation.party_size, existing.length + created.length);
