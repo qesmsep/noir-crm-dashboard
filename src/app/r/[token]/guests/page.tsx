@@ -6,7 +6,7 @@
  * name and last initial) — never guests' phones or any member data.
  */
 import React, { use, useEffect, useState } from 'react';
-import { CheckCircle2, Link2, Share2, UserRound } from 'lucide-react';
+import { CheckCircle2, Copy, Link2, MessageSquare, Share2, UserRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Spinner } from '@/components/ui/spinner';
 import AddGuestsForm, { toSubmitResult } from '@/components/guests/AddGuestsForm';
@@ -25,26 +25,34 @@ interface Summary {
   join_path?: string | null;
 }
 
-/** "Send this link to your guests" card: native share sheet where there is one, copy otherwise. */
+/**
+ * "Send this link to your guests" card. "Text the link" opens the phone's
+ * Messages app with the link written out, so the member only picks who gets it.
+ * Share (the phone's share sheet, where there is one) and Copy sit under it.
+ */
 function ShareJoinLink({ path, host }: { path: string; host: string }) {
   const [copied, setCopied] = useState(false);
+  const [canShare, setCanShare] = useState(false);
+  useEffect(() => setCanShare(typeof navigator !== 'undefined' && typeof navigator.share === 'function'), []);
   const url = typeof window !== 'undefined' ? `${window.location.origin}${path}` : path;
-  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
-  const share = async () => {
-    if (canShare) {
-      try {
-        await navigator.share({ title: 'Add yourself to the list', text: `Add yourself to ${host}'s reservation:`, url });
-        return;
-      } catch {
-        // Cancelled, or the share sheet isn't allowed here: fall back to copying.
-      }
-    }
+  const message = `Add yourself to ${host}'s reservation: ${url}`;
+  // "sms:?&body=" opens Messages with the text filled in on both iPhone and Android.
+  const smsHref = `sms:?&body=${encodeURIComponent(message)}`;
+  const copy = async () => {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     } catch {
       // Clipboard blocked; the link is still shown to copy by hand.
+    }
+  };
+  const share = async () => {
+    try {
+      await navigator.share({ title: 'Add yourself to the list', text: `Add yourself to ${host}'s reservation:`, url });
+    } catch (err) {
+      // Closing the share sheet is not a failure; anything else falls back to copying.
+      if ((err as { name?: string })?.name !== 'AbortError') await copy();
     }
   };
   return (
@@ -55,10 +63,24 @@ function ShareJoinLink({ path, host }: { path: string; host: string }) {
         <Link2 className="h-4 w-4 shrink-0 text-text-muted" aria-hidden />
         <span className="truncate text-sm text-text-primary" data-testid="join-link">{url}</span>
       </div>
-      <Button type="button" className="mt-3 h-11 w-full" onClick={share}>
-        <Share2 className="mr-2 h-4 w-4" aria-hidden />
-        {copied ? 'Link copied' : canShare ? 'Share link' : 'Copy link'}
+      <Button asChild className="mt-3 h-11 w-full">
+        <a href={smsHref}>
+          <MessageSquare className="mr-2 h-4 w-4" aria-hidden />
+          Text the link
+        </a>
       </Button>
+      <div className="mt-2 flex gap-2">
+        {canShare && (
+          <Button type="button" variant="outline" className="h-11 flex-1" onClick={share}>
+            <Share2 className="mr-2 h-4 w-4" aria-hidden />
+            Share
+          </Button>
+        )}
+        <Button type="button" variant="outline" className="h-11 flex-1" onClick={copy}>
+          <Copy className="mr-2 h-4 w-4" aria-hidden />
+          {copied ? 'Copied' : 'Copy link'}
+        </Button>
+      </div>
     </section>
   );
 }
