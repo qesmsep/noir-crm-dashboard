@@ -10,10 +10,14 @@ BEGIN;
 -- take the on/off state of the campaigns that replaced them, so a text staff
 -- had turned off stays off.
 UPDATE public.guest_message_templates SET is_active = true WHERE kind = 'day_of';
-UPDATE public.guest_message_templates t SET is_active = c.is_active
-  FROM public.campaigns c
- WHERE (t.kind = 'time_changed' AND c.trigger_type = 'reservation_moved')
-    OR (t.kind = 'cancelled' AND c.trigger_type = 'reservation_cancelled');
+-- A built-in goes back on only if some active campaign on its trigger still
+-- has an active message, so the result doesn't depend on which row is read.
+UPDATE public.guest_message_templates t SET is_active = EXISTS (
+  SELECT 1 FROM public.campaigns c
+    JOIN public.campaign_messages m ON m.campaign_id = c.id
+   WHERE c.is_active AND m.is_active
+     AND c.trigger_type = CASE t.kind WHEN 'time_changed' THEN 'reservation_moved' ELSE 'reservation_cancelled' END)
+ WHERE t.kind IN ('time_changed', 'cancelled');
 DELETE FROM public.scheduled_guest_messages WHERE campaign_message_id IS NOT NULL AND status = 'pending';
 -- Keep the sent/failed history: detach it before the campaign messages go,
 -- since the column cascades on delete.

@@ -1265,6 +1265,11 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                 {isGuestTrigger && formData.recipient_type === 'reservation_guest' && formData.content.trim() !== '' && !/reply stop/i.test(formData.content) && (
                   <p className="mt-1 text-xs text-error-red">Guest texts should end with &ldquo;Reply STOP to opt out.&rdquo;</p>
                 )}
+                {(isGuestTrigger || campaignTriggerType === 'member_guest_link') && formData.content.length > 480 && (
+                  <p className="mt-1 text-xs text-error-red">
+                    {formData.content.length} characters. Keep guest texts under 480, since links and addresses make them longer when sent.
+                  </p>
+                )}
               </Field>
 
               {/* Placeholder reference. Was a native alert() before, which is
