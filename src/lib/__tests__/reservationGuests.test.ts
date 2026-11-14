@@ -55,7 +55,7 @@ const INTRO = {
   campaigns: { id: 'camp-g', trigger_type: 'guest_registration', is_active: true, applies_to_all_locations: true, campaign_locations: [] },
 };
 
-function seed(extra: { reservation?: Record<string, unknown>; members?: Record<string, unknown>[]; templates?: Record<string, unknown>[]; intro?: boolean } = {}) {
+function seed(extra: { reservation?: Record<string, unknown>; members?: Record<string, unknown>[]; templates?: Record<string, unknown>[]; intro?: boolean; messages?: Record<string, unknown>[] } = {}) {
   db = new FakeDb(
     {
       reservations: [
@@ -86,7 +86,7 @@ function seed(extra: { reservation?: Record<string, unknown>; members?: Record<s
       reservation_guests: [],
       scheduled_guest_messages: [],
       guest_messages: [],
-      campaign_messages: extra.intro ? [INTRO] : [],
+      campaign_messages: [...(extra.intro ? [INTRO] : []), ...(extra.messages ?? [])],
       scheduled_messages: [],
     },
     {
@@ -94,7 +94,7 @@ function seed(extra: { reservation?: Record<string, unknown>; members?: Record<s
       unique: {
         guest_contacts: [{ columns: ['phone'] }],
         reservation_guests: [{ columns: ['reservation_id', 'guest_contact_id'], where: (r) => r.status === 'active' }],
-        scheduled_guest_messages: [{ columns: ['reservation_guest_id', 'kind'], where: (r) => r.status === 'pending' }],
+        scheduled_guest_messages: [{ columns: ['reservation_guest_id', 'kind', 'campaign_message_id'], where: (r) => r.status === 'pending' }],
         scheduled_messages: [{ columns: ['campaign_message_id', 'reservation_guest_id'], where: (r) => r.reservation_guest_id != null && (r.status === 'pending' || r.status === 'sent') }],
       },
     },
@@ -531,5 +531,97 @@ describe('opt-out keywords', () => {
   it('unknown numbers and non-keywords are left alone', async () => {
     expect(await handleGuestOptKeyword('+18165550000', 'STOP', deps())).toBe('no_contact');
     expect(await handleGuestOptKeyword('+19135550101', 'hello', deps())).toBe('not_keyword');
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// Guest texts as campaign messages (built-in templates off)
+// ---------------------------------------------------------------------------
+
+const TEMPLATES_OFF = [
+  { kind: 'day_of', body: 'legacy day of', is_active: false, send_offset_minutes: 120 },
+  { kind: 'time_changed', body: 'legacy moved', is_active: false, send_offset_minutes: null },
+  { kind: 'cancelled', body: 'legacy cancelled', is_active: false, send_offset_minutes: null },
+];
+const eventMessage = (id: string, trigger: string, content: string, campaignExtra: Record<string, unknown> = {}) => ({
+  id,
+  name: id,
+  content,
+  recipient_type: 'reservation_guest',
+  specific_phone: null,
+  timing_type: 'immediate',
+  is_active: true,
+  campaigns: { id: `camp-${id}`, trigger_type: trigger, is_active: true, applies_to_all_locations: true, campaign_locations: [], ...campaignExtra },
+});
+const MOVED = eventMessage('msg-moved', 'reservation_moved', 'Hi {{guest_first_name}}, {{host_first_name}} moved it to {{reservation_date}} at {{reservation_time}}.');
+const CANCELLED = eventMessage('msg-cancelled', 'reservation_cancelled', 'Hi {{guest_first_name}}, {{host_first_name}} cancelled {{location_name}}.');
+const DAY_OF = {
+  ...eventMessage('msg-dayof', 'guest_registration', 'See you at {{reservation_time}}, {{guest_first_name}}.'),
+  timing_type: 'relative',
+  relative_quantity: 1,
+  relative_unit: 'hour',
+  relative_proximity: 'before',
+  relative_anchor: 'reservation_start',
+};
+
+describe('guest texts from Campaigns', () => {
+  it('reservation moved: notified guests get the campaign message', async () => {
+    seed({ intro: true, templates: TEMPLATES_OFF, messages: [MOVED] });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    mockSend.mockClear();
+    db.rows('reservations')[0].start_time = '2026-11-21T02:00:00.000Z';
+    db.rows('reservations')[0].end_time = '2026-11-21T04:00:00.000Z';
+    await onReservationRescheduled('r-1', deps());
+    const pending = db.rows('scheduled_guest_messages').filter((m) => m.status === 'pending');
+    expect(pending.map((m) => [m.kind, m.campaign_message_id])).toEqual([['time_changed', 'msg-moved']]);
+    await processDueGuestMessages({}, deps());
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend.mock.calls[0][0]).toEqual({ to: '+19135550101', content: 'Hi Ava, Tim moved it to Friday, November 20 at 8:00 PM.' });
+  });
+
+  it('reservation moved: a campaign turned off after queueing sends nothing', async () => {
+    seed({ intro: true, templates: TEMPLATES_OFF, messages: [MOVED] });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    mockSend.mockClear();
+    await onReservationRescheduled('r-1', deps());
+    db.rows('campaign_messages').find((m) => m.id === 'msg-moved')!.campaigns.is_active = false;
+    await processDueGuestMessages({}, deps());
+    expect(mockSend).not.toHaveBeenCalled();
+    expect(db.rows('scheduled_guest_messages')[0]).toMatchObject({ status: 'skipped', skip_reason: 'campaign_inactive' });
+  });
+
+  it('reservation cancelled (sendNow): notified guests get the campaign message, others nothing', async () => {
+    seed({ intro: true, templates: TEMPLATES_OFF, messages: [CANCELLED] });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    db.rows('reservation_guests').push({ ...db.rows('reservation_guests')[0], id: 'g-quiet', guest_contact_id: 'none', notified_at: null });
+    mockSend.mockClear();
+    await onReservationCancelled('r-1', { sendNow: true }, deps());
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend.mock.calls[0][0]).toEqual({ to: '+19135550101', content: 'Hi Ava, Tim cancelled Noir KC.' });
+  });
+
+  it('reservation cancelled: no campaign and built-in off means no text', async () => {
+    seed({ intro: true, templates: TEMPLATES_OFF });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    mockSend.mockClear();
+    await onReservationCancelled('r-1', { sendNow: true }, deps());
+    expect(mockSend).not.toHaveBeenCalled();
+  });
+
+  it('a guest added after the day-of time gets it right away, instead of the intro', async () => {
+    seed({ intro: true, templates: TEMPLATES_OFF, messages: [DAY_OF] });
+    clock = DateTime.fromISO('2026-11-20T01:30:00.000Z', { zone: 'utc' }); // 30 minutes before the start
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend.mock.calls[0][0].content).toBe('See you at 8:00 PM, Ava.');
+  });
+
+  it('a guest added well ahead gets the intro; the day-of waits for its time', async () => {
+    seed({ intro: true, templates: TEMPLATES_OFF, messages: [DAY_OF] });
+    await addGuests('r-1', [{ first_name: 'Ava', phone: '9135550101' }], { via: 'portal' }, deps());
+    expect(mockSend).toHaveBeenCalledTimes(1);
+    expect(mockSend.mock.calls[0][0].content).toMatch(/^Hi Ava, Tim put you on their reservation/);
+    expect(db.rows('scheduled_guest_messages')).toHaveLength(0); // built-in day-of is off
   });
 });

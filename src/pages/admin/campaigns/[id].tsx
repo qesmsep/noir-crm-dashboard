@@ -633,6 +633,9 @@ export default function CampaignEditPage() {
                           <option value="reservation">Reservation</option>
                           <option value="reservation_created">Reservation Created</option>
                           <option value="guest_registration">Guest Registration</option>
+                          <option value="reservation_moved">Reservation Moved (guests)</option>
+                          <option value="reservation_cancelled">Reservation Cancelled (guests)</option>
+                          <option value="member_guest_link">Staff Texts Guest Link</option>
                           <option value="reservation_range">Reservation Range</option>
                           <option value="reservation_time">Reservation Time</option>
                         </Select>

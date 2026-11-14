@@ -6,14 +6,14 @@ import {
   claimReservationSend,
   finishReservationSend,
   isCancelled,
-  guestLinkForReservation,
+  guestLinksForReservation,
   usesGuestLink,
   renderReservationMessage,
   reservationMatchesRecipientType,
   type LocationInfo,
 } from '../../lib/reservationCampaigns';
 import { sendSMS } from '../../lib/sms';
-import { GUEST_REGISTRATION_TRIGGER, processGuestAddedCampaignMessage, retryImmediateGuestSends } from '../../lib/guestCampaigns';
+import { GUEST_EVENT_TRIGGERS, GUEST_REGISTRATION_TRIGGER, processGuestAddedCampaignMessage, retryImmediateGuestSends } from '../../lib/guestCampaigns';
 
 // Constants for message timing windows
 const MESSAGE_SEND_WINDOW_FUTURE_MINUTES = 5; // Send messages within 5 minutes of target time
@@ -259,6 +259,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // sendReservationCreatedMessages (POST /api/reservations), never here.
         if (message.timing_type === 'immediate') {
           console.log('⏭️  Immediate message — sent at booking time, skipping in cron');
+          continue;
+        }
+
+        // Reservation moved / cancelled (guests): sent through the guest queue
+        // when the reservation changes (lib/reservationGuests), never here.
+        // Staff Texts Guest Link: sent only when staff tap the button.
+        if ((GUEST_EVENT_TRIGGERS as readonly string[]).includes(triggerType) || triggerType === 'member_guest_link') {
           continue;
         }
 
@@ -875,13 +882,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           // location timezone. For reservation_created the date/time is the
           // reservation start, not the moment it was booked.
           if (isReservationTrigger) {
-            // {{guest_link}}: the reservation's no-login add-guests link.
-            const guestLink =
+            // {{guest_link}} / {{guest_join_link}}: the reservation's no-login guest links.
+            const links =
               member.reservation_id && usesGuestLink(message.content)
-                ? await guestLinkForReservation(member.reservation_id)
-                : '';
-            // Never send a {{guest_link}} message without the link.
-            if (usesGuestLink(message.content) && !guestLink) {
+                ? await guestLinksForReservation(member.reservation_id)
+                : { guestLink: '', guestJoinLink: '' };
+            // Never send a guest-link message without the link.
+            if (usesGuestLink(message.content) && (!links.guestLink || (message.content.includes('{{guest_join_link}}') && !links.guestJoinLink))) {
               console.error(`❌ No guest link for reservation ${member.reservation_id}; skipping message ${message.id}`);
               continue;
             }
@@ -901,7 +908,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
                 address: memberLocation?.address || null,
                 parking_instructions: memberLocation?.parking_instructions || null,
               },
-              { guestLink },
+              links,
             );
           }
 

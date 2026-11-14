@@ -109,3 +109,8 @@ export function guestLinkUrl(token: string): string {
   }
   return `${base.replace(/\/$/, '')}/r/${token}/guests`;
 }
+
+/** The guest self-register link: one guest adds themselves (token from guestJoinToken). */
+export function guestJoinUrl(joinToken: string): string {
+  return guestLinkUrl(joinToken).replace(/\/guests$/, '/join');
+}

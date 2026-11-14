@@ -21,7 +21,7 @@ interface Campaign {
   id?: string;
   name: string;
   description: string;
-  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created' | 'reservation' | 'recurring' | 'reservation_range' | 'private_event' | 'all_members' | 'guest_registration';
+  trigger_type: 'member_signup' | 'member_birthday' | 'member_renewal' | 'reservation_time' | 'reservation_created' | 'reservation' | 'recurring' | 'reservation_range' | 'private_event' | 'all_members' | 'guest_registration' | 'reservation_moved' | 'reservation_cancelled' | 'member_guest_link';
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
@@ -207,6 +207,9 @@ const CampaignDrawer: React.FC<CampaignDrawerProps> = ({
     { value: 'reservation', label: 'Reservation' },
     { value: 'reservation_created', label: 'Reservation Created' },
     { value: 'guest_registration', label: 'Guest Registration' },
+    { value: 'reservation_moved', label: 'Reservation Moved (guests)' },
+    { value: 'reservation_cancelled', label: 'Reservation Cancelled (guests)' },
+    { value: 'member_guest_link', label: 'Staff Texts Guest Link' },
     { value: 'reservation_range', label: 'Reservation Range' },
     { value: 'reservation_time', label: 'Reservation Time' },
   ];

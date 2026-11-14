@@ -11,11 +11,18 @@
  *                 (src/lib/guestCampaigns.ts). The immediate intro is skipped
  *                 when the reservation starts within 2 hours and day_of is on,
  *                 because day_of goes out right away and covers it.
- *   day_of        start − send_offset_minutes (default 120), venue timezone;
- *                 if that time has passed but the start hasn't, sent now
- *   time_changed  to guests already texted, when the reservation moves
- *   cancelled     to guests already texted, when the reservation is cancelled
+ *   day of        a Guest Registration message timed from the reservation
+ *                 ("Relative to: The reservation time"); a guest added after
+ *                 that time but before the start gets it right away
+ *   moved         Campaigns, trigger "Reservation moved": to guests already
+ *                 texted, when the reservation's time changes
+ *   cancelled     Campaigns, trigger "Reservation cancelled": to guests
+ *                 already texted, when the reservation is cancelled
  *   member_link   to the host, from the staff "Text link to member" button
+ * Moved and cancelled texts go through the guest queue
+ * (scheduled_guest_messages, one row per guest and campaign message). The
+ * legacy built-in day_of / time_changed / cancelled templates still work if
+ * someone turns them back on, but they are off and no longer shown.
  * Nothing is ever sent to an opted-out contact or a guest who is already a
  * member.
  */
@@ -676,17 +683,19 @@ export async function countActiveGuests(reservationId: string, deps: GuestDeps =
 // Scheduling
 // ---------------------------------------------------------------------------
 
-async function insertPending(db: Db, guestId: string, kind: GuestMessageKind, at: DateTime): Promise<void> {
+async function insertPending(db: Db, guestId: string, kind: GuestMessageKind, at: DateTime, campaignMessageId: string | null = null): Promise<void> {
   const { error } = await db
     .from('scheduled_guest_messages')
-    .insert({ reservation_guest_id: guestId, kind, scheduled_for: at.toUTC().toISO(), status: 'pending' });
+    .insert({ reservation_guest_id: guestId, kind, scheduled_for: at.toUTC().toISO(), status: 'pending', campaign_message_id: campaignMessageId });
   if (error?.code === '23505') {
-    await db
+    let q = db
       .from('scheduled_guest_messages')
       .update({ scheduled_for: at.toUTC().toISO() })
       .eq('reservation_guest_id', guestId)
       .eq('kind', kind)
       .eq('status', 'pending');
+    q = campaignMessageId ? q.eq('campaign_message_id', campaignMessageId) : q.is('campaign_message_id', null);
+    await q;
   } else if (error) {
     console.error('[reservation guests] could not schedule', kind, guestId, error.message);
   }
@@ -747,6 +756,9 @@ export async function onReservationRescheduled(reservationId: string, deps: Gues
     const offset = templates.get('day_of')?.send_offset_minutes ?? DEFAULT_DAY_OF_OFFSET_MINUTES;
     const dayOfAt = start.minus({ minutes: offset });
 
+    const { loadGuestEventMessages, RESERVATION_MOVED_TRIGGER } = await import('@/lib/guestCampaigns');
+    const moved = await loadGuestEventMessages(db, RESERVATION_MOVED_TRIGGER, reservation.location_id);
+
     for (const g of guests) {
       if (!g.notified_at) {
         await cancelPendingForGuests(db, [g.id], undefined, 'rescheduled');
@@ -755,6 +767,8 @@ export async function onReservationRescheduled(reservationId: string, deps: Gues
         continue;
       }
       await cancelPendingForGuests(db, [g.id], ['day_of', 'time_changed'], 'rescheduled');
+      // "Reservation moved" campaign messages (legacy built-in only if someone turned it back on).
+      for (const m of moved) await insertPending(db, g.id, 'time_changed', now, m.id);
       if (active.has('time_changed')) await insertPending(db, g.id, 'time_changed', now);
       if (active.has('day_of') && dayOfAt > now) await insertPending(db, g.id, 'day_of', dayOfAt);
     }
@@ -778,26 +792,35 @@ export async function onReservationCancelled(
     const guests = await loadActiveGuests(db, reservationId);
     if (guests.length === 0) return;
     await cancelPendingForGuests(db, guests.map((g) => g.id), undefined, 'reservation_cancelled');
-    const templates = await loadTemplates(db);
-    if (templates.get('cancelled')?.is_active === false) return;
     const toTell = guests.filter((g) => g.notified_at && guestIsTextable(g));
     if (toTell.length === 0) return;
 
+    const reservation = await loadReservation(db, reservationId);
+    const templates = await loadTemplates(db);
+    const { loadGuestEventMessages, RESERVATION_CANCELLED_TRIGGER } = await import('@/lib/guestCampaigns');
+    const messages = await loadGuestEventMessages(db, RESERVATION_CANCELLED_TRIGGER, reservation.location_id);
+    // "Reservation cancelled" campaign messages, plus the legacy built-in only if someone turned it back on.
+    const sends: Array<EventCampaignMessage | null> = [...messages];
+    if (templates.get('cancelled')?.is_active === true) sends.push(null);
+    if (sends.length === 0) return;
+
     if (!opts.sendNow) {
-      for (const g of toTell) await insertPending(db, g.id, 'cancelled', now);
+      for (const g of toTell) for (const m of sends) await insertPending(db, g.id, 'cancelled', now, m?.id ?? null);
       return;
     }
-    const reservation = await loadReservation(db, reservationId);
     const [location, host] = await Promise.all([loadLocation(db, reservation.location_id), hostName(db, reservation)]);
     for (const g of toTell) {
-      await deliver(db, deps, {
-        kind: 'cancelled',
-        guest: g,
-        reservation,
-        location,
-        host,
-        template: templates.get('cancelled') || null,
-      });
+      for (const m of sends) {
+        await deliver(db, deps, {
+          kind: 'cancelled',
+          guest: g,
+          reservation,
+          location,
+          host,
+          template: m ? null : templates.get('cancelled') || null,
+          campaignMessage: m,
+        });
+      }
     }
   } catch (err) {
     console.error('[reservation guests] onReservationCancelled failed', reservationId, err);
@@ -912,17 +935,49 @@ interface DeliverArgs {
   location: LocationRow | null;
   host: HostName;
   template: TemplateRow | null;
+  /** A campaign message (Reservation moved / cancelled) sent instead of a built-in template. */
+  campaignMessage?: EventCampaignMessage | null;
+}
+
+/** A "Reservation moved" / "Reservation cancelled" campaign message. */
+export interface EventCampaignMessage {
+  id: string;
+  content: string;
+  /** Message and its campaign both on. */
+  active: boolean;
 }
 
 type DeliverResult = { status: 'sent'; messageId?: string } | { status: 'skipped'; reason: string } | { status: 'failed'; error: string };
+
+/** Fill a campaign message with the same placeholders as Guest Registration messages. */
+async function renderEventCampaignMessage(content: string, a: DeliverArgs, contact: ContactRow): Promise<string> {
+  const { renderGuestCampaignMessage } = await import('@/lib/guestCampaigns');
+  return renderGuestCampaignMessage(content, {
+    guestFirstName: a.guest.first_name_snapshot || contact.first_name,
+    guestLastName: contact.last_name,
+    hostFirstName: a.host.first,
+    hostLastName: a.host.last,
+    locationName: a.location?.name || 'Noir',
+    locationAddress: a.location?.address,
+    parkingInstructions: a.location?.parking_instructions,
+    start: a.reservation.start_time,
+    partySize: a.reservation.party_size,
+    timezone: a.location?.timezone || DEFAULT_TIMEZONE,
+    arrivalInstructions: a.location?.guest_arrival_instructions,
+  });
+}
 
 /** Re-check, render, send and log one guest text. */
 async function deliver(db: Db, deps: GuestDeps, a: DeliverArgs): Promise<DeliverResult> {
   const { send, now } = resolve(deps);
   const contact = a.guest.guest_contacts;
   if (!contact) return { status: 'skipped', reason: 'no_contact' };
-  if (!a.template) return { status: 'skipped', reason: 'no_template' };
-  if (!a.template.is_active) return { status: 'skipped', reason: 'template_inactive' };
+  if (a.campaignMessage) {
+    if (!a.campaignMessage.active) return { status: 'skipped', reason: 'campaign_inactive' };
+  } else {
+    if (!a.template) return { status: 'skipped', reason: 'no_template' };
+    if (!a.template.is_active) return { status: 'skipped', reason: 'template_inactive' };
+  }
   if (a.guest.status !== 'active') return { status: 'skipped', reason: 'guest_removed' };
   if (contact.sms_opted_out_at) return { status: 'skipped', reason: 'opted_out' };
   if (a.guest.matched_member_id) return { status: 'skipped', reason: 'matched_member' };
@@ -937,7 +992,9 @@ async function deliver(db: Db, deps: GuestDeps, a: DeliverArgs): Promise<Deliver
     return { status: 'skipped', reason: 'matched_member' };
   }
 
-  const content = renderGuestMessage(a.template.body, {
+  const content = a.campaignMessage
+    ? await renderEventCampaignMessage(a.campaignMessage.content, a, contact)
+    : renderGuestMessage(a.template!.body, {
     guestFirstName: a.guest.first_name_snapshot || contact.first_name,
     hostFirstName: a.host.first,
     hostLastName: a.host.last,
@@ -999,6 +1056,7 @@ export async function processDueGuestMessages(opts: { limit?: number } = {}, dep
   const templates = await loadTemplates(db);
   const locationCache = new Map<string, LocationRow | null>();
   const hostCache = new Map<string, HostName>();
+  const campaignCache = new Map<string, EventCampaignMessage | null>();
 
   for (const { id } of (due || []) as Array<{ id: string }>) {
     const { data: claimedRows } = await db
@@ -1006,8 +1064,8 @@ export async function processDueGuestMessages(opts: { limit?: number } = {}, dep
       .update({ status: 'sending' })
       .eq('id', id)
       .eq('status', 'pending')
-      .select('id, kind, reservation_guest_id');
-    const claimed = ((claimedRows || []) as Array<{ id: string; kind: GuestMessageKind; reservation_guest_id: string }>)[0];
+      .select('id, kind, reservation_guest_id, campaign_message_id');
+    const claimed = ((claimedRows || []) as Array<{ id: string; kind: GuestMessageKind; reservation_guest_id: string; campaign_message_id?: string | null }>)[0];
     if (!claimed) continue; // another run took it
     result.claimed++;
 
@@ -1030,14 +1088,25 @@ export async function processDueGuestMessages(opts: { limit?: number } = {}, dep
           const locKey = reservation.location_id || '';
           if (!locationCache.has(locKey)) locationCache.set(locKey, await loadLocation(db, reservation.location_id));
           if (!hostCache.has(reservation.id)) hostCache.set(reservation.id, await hostName(db, reservation));
-          outcome = await deliver(db, deps, {
-            kind: claimed.kind,
-            guest: g,
-            reservation,
-            location: locationCache.get(locKey) || null,
-            host: hostCache.get(reservation.id)!,
-            template: templates.get(claimed.kind) || null,
-          });
+          let campaignMessage: EventCampaignMessage | null = null;
+          if (claimed.campaign_message_id) {
+            if (!campaignCache.has(claimed.campaign_message_id)) {
+              const { loadEventCampaignMessage } = await import('@/lib/guestCampaigns');
+              campaignCache.set(claimed.campaign_message_id, await loadEventCampaignMessage(db, claimed.campaign_message_id));
+            }
+            campaignMessage = campaignCache.get(claimed.campaign_message_id) || null;
+          }
+          outcome = claimed.campaign_message_id && !campaignMessage
+            ? { status: 'skipped', reason: 'campaign_message_missing' }
+            : await deliver(db, deps, {
+                kind: claimed.kind,
+                guest: g,
+                reservation,
+                location: locationCache.get(locKey) || null,
+                host: hostCache.get(reservation.id)!,
+                template: templates.get(claimed.kind) || null,
+                campaignMessage,
+              });
         }
       }
     } catch (err) {
@@ -1062,7 +1131,7 @@ export async function processDueGuestMessages(opts: { limit?: number } = {}, dep
 }
 
 // ---------------------------------------------------------------------------
-// Staff texting (Campaigns → Reservation guests)
+// Staff texting (Membership → Guests)
 // ---------------------------------------------------------------------------
 
 /** Manual text from staff to a guest. Blocked if the contact opted out. */

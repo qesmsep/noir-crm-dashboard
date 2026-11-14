@@ -5,7 +5,7 @@ import { getAdmin } from '@/lib/guestApi';
 /**
  * POST /api/admin/reservations/[id]/guest-link-text
  * Texts the host the add-guests link using the "Member guest link" message
- * from Campaigns → Reservation guests. Auth: admin Bearer token.
+ * from the Campaigns trigger "Staff Texts Guest Link". Auth: admin Bearer token.
  */
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {

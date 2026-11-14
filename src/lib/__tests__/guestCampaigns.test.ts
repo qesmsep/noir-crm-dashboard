@@ -58,8 +58,14 @@ function seed(guestExtra: Record<string, unknown> = {}, reservationExtra: Record
       reservation_guests: [
         { id: 'g-1', reservation_id: 'r-1', guest_contact_id: 'c-1', location_id: LOC, status: 'active', first_name_snapshot: 'Ava', matched_member_id: null, notified_at: ADDED, created_at: ADDED, ...guestExtra },
       ],
-      guest_message_templates: [
-        { kind: 'member_link', body: 'Hi {{member_first_name}}, add guests for {{date}} at {{time}}: {{guest_link}}', is_active: true, send_offset_minutes: null },
+      campaign_messages: [
+        {
+          id: 'msg-link',
+          content: 'Hi {{first_name}}, add guests for {{reservation_date}} at {{reservation_time}}: {{guest_link}}',
+          is_active: true,
+          created_at: '2026-11-01T00:00:00Z',
+          campaigns: { is_active: true, trigger_type: 'member_guest_link', applies_to_all_locations: true, campaign_locations: [] },
+        },
       ],
       scheduled_messages: [],
       guest_messages: [],
@@ -148,12 +154,12 @@ describe('textGuestLinkToMember', () => {
     const token = db.rows('reservations')[0].guest_link_token;
     expect(token).toMatch(/^[A-Za-z0-9_-]{43}$/);
     expect(mockSend).toHaveBeenCalledWith(
-      expect.objectContaining({ to: '+19135550100', memberId: 'm-host', accountId: 'a-host', content: expect.stringMatching(new RegExp(`^Hi Tim, add guests for Thursday, November 19 at 8:00 PM: .*/r/${token}/guests$`)) }),
+      expect.objectContaining({ to: '+19135550100', memberId: 'm-host', accountId: 'a-host', content: expect.stringMatching(new RegExp(`^Hi Tim, add guests for November 19, 2026 at 8:00 PM: .*/r/${token}/guests$`)) }),
     );
   });
 
   it('refuses when the message is off', async () => {
-    db.rows('guest_message_templates')[0].is_active = false;
+    db.rows('campaign_messages')[0].campaigns.is_active = false;
     const result = await textGuestLinkToMember('r-1', 'staff@example.com', at('2026-11-12T18:00:00Z'));
     expect(result).toMatchObject({ ok: false, status: 409 });
     expect(mockSend).not.toHaveBeenCalled();
@@ -164,6 +170,14 @@ describe('textGuestLinkToMember', () => {
     db.rows('reservations')[0].account_id = null;
     await textGuestLinkToMember('r-1', 'staff@example.com', at('2026-11-12T18:00:00Z'));
     expect(db.rows('guest_messages')[0]).toMatchObject({ sent_by: 'staff@example.com', reservation_id: 'r-1', status: 'sent' });
+  });
+
+  it('can include the guest self-register link', async () => {
+    const id = '7d3c6c2e-5b1a-4f7e-9d43-2a8b1c0e9f11';
+    db.rows('reservations')[0].id = id;
+    db.rows('campaign_messages')[0].content = 'Share with your guests: {{guest_join_link}}';
+    expect((await textGuestLinkToMember(id, 'x', at('2026-11-12T18:00:00Z'))).ok).toBe(true);
+    expect(mockSend.mock.calls[0][0].content).toMatch(/^Share with your guests: .*\/r\/[A-Za-z0-9_-]{44}\/join$/);
   });
 
   it('refuses a cancelled reservation', async () => {
