@@ -180,6 +180,15 @@ describe('textGuestLinkToMember', () => {
     expect(mockSend.mock.calls[0][0].content).toMatch(/^Share with your guests: .*\/r\/[A-Za-z0-9_-]{44}\/join$/);
   });
 
+  it('keeps sending after one message fails and says how many went', async () => {
+    const first = db.rows('campaign_messages')[0];
+    db.rows('campaign_messages').push({ ...first, id: 'msg-link-2', content: 'Second text' });
+    mockSend.mockResolvedValueOnce({ success: false, error: 'Carrier error' });
+    const result = await textGuestLinkToMember('r-1', 'x', at('2026-11-12T18:00:00Z'));
+    expect(mockSend).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ ok: false, status: 502, error: 'Sent 1 of 2 texts. Carrier error' });
+  });
+
   it('refuses a cancelled reservation', async () => {
     db.rows('reservations')[0].status = 'cancelled';
     expect(await textGuestLinkToMember('r-1', 'x', at('2026-11-12T18:00:00Z'))).toMatchObject({ ok: false, status: 409 });

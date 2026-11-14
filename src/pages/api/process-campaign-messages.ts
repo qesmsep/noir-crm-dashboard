@@ -14,6 +14,7 @@ import {
 } from '../../lib/reservationCampaigns';
 import { sendSMS } from '../../lib/sms';
 import { GUEST_EVENT_TRIGGERS, GUEST_REGISTRATION_TRIGGER, processGuestAddedCampaignMessage, retryImmediateGuestSends } from '../../lib/guestCampaigns';
+import { MEMBER_GUEST_LINK_TRIGGER } from '../../lib/memberGuestLink';
 
 // Constants for message timing windows
 const MESSAGE_SEND_WINDOW_FUTURE_MINUTES = 5; // Send messages within 5 minutes of target time
@@ -265,7 +266,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         // Reservation moved / cancelled (guests): sent through the guest queue
         // when the reservation changes (lib/reservationGuests), never here.
         // Staff Texts Guest Link: sent only when staff tap the button.
-        if ((GUEST_EVENT_TRIGGERS as readonly string[]).includes(triggerType) || triggerType === 'member_guest_link') {
+        if ((GUEST_EVENT_TRIGGERS as readonly string[]).includes(triggerType) || triggerType === MEMBER_GUEST_LINK_TRIGGER) {
           continue;
         }
 

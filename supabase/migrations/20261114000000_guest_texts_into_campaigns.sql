@@ -18,6 +18,8 @@
 -- count from the reservation instead.
 -- Rollback: 20261114000000_guest_texts_into_campaigns_ROLLBACK.sql
 
+BEGIN;
+
 -- 1) Triggers
 ALTER TABLE public.campaigns DROP CONSTRAINT IF EXISTS campaigns_trigger_type_check;
 ALTER TABLE public.campaigns ADD CONSTRAINT campaigns_trigger_type_check
@@ -112,6 +114,8 @@ UPDATE public.campaign_messages m
    AND m.timing_type = 'relative'
    AND m.relative_proximity = 'before'
    AND m.relative_anchor IS NULL;
+
+COMMIT;
 
 -- ========================================
 -- VERIFICATION

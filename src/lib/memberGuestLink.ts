@@ -80,6 +80,10 @@ export async function textGuestLinkToMember(
   // Members' texts are logged to their message history by sendSMS; non-member
   // reservations go to guest_messages like other non-member texts.
   const isMember = !!(r.member_id && r.account_id);
+  // Keep going past a failed send so one bad message doesn't stop the rest;
+  // report how many went out so staff know a retry repeats the sent ones.
+  let sent = 0;
+  let lastError = '';
   for (const message of messages) {
     const content = renderReservationMessage(
       message.content,
@@ -100,7 +104,12 @@ export async function textGuestLinkToMember(
         timestamp: now.toISO(),
       });
     }
-    if (!result.success) return { ok: false, status: 502, error: result.error || 'Send failed.' };
+    if (result.success) sent += 1;
+    else lastError = result.error || 'Send failed.';
+  }
+  if (sent < messages.length) {
+    const error = sent === 0 ? lastError : `Sent ${sent} of ${messages.length} texts. ${lastError}`;
+    return { ok: false, status: 502, error };
   }
   return { ok: true, url: links.guestLink };
 }

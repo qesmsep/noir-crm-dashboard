@@ -1,7 +1,10 @@
 -- Rollback for 20261114000000_guest_texts_into_campaigns.sql
 -- Turns the built-in guest texts back on and removes the moved/cancelled and
--- staff guest-link campaigns. The member_link template was never turned off. Guest Registration messages switched to "from the reservation"
--- are left as they are (that setting existed before this migration).
+-- staff guest-link campaigns. The member_link template was never turned off.
+-- Guest Registration messages switched to "from the reservation" are left as
+-- they are (that setting existed before this migration).
+-- Note: this deletes every campaign on the three new triggers, including any
+-- messages staff created or edited after the forward migration ran.
 BEGIN;
 UPDATE public.guest_message_templates SET is_active = true WHERE kind IN ('day_of', 'time_changed', 'cancelled');
 DELETE FROM public.scheduled_guest_messages WHERE campaign_message_id IS NOT NULL AND status = 'pending';
