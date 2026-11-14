@@ -180,7 +180,7 @@ describe('addGuests rules', () => {
     ], { via: 'guest_link', growParty: true }, deps());
     const alerts = mockSend.mock.calls.map((c) => c[0]).filter((m) => m.to === '+19135559999');
     expect(alerts).toHaveLength(1);
-    expect(alerts[0].content).toContain('party grew 3 → 4 for Tim');
+    expect(alerts[0].content).toContain('party grew from 3 to 4 for Tim');
     expect(alerts[0].content).toContain('Added via guest link: A, B, C');
   });
 

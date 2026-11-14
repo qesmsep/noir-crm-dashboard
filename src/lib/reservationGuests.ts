@@ -574,7 +574,7 @@ async function alertStaffPartyGrew(
       .toFormat('ccc L/d h:mm a');
     const how = via === 'guest_link' ? 'guest link' : via === 'portal' ? 'member portal' : 'staff';
     const content =
-      `Noir: party grew ${from} → ${to} for ${hostLabel}, ${when}${location?.name ? `, ${location.name}` : ''}. ` +
+      `Noir: party grew from ${from} to ${to} for ${hostLabel}, ${when}${location?.name ? `, ${location.name}` : ''}. ` +
       `Added via ${how}: ${addedNames.join(', ')}. Please make room.`;
     const result = await send({ to: to164, content });
     if (!result.success) console.error('[reservation guests] party-grew alert failed', reservation.id, result.error);
