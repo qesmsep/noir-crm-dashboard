@@ -7,7 +7,8 @@ import QuestionnaireManager from '../../components/admin/QuestionnaireManager';
 import AgreementManager from '../../components/admin/AgreementManager';
 import IntakeCampaignManager from '../../components/admin/IntakeCampaignManager';
 import ReferralAnalytics from '../../components/admin/ReferralAnalytics';
-import { Settings, List, Users, FileText, CheckSquare, MessageSquare, TrendingUp } from 'lucide-react';
+import { GuestsDirectory } from '../../components/guests/GuestsDirectory';
+import { Settings, List, Users, FileText, CheckSquare, MessageSquare, TrendingUp, UserCheck } from 'lucide-react';
 import styles from '../../styles/Membership.module.css';
 
 export default function AdminMembership() {
@@ -21,6 +22,7 @@ export default function AdminMembership() {
     { id: 4, name: 'Questionnaires', icon: FileText, component: QuestionnaireManager },
     { id: 5, name: 'Agreements', icon: CheckSquare, component: AgreementManager },
     { id: 6, name: 'Intake Campaigns', icon: MessageSquare, component: IntakeCampaignManager },
+    { id: 7, name: 'Guests', icon: UserCheck, component: GuestsDirectory },
   ];
 
   const ActiveComponent = tabs[activeTab].component;

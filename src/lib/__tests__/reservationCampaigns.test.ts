@@ -25,6 +25,7 @@ jest.mock('@/lib/sms', () => ({ sendSMS: (...args: unknown[]) => mockSend(...arg
 
 import {
   claimReservationSend,
+  missingRequiredLink,
   renderReservationMessage,
   reservationMatchesRecipientType,
   sendReservationCreatedMessages,
@@ -252,6 +253,15 @@ describe('{{guest_link}} in the confirmation', () => {
     err.mockRestore();
   });
 
+  it('{{guest_join_link}}: the link the booker shares so each guest adds themselves', async () => {
+    const id = '7d3c6c2e-5b1a-4f7e-9d43-2a8b1c0e9f11';
+    seed([reservation(id, { member_id: 'm-1' })], [message('msg-join', 'member_only', 'Share this with your guests: {{guest_join_link}}')]);
+    await sendReservationCreatedMessages(id);
+    const token = db.rows('reservations')[0].guest_link_token;
+    const { guestJoinToken } = await import('../guestLink');
+    expect(mockSend.mock.calls[0][0].content).toBe(`Share this with your guests: https://noir.example/r/${guestJoinToken(id, token)}/join`);
+  });
+
   it('messages without the token never create a link', async () => {
     seed([reservation('r-plain')], [NONMEMBER_MSG]);
     await sendReservationCreatedMessages('r-plain');
@@ -291,5 +301,22 @@ describe('helpers', () => {
       { name: 'Noir KC', timezone: 'America/Chicago' },
     );
     expect(text).toBe('July 3, 2026 8:30 PM');
+  });
+});
+
+describe('missingRequiredLink', () => {
+  const both = { guestLink: 'https://x/r/a/guests', guestJoinLink: 'https://x/r/b/join' };
+  it('is false when no link placeholder is used', () => {
+    expect(missingRequiredLink('See you soon', { guestLink: '', guestJoinLink: '' })).toBe(false);
+  });
+  it('is true when the guest link is missing', () => {
+    expect(missingRequiredLink('Add guests: {{guest_link}}', { guestLink: '', guestJoinLink: '' })).toBe(true);
+  });
+  it('is true when only the join link is missing and it is used', () => {
+    expect(missingRequiredLink('Share: {{guest_join_link}}', { ...both, guestJoinLink: '' })).toBe(true);
+    expect(missingRequiredLink('Add guests: {{guest_link}}', { ...both, guestJoinLink: '' })).toBe(false);
+  });
+  it('is false when every used link exists', () => {
+    expect(missingRequiredLink('{{guest_link}} {{guest_join_link}}', both)).toBe(false);
   });
 });

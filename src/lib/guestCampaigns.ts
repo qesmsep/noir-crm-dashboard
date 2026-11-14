@@ -28,10 +28,15 @@ import {
   findMemberIdByPhone,
   introCoveredByDayOf,
   loadTemplates,
+  type EventCampaignMessage,
   type GuestDeps,
 } from '@/lib/reservationGuests';
 
 export const GUEST_REGISTRATION_TRIGGER = 'guest_registration';
+/** Sent through the guest queue when a reservation with guests moves or is cancelled. */
+export const RESERVATION_MOVED_TRIGGER = 'reservation_moved';
+export const RESERVATION_CANCELLED_TRIGGER = 'reservation_cancelled';
+export const GUEST_EVENT_TRIGGERS = [RESERVATION_MOVED_TRIGGER, RESERVATION_CANCELLED_TRIGGER] as const;
 export const SENT_BY_CAMPAIGN = 'system:campaign';
 const WINDOW_FUTURE_MINUTES = 5;
 const WINDOW_PAST_MINUTES = 60;
@@ -112,9 +117,13 @@ function resolve(deps: GuestDeps = {}) {
 // Pure helpers
 // ---------------------------------------------------------------------------
 
-export function messageAppliesToGuestLocation(message: GuestCampaignMessage, locationId: string | null): boolean {
+export function messageAppliesToGuestLocation(
+  message: GuestCampaignMessage,
+  locationId: string | null,
+  trigger: string = GUEST_REGISTRATION_TRIGGER,
+): boolean {
   const c = message.campaigns;
-  if (!c || c.trigger_type !== GUEST_REGISTRATION_TRIGGER || c.is_active === false) return false;
+  if (!c || c.trigger_type !== trigger || c.is_active === false) return false;
   if (c.applies_to_all_locations) return true;
   return !!locationId && (c.campaign_locations || []).some((cl) => cl.location_id === locationId);
 }
@@ -368,6 +377,34 @@ async function loadGuestAddedMessages(db: Db, immediateOnly: boolean): Promise<G
 }
 
 /**
+ * Active "Reservation moved" / "Reservation cancelled" messages to the guest
+ * for a reservation's location. Empty on any error (nothing is sent).
+ */
+export async function loadGuestEventMessages(db: Db, trigger: string, locationId: string | null): Promise<EventCampaignMessage[]> {
+  const { data, error } = await db
+    .from('campaign_messages')
+    .select(MESSAGE_SELECT)
+    .eq('is_active', true)
+    .eq('recipient_type', 'reservation_guest')
+    .eq('campaigns.trigger_type', trigger);
+  if (error) {
+    console.error('[guest campaigns] could not load messages', trigger, error.message);
+    return [];
+  }
+  return ((data || []) as unknown as GuestCampaignMessage[])
+    .filter((m) => messageAppliesToGuestLocation(m, locationId, trigger))
+    .map((m) => ({ id: m.id, content: m.content, active: true }));
+}
+
+/** One queued moved/cancelled message, re-read at send time (it may have been edited or turned off). */
+export async function loadEventCampaignMessage(db: Db, id: string): Promise<EventCampaignMessage | null> {
+  const { data } = await db.from('campaign_messages').select(MESSAGE_SELECT).eq('id', id).maybeSingle();
+  if (!data) return null;
+  const m = data as unknown as GuestCampaignMessage;
+  return { id: m.id, content: m.content, active: m.is_active !== false && m.campaigns?.is_active !== false };
+}
+
+/**
  * Called as a guest is added: send every active "Send immediately"
  * Guest Registration message for the guest's location. Never throws.
  */
@@ -379,28 +416,48 @@ export async function sendGuestAddedCampaignMessages(
   try {
     const ctx = await loadContext(db, guestId);
     if (!ctx) return { outcomes: [], reason: 'guest_not_found' };
-    const messages = (await loadGuestAddedMessages(db, true)).filter((m) =>
-      (!deps.onlyMessageIds || deps.onlyMessageIds.includes(m.id)) &&
-      messageAppliesToGuestLocation(m, ctx.reservation.location_id || ctx.guest.location_id),
-    );
-    if (messages.length === 0) return { outcomes: [], reason: 'no_matching_message' };
-
-    const templates = await loadTemplates(db);
-    if (introCoveredByDayOf({ start: ctx.reservation.start_time, now, dayOfActive: activeKindsFrom(templates).has('day_of') })) {
-      // The day-of text goes out right now; skip the guest intro, still send staff alerts.
-      const staffOnly = messages.filter((m) => m.recipient_type !== 'reservation_guest');
-      const outcomes: GuestCampaignOutcome[] = [];
-      for (const m of staffOnly) outcomes.push(await deliver(db, deps, m, ctx, now));
-      return { outcomes, reason: 'intro_covered_by_day_of' };
-    }
+    const locationId = ctx.reservation.location_id || ctx.guest.location_id;
+    const all = (await loadGuestAddedMessages(db, false)).filter((m) => messageAppliesToGuestLocation(m, locationId));
+    const tz = ctx.location?.timezone || DEFAULT_TIMEZONE;
+    const immediate = all.filter((m) => m.timing_type === 'immediate');
+    const catchUp = all.filter((m) => isLateCatchUp(m, ctx.reservation.start_time, now, tz));
+    const pick = (list: GuestCampaignMessage[]) => list.filter((m) => !deps.onlyMessageIds || deps.onlyMessageIds.includes(m.id));
+    const messages = pick(immediate);
+    const late = pick(catchUp);
+    if (messages.length === 0 && late.length === 0) return { outcomes: [], reason: 'no_matching_message' };
 
     const outcomes: GuestCampaignOutcome[] = [];
+    // Added after a "before the reservation" text's time: it goes now. It
+    // covers the intro, so the guest-facing intro is skipped (staff alerts
+    // still go), as it is when the legacy built-in day-of text is on.
+    for (const m of late) outcomes.push(await deliver(db, deps, m, ctx, now));
+    const templates = await loadTemplates(db);
+    const legacyDayOf = introCoveredByDayOf({ start: ctx.reservation.start_time, now, dayOfActive: activeKindsFrom(templates).has('day_of') });
+    const lateToGuest = catchUp.some((m) => m.recipient_type === 'reservation_guest');
+    if (legacyDayOf || lateToGuest) {
+      for (const m of messages.filter((x) => x.recipient_type !== 'reservation_guest')) outcomes.push(await deliver(db, deps, m, ctx, now));
+      return { outcomes, reason: 'intro_covered_by_day_of' };
+    }
     for (const m of messages) outcomes.push(await deliver(db, deps, m, ctx, now));
     return { outcomes };
   } catch (err) {
     console.error('[guest campaigns] immediate send failed', guestId, err);
     return { outcomes: [], reason: 'error' };
   }
+}
+
+/**
+ * A message timed minutes or hours before the reservation whose moment has
+ * already passed, while the reservation is still ahead: a guest added late
+ * gets it right away (the cron only looks back an hour).
+ */
+export function isLateCatchUp(message: GuestCampaignMessage, reservationStart: string, now: DateTime, timezone: string): boolean {
+  if (!anchorsOnReservation(message) || message.relative_proximity !== 'before') return false;
+  if (message.relative_unit !== 'minute' && message.relative_unit !== 'hour') return false;
+  const start = DateTime.fromISO(reservationStart, { zone: 'utc' });
+  if (!start.isValid || start <= now) return false;
+  const target = guestAddedSendTime(message, now, timezone, reservationStart);
+  return !!target && target <= now;
 }
 
 /**

@@ -1,22 +1,18 @@
 'use client';
 
 /**
- * Campaigns → Reservation guests. Everything about texts to people members
- * bring lives here:
- *   Messages — built-in texts (day of, time changed, cancelled, and the host's
- *              "Member guest link"): edit, on/off, live preview, character count.
- *              The guest intro + follow-ups are campaigns with the trigger
- *              "Guest Registration".
- *   Guests   — one row per guest visit for manual follow-up: text a guest,
- *              mark followed up with a note, see sent history, export CSV.
+ * Membership → Guests: one row per guest visit (everyone who registered as a
+ * guest or was added to a reservation) for manual follow-up: text a guest,
+ * mark followed up with a note, see sent history, export CSV.
  *
+ * Every text to guests is a campaign message now (Guest Registration,
+ * Reservation Moved, Reservation Cancelled, Staff Texts Guest Link).
  * ("Guests" here are reservation guests, not the campaign engine's
  * non-member reservation phones.)
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { DateTime } from 'luxon';
 import { Download, MessageSquare } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -27,16 +23,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Spinner } from '@/components/ui/spinner';
 import { useToast } from '@/hooks/useToast';
 import { adminRequestHeaders } from '@/lib/adminRequestHeaders';
-import { renderGuestMessage, renderMemberLinkMessage } from '@/lib/guestMessageRender';
-
-type Kind = 'day_of' | 'time_changed' | 'cancelled' | 'member_link';
-
-interface Template {
-  kind: Kind;
-  body: string;
-  is_active: boolean;
-  send_offset_minutes: number | null;
-}
 
 interface Row {
   id: string;
@@ -64,173 +50,8 @@ interface SentMessage {
   created_at: string;
 }
 
-const KIND_LABELS: Record<Kind, { title: string; when: string }> = {
-  day_of: { title: 'Day of', when: 'To each guest before the reservation, at the time set below.' },
-  time_changed: { title: 'Time changed', when: 'To guests already texted, when the reservation moves.' },
-  cancelled: { title: 'Cancelled', when: 'To guests already texted, when the reservation is cancelled.' },
-  member_link: {
-    title: 'Member guest link',
-    when: 'To the member, when staff tap "Text link to member" on a reservation. Placeholders: {{member_first_name}} {{location_name}} {{date}} {{time}} {{guest_link}}.',
-  },
-};
-
 const TZ = 'America/Chicago';
 const fmt = (iso: string | null, f = 'LLL d, h:mm a') => (iso ? DateTime.fromISO(iso, { zone: 'utc' }).setZone(TZ).toFormat(f) : '—');
-
-// ---------------------------------------------------------------------------
-
-function MessagesTab() {
-  const { toast } = useToast();
-  const [templates, setTemplates] = useState<Template[]>([]);
-  const [drafts, setDrafts] = useState<Record<string, Template>>({});
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState<Kind | null>(null);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const response = await fetch('/api/admin/reservation-guests/templates', { headers: await adminRequestHeaders() });
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Could not load messages.');
-        setTemplates(data.templates || []);
-        setDrafts(Object.fromEntries((data.templates || []).map((t: Template) => [t.kind, t])));
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Could not load messages.');
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  const save = async (kind: Kind) => {
-    const d = drafts[kind];
-    setSaving(kind);
-    try {
-      const body: Record<string, unknown> = { kind, body: d.body, is_active: d.is_active };
-      if (kind === 'day_of') body.send_offset_minutes = d.send_offset_minutes ?? 120;
-      const response = await fetch('/api/admin/reservation-guests/templates', {
-        method: 'PUT',
-        headers: await adminRequestHeaders(),
-        body: JSON.stringify(body),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Could not save.');
-      setTemplates((prev) => prev.map((t) => (t.kind === kind ? data.template : t)));
-      toast({ title: 'Message saved', variant: 'success' });
-    } catch (e) {
-      toast({ title: 'Error', description: e instanceof Error ? e.message : 'Could not save.', variant: 'error' });
-    } finally {
-      setSaving(null);
-    }
-  };
-
-  if (loading) return <div className="flex justify-center py-8"><Spinner /></div>;
-  if (error) return <p className="text-sm text-error-red">{error}</p>;
-
-  const previewStart = DateTime.now().setZone(TZ).plus({ days: 2 }).set({ hour: 20, minute: 0 }).toUTC().toISO()!;
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="rounded-2xl border border-border-cream-1 bg-bg-cream-1 p-4 text-sm text-text-primary">
-        <p className="font-semibold">Intro and follow-up texts to guests are campaigns.</p>
-        <p className="mt-1 text-text-muted">
-          Create a campaign with the trigger &ldquo;Guest Registration&rdquo; and recipient &ldquo;The guest&rdquo;: a &ldquo;Send immediately&rdquo;
-          message for the intro, then relative messages for follow-ups. Follow-ups stop only if the guest texts STOP.
-        </p>
-      </div>
-      <p className="text-sm text-text-muted">
-        Guest placeholders:{' '}
-        {'{{guest_first_name}} {{host_first_name}} {{host_last_name}} {{location_name}} {{location_address}} {{date}} {{time}} {{arrival_instructions}} {{parking_instructions}}'}.
-        Address, arrival and parking are set per location in Settings. End every guest text with &ldquo;Reply STOP to opt out.&rdquo;
-      </p>
-      {templates.map((t) => {
-        const d = drafts[t.kind] || t;
-        const preview =
-          t.kind === 'member_link'
-            ? renderMemberLinkMessage(d.body, {
-                memberFirstName: 'Tim',
-                locationName: 'Noir KC',
-                start: previewStart,
-                timezone: TZ,
-                guestLink: 'https://noir.example/r/abc123/guests',
-              })
-            : renderGuestMessage(d.body, {
-                guestFirstName: 'Ava',
-                hostFirstName: 'Tim',
-                hostLastName: 'Wirick',
-                locationName: 'Noir KC',
-                locationAddress: '1234 Main St, Kansas City, MO',
-                parkingInstructions: 'Free parking in the garage on 13th St.',
-                start: previewStart,
-                timezone: TZ,
-                arrivalInstructions: null,
-              });
-        const changed = d.body !== t.body || d.is_active !== t.is_active || d.send_offset_minutes !== t.send_offset_minutes;
-        const missingStop = t.kind !== 'member_link' && !/reply stop to opt out/i.test(d.body);
-        const missingLink = t.kind === 'member_link' && !d.body.includes('{{guest_link}}');
-        return (
-          <div key={t.kind} className="flex flex-col gap-3 rounded-2xl border border-border-cream-1 bg-white p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-semibold text-text-primary">{KIND_LABELS[t.kind].title}</h3>
-                <p className="text-xs text-text-muted">{KIND_LABELS[t.kind].when}</p>
-              </div>
-              <label className="flex h-11 shrink-0 items-center gap-2 text-sm text-text-muted">
-                <Switch
-                  checked={d.is_active}
-                  onCheckedChange={(checked) => setDrafts((prev) => ({ ...prev, [t.kind]: { ...d, is_active: checked } }))}
-                  aria-label={`${KIND_LABELS[t.kind].title} on`}
-                />
-                {d.is_active ? 'On' : 'Off'}
-              </label>
-            </div>
-            <Label htmlFor={`tpl-${t.kind}`} className="sr-only">
-              {KIND_LABELS[t.kind].title} message
-            </Label>
-            <Textarea
-              id={`tpl-${t.kind}`}
-              rows={4}
-              className="text-base"
-              value={d.body}
-              onChange={(e) => setDrafts((prev) => ({ ...prev, [t.kind]: { ...d, body: e.target.value } }))}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-text-muted">
-              <span>{d.body.length} characters (template)</span>
-              <span className={preview.length > 300 ? 'text-error-red' : ''}>{preview.length} characters as sent (preview)</span>
-            </div>
-            {missingStop && <p className="text-xs text-error-red">Add &ldquo;Reply STOP to opt out.&rdquo;</p>}
-            {missingLink && <p className="text-xs text-error-red">Include {'{{guest_link}}'} or the member gets no link.</p>}
-            {t.kind === 'day_of' && (
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="tpl-day-of-offset">Minutes before the reservation</Label>
-                <Input
-                  id="tpl-day-of-offset"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  max={1440}
-                  className="h-11 w-32 text-base"
-                  value={d.send_offset_minutes ?? 120}
-                  onChange={(e) => setDrafts((prev) => ({ ...prev, day_of: { ...d, send_offset_minutes: Number(e.target.value) } }))}
-                />
-              </div>
-            )}
-            <div className="rounded-lg bg-bg-cream-1 p-3">
-              <p className="mb-1 text-xs font-semibold text-text-muted">Preview</p>
-              <p className="whitespace-pre-wrap text-sm text-text-primary">{preview}</p>
-            </div>
-            <Button className="h-11 self-stretch sm:self-end" disabled={!changed || saving === t.kind || !d.body.trim()} onClick={() => save(t.kind)}>
-              {saving === t.kind ? 'Saving…' : 'Save'}
-            </Button>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 
 function GuestRowCard({ row, onChanged }: { row: Row; onChanged: (patch: Partial<Row>) => void }) {
   const { toast } = useToast();
@@ -372,6 +193,14 @@ function GuestRowCard({ row, onChanged }: { row: Row; onChanged: (patch: Partial
   );
 }
 
+/**
+ * Membership → Guests: one row per guest visit (everyone who registered as a
+ * guest or was added to a reservation), for manual follow-up.
+ */
+export function GuestsDirectory() {
+  return <GuestsTab />;
+}
+
 function GuestsTab() {
   const [rows, setRows] = useState<Row[]>([]);
   const [truncated, setTruncated] = useState(false);
@@ -503,27 +332,3 @@ function GuestsTab() {
   );
 }
 
-export default function ReservationGuestsSection() {
-  return (
-    <section className="mt-10 flex flex-col gap-4" aria-labelledby="reservation-guests-heading">
-      <div>
-        <h2 id="reservation-guests-heading" className="text-xl font-semibold text-text-primary">
-          Reservation guests
-        </h2>
-        <p className="text-sm text-text-muted">Texts to the people members bring, and follow-up after their visit.</p>
-      </div>
-      <Tabs defaultValue="messages" className="w-full">
-        <TabsList className="grid h-auto w-full grid-cols-2 p-1 sm:inline-grid sm:w-auto">
-          <TabsTrigger value="messages" className="h-11 px-6">Messages</TabsTrigger>
-          <TabsTrigger value="guests" className="h-11 px-6">Guests</TabsTrigger>
-        </TabsList>
-        <TabsContent value="messages" className="mt-4">
-          <MessagesTab />
-        </TabsContent>
-        <TabsContent value="guests" className="mt-4">
-          <GuestsTab />
-        </TabsContent>
-      </Tabs>
-    </section>
-  );
-}

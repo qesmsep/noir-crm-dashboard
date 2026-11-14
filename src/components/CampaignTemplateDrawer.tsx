@@ -157,6 +157,11 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   const { toast } = useToast();
   const { settings } = useSettings();
 
+  // Moved / cancelled: sent to guests the moment the reservation changes.
+  const isGuestEventTrigger = campaignTriggerType === 'reservation_moved' || campaignTriggerType === 'reservation_cancelled';
+  // Triggers whose messages go to reservation guests (same placeholders).
+  const isGuestTrigger = campaignTriggerType === 'guest_registration' || isGuestEventTrigger;
+
   useEffect(() => {
     if (isOpen) {
       if (isCreateMode) {
@@ -166,9 +171,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           name: '',
           description: '',
           content: '',
-          recipient_type: 'member',
+          recipient_type: isGuestEventTrigger ? 'reservation_guest' : 'member',
           specific_phone: '',
-          timing_type: 'specific_time',
+          timing_type: isGuestEventTrigger || campaignTriggerType === 'member_guest_link' ? 'immediate' : 'specific_time',
           specific_time: '10:00',
           specific_date: '',
           recurring_type: undefined,
@@ -531,7 +536,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       .replace(/\{\{phone\}\}/g, '(555) 123-4567')
       .replace(/\{\{email\}\}/g, 'john.doe@example.com');
 
-    if (campaignTriggerType === 'guest_registration') {
+    if (isGuestTrigger) {
       return formData.content
         .replace(/\{\{(guest_first_name|first_name)\}\}/g, 'Ava')
         .replace(/\{\{(guest_last_name|last_name)\}\}/g, 'Stone')
@@ -547,7 +552,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     }
 
     // Add reservation-specific placeholders if this is a reservation campaign
-    if (campaignTriggerType === 'reservation' || campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created') {
+    if (campaignTriggerType === 'reservation' || campaignTriggerType === 'reservation_time' || campaignTriggerType === 'reservation_created' || campaignTriggerType === 'member_guest_link') {
       previewContent = previewContent
         .replace(/\{\{reservation_time\}\}/g, '7:30 PM')
         .replace(/\{\{reservation_date\}\}/g, 'March 15, 2026')
@@ -555,6 +560,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
         .replace(/\{\{location_address\}\}/g, '1234 Main St, Kansas City, MO')
         .replace(/\{\{parking_instructions\}\}/g, 'Free parking in the garage on 13th St.')
         .replace(/\{\{guest_link\}\}/g, 'https://noirkc.com/r/abc123/guests')
+        .replace(/\{\{guest_join_link\}\}/g, 'https://noirkc.com/r/abc123/join')
         .replace(/\{\{party_size\}\}/g, '4');
     }
 
@@ -685,6 +691,13 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
           { value: 'specific_phone', label: 'Custom phone number' }
         ];
 
+      case 'member_guest_link':
+        return [{ value: 'member', label: `The person who booked${locationHint}` }];
+
+      case 'reservation_moved':
+      case 'reservation_cancelled':
+        return [{ value: 'reservation_guest', label: `Guests already texted about the reservation${locationHint}` }];
+
       case 'guest_registration':
         return [
           { value: 'reservation_guest', label: `The guest${locationHint}` },
@@ -731,6 +744,9 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
     if (campaignTriggerType === 'guest_registration') {
       return ['immediate', 'specific_time', 'relative'];
     }
+    if (campaignTriggerType === 'reservation_moved' || campaignTriggerType === 'reservation_cancelled' || campaignTriggerType === 'member_guest_link') {
+      return ['immediate'];
+    }
 
     switch (campaignTriggerType) {
       case 'recurring':
@@ -757,7 +773,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   };
 
   const getAvailablePlaceholders = () => {
-    if (campaignTriggerType === 'guest_registration') {
+    if (isGuestTrigger) {
       return [
         { name: '{{guest_first_name}}', description: 'Guest first name' },
         { name: '{{guest_last_name}}', description: 'Guest last name (may be blank)' },
@@ -785,6 +801,7 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
       { name: '{{location_address}}', description: 'Reservation location address (Settings → location)' },
       { name: '{{parking_instructions}}', description: 'Parking at the location (Settings → location)' },
       { name: '{{guest_link}}', description: 'Link for the booker to add their guests (no login; reservation triggers)' },
+      { name: '{{guest_join_link}}', description: 'Link the booker shares so each guest adds themselves (reservation triggers)' },
       { name: '{{event_name}}', description: 'Private event name' },
       { name: '{{event_date}}', description: 'Private event date' },
       { name: '{{event_time}}', description: 'Private event time' },
@@ -801,7 +818,17 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
   };
 
   const timingTypeOptions = [
-    { value: 'immediate', label: 'Send immediately' },
+    {
+      value: 'immediate',
+      label:
+        campaignTriggerType === 'member_guest_link'
+          ? 'Send when staff tap "Text link to member"'
+          : campaignTriggerType === 'reservation_moved'
+            ? 'Send when the reservation time changes'
+            : campaignTriggerType === 'reservation_cancelled'
+              ? 'Send when the reservation is cancelled'
+              : 'Send immediately',
+    },
     { value: 'specific_time', label: 'Send at specific time' },
     { value: 'recurring', label: 'Send on recurring schedule' },
     ...(shouldShowRelativeOption()
@@ -1235,6 +1262,14 @@ const CampaignTemplateDrawer: React.FC<CampaignTemplateDrawerProps> = ({
                   className="min-h-[180px]"
                   placeholder="Enter your message template here. Use placeholders like {{first_name}}, {{last_name}}, etc."
                 />
+                {isGuestTrigger && formData.recipient_type === 'reservation_guest' && formData.content.trim() !== '' && !/reply stop/i.test(formData.content) && (
+                  <p className="mt-1 text-xs text-error-red">Guest texts should end with &ldquo;Reply STOP to opt out.&rdquo;</p>
+                )}
+                {(isGuestTrigger || campaignTriggerType === 'member_guest_link') && formData.content.length > 480 && (
+                  <p className="mt-1 text-xs text-error-red">
+                    {formData.content.length} characters. Keep guest texts under 480, since links and addresses make them longer when sent.
+                  </p>
+                )}
               </Field>
 
               {/* Placeholder reference. Was a native alert() before, which is

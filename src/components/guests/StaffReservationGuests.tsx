@@ -5,7 +5,7 @@
  * member / opted-out badges, per-guest check-in, add / edit / remove, a
  * per-guest "Texts" switch that stops all guest texts (like the guest texting STOP), the
  * no-login guest link with a Copy button, and "Text link to member" (sends the
- * "Member guest link" message from Campaigns → Reservation guests).
+ * message under the Campaigns trigger "Staff Texts Guest Link").
  *
  * Used by ReservationEditModal (timeline) and ReservationEditDrawer (calendar).
  */

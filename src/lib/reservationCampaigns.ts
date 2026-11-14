@@ -110,7 +110,7 @@ export function renderReservationMessage(
   content: string,
   reservation: Pick<CampaignReservation, 'first_name' | 'last_name' | 'email' | 'phone' | 'party_size' | 'start_time'>,
   location: { name?: string | null; timezone?: string | null; address?: string | null; parking_instructions?: string | null } | null,
-  extras: { guestLink?: string | null } = {},
+  extras: { guestLink?: string | null; guestJoinLink?: string | null } = {},
 ): string {
   const tz = location?.timezone || DEFAULT_VENUE_TIMEZONE;
   const start = DateTime.fromISO(reservation.start_time, { zone: 'utc' }).setZone(tz);
@@ -129,29 +129,52 @@ export function renderReservationMessage(
     .replace(/\{\{location_address\}\}/g, () => (location?.address || '').trim())
     .replace(/\{\{parking_instructions\}\}/g, () => (location?.parking_instructions || '').trim())
     .replace(/\{\{guest_link\}\}/g, () => extras.guestLink || '')
+    .replace(/\{\{guest_join_link\}\}/g, () => extras.guestJoinLink || '')
     .replace(/[ \t]{2,}/g, ' ')
     .trim();
 }
 
+/** True when the message uses either reservation link placeholder. */
 export function usesGuestLink(content: string): boolean {
-  return content.includes('{{guest_link}}');
+  return content.includes('{{guest_link}}') || content.includes('{{guest_join_link}}');
+}
+
+/** True when the message uses a link placeholder whose link couldn't be made, so it must not send. */
+export function missingRequiredLink(content: string, links: { guestLink?: string; guestJoinLink?: string }): boolean {
+  if (!usesGuestLink(content)) return false;
+  if (!links.guestLink) return true;
+  return content.includes('{{guest_join_link}}') && !links.guestJoinLink;
+}
+
+export interface ReservationLinks {
+  /** {{guest_link}}: the booker's no-login "add your guests" link. */
+  guestLink: string;
+  /** {{guest_join_link}}: the link the booker shares so a guest adds themselves. */
+  guestJoinLink: string;
 }
 
 /**
- * The no-login "add your guests" link for a reservation, created on first use
- * and reused after (same token as staff "Text link to member"). Empty when the
- * reservation is cancelled or over, or the link can't be made.
+ * The reservation's guest links, created on first use and reused after (same
+ * token as staff "Text link to member"; the join link is derived from it).
+ * Both empty when the reservation is cancelled or over, or the link can't be made.
  */
-export async function guestLinkForReservation(reservationId: string, db?: typeof supabaseAdmin): Promise<string> {
+export async function guestLinksForReservation(reservationId: string, db?: typeof supabaseAdmin, now?: DateTime): Promise<ReservationLinks> {
   try {
-    const { ensureGuestLink } = await import('@/lib/guestLink');
-    const { guestLinkUrl } = await import('@/lib/guestApi');
-    const link = await ensureGuestLink(reservationId, db ? { db } : {});
-    return link.ok ? guestLinkUrl(link.token) : '';
+    const { ensureGuestLink, guestJoinToken } = await import('@/lib/guestLink');
+    const { guestLinkUrl, guestJoinUrl } = await import('@/lib/guestApi');
+    const link = await ensureGuestLink(reservationId, { ...(db ? { db } : {}), ...(now ? { now } : {}) });
+    if (!link.ok) return { guestLink: '', guestJoinLink: '' };
+    const join = guestJoinToken(reservationId, link.token);
+    return { guestLink: guestLinkUrl(link.token), guestJoinLink: join ? guestJoinUrl(join) : '' };
   } catch (err) {
     console.error('[reservation campaigns] could not create guest link', reservationId, err);
-    return '';
+    return { guestLink: '', guestJoinLink: '' };
   }
+}
+
+/** The booker's add-guests link only (kept for callers that need just that). */
+export async function guestLinkForReservation(reservationId: string, db?: typeof supabaseAdmin): Promise<string> {
+  return (await guestLinksForReservation(reservationId, db)).guestLink;
 }
 
 type Db = typeof supabaseAdmin;
@@ -373,8 +396,8 @@ export async function sendReservationCreatedMessages(
         continue;
       }
       const needsLink = usesGuestLink(message.content);
-      const guestLink = needsLink ? await guestLinkForReservation(r.id, db) : '';
-      const content = renderReservationMessage(message.content, r, location, { guestLink });
+      const links = needsLink ? await guestLinksForReservation(r.id, db) : { guestLink: '', guestJoinLink: '' };
+      const content = renderReservationMessage(message.content, r, location, links);
       const scheduledTime = now.toISO()!;
       const claim = await claimReservationSend(db, {
         campaignMessageId: message.id,
@@ -393,9 +416,9 @@ export async function sendReservationCreatedMessages(
         result.failed++;
         continue;
       }
-      // A message that uses {{guest_link}} never goes out without the link:
+      // A message that uses a guest link never goes out without it:
       // record a failed attempt instead, so the retry pass tries again.
-      if (needsLink && !guestLink) {
+      if (missingRequiredLink(message.content, links)) {
         await finishReservationSend(
           db,
           claim.rowId,

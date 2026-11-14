@@ -5,7 +5,6 @@ import { supabase } from '../../lib/supabase';
 import AdminLayout from '../../components/layouts/AdminLayout';
 import CampaignDrawer from '../../components/CampaignDrawer';
 import CampaignTemplateDrawer from '../../components/CampaignTemplateDrawer';
-import ReservationGuestsSection from '../../components/guests/ReservationGuestsSection';
 import { sortCampaignTemplates } from '../../utils/campaignSorting';
 import styles from '../../styles/Communication.module.css';
 import { Campaign as BaseCampaign, CampaignLocation } from '../../types';
@@ -292,7 +291,10 @@ export default function CommunicationPage() {
       'reservation_range': 'Reservation Range',
       'private_event': 'Private Event',
       'all_members': 'All Members',
-      'guest_registration': 'Guest Registration'
+      'guest_registration': 'Guest Registration',
+      'reservation_moved': 'Reservation Moved (guests)',
+      'reservation_cancelled': 'Reservation Cancelled (guests)',
+      'member_guest_link': 'Staff Texts Guest Link'
     };
     return labels[triggerType] || triggerType;
   };
@@ -500,7 +502,6 @@ export default function CommunicationPage() {
           </>
         )}
 
-        {!loading && <ReservationGuestsSection />}
 
         <CampaignDrawer
           isOpen={isCampaignDrawerOpen}
